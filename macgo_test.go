@@ -1,10 +1,13 @@
 package macgo
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCalculateSHA256(t *testing.T) {
@@ -1381,4 +1384,902 @@ func TestEntitlementsMapOperations(t *testing.T) {
 	if _, exists := cfg.Entitlements[EntMicrophone]; exists {
 		t.Error("Expected EntMicrophone to be deleted from map")
 	}
+}
+
+// TestLoadEntitlementsFromJSON_EdgeCases tests edge cases for LoadEntitlementsFromJSON
+func TestLoadEntitlementsFromJSON_EdgeCases(t *testing.T) {
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	tests := []struct {
+		name        string
+		setup       func()
+		jsonData    string
+		expected    map[Entitlement]bool
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "null JSON value",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			jsonData:    `null`,
+			expectError: true,
+			errorMsg:    "parse entitlements JSON",
+		},
+		{
+			name: "JSON array instead of object",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			jsonData:    `["com.apple.security.device.camera", "com.apple.security.device.microphone"]`,
+			expectError: true,
+			errorMsg:    "parse entitlements JSON",
+		},
+		{
+			name: "JSON with non-boolean values",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			jsonData:    `{"com.apple.security.device.camera": "yes", "com.apple.security.device.microphone": 1}`,
+			expectError: true,
+			errorMsg:    "parse entitlements JSON",
+		},
+		{
+			name: "empty JSON string",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			jsonData:    ``,
+			expectError: true,
+			errorMsg:    "parse entitlements JSON",
+		},
+		{
+			name: "JSON with nested objects",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			jsonData:    `{"com.apple.security.device.camera": {"enabled": true}}`,
+			expectError: true,
+			errorMsg:    "parse entitlements JSON",
+		},
+		{
+			name: "very large JSON",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			jsonData: func() string {
+				// Create a large JSON with many entitlements
+				entries := []string{}
+				for i := 0; i < 1000; i++ {
+					entries = append(entries, fmt.Sprintf(`"com.apple.security.test.entitlement%d": true`, i))
+				}
+				return "{" + strings.Join(entries, ",") + "}"
+			}(),
+			expectError: false,
+			expected: func() map[Entitlement]bool {
+				m := make(map[Entitlement]bool)
+				for i := 0; i < 1000; i++ {
+					m[Entitlement(fmt.Sprintf("com.apple.security.test.entitlement%d", i))] = true
+				}
+				return m
+			}(),
+		},
+		{
+			name: "JSON with special characters in keys",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			jsonData: `{"com.apple.security.device.camera\n": true, "com.apple.security.device\t.microphone": false}`,
+			expected: map[Entitlement]bool{
+				Entitlement("com.apple.security.device.camera\n"):   true,
+				Entitlement("com.apple.security.device\t.microphone"): false,
+			},
+			expectError: false,
+		},
+		{
+			name: "load when DefaultConfig.Entitlements is nil",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: nil,
+				}
+			},
+			jsonData: `{"com.apple.security.device.camera": true}`,
+			expected: map[Entitlement]bool{
+				EntCamera: true,
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			err := LoadEntitlementsFromJSON([]byte(tt.jsonData))
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Expected error containing %q, got %v", tt.errorMsg, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			// For large test case, just check a few samples
+			if len(tt.expected) > 100 {
+				// Check that the map has the right size
+				if len(DefaultConfig.Entitlements) != len(tt.expected) {
+					t.Errorf("Expected %d entitlements, got %d", len(tt.expected), len(DefaultConfig.Entitlements))
+				}
+				// Check a few samples
+				for i := 0; i < 10; i++ {
+					key := Entitlement(fmt.Sprintf("com.apple.security.test.entitlement%d", i))
+					if val, exists := DefaultConfig.Entitlements[key]; !exists || val != true {
+						t.Errorf("Expected entitlement %s to be true", key)
+					}
+				}
+			} else {
+				// Check all expected entitlements
+				for expectedEnt, expectedVal := range tt.expected {
+					if val, exists := DefaultConfig.Entitlements[expectedEnt]; !exists {
+						t.Errorf("Expected entitlement %s to be present", expectedEnt)
+					} else if val != expectedVal {
+						t.Errorf("Expected entitlement %s to have value %v, got %v", expectedEnt, expectedVal, val)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestEnableDebug tests the EnableDebug function
+func TestEnableDebug(t *testing.T) {
+	// Save original env var
+	originalDebug := os.Getenv("MACGO_DEBUG")
+	defer func() {
+		if originalDebug == "" {
+			os.Unsetenv("MACGO_DEBUG")
+		} else {
+			os.Setenv("MACGO_DEBUG", originalDebug)
+		}
+	}()
+
+	// Clear the env var first
+	os.Unsetenv("MACGO_DEBUG")
+
+	// Enable debug
+	EnableDebug()
+
+	// Check that env var was set
+	if val := os.Getenv("MACGO_DEBUG"); val != "1" {
+		t.Errorf("Expected MACGO_DEBUG to be '1', got %q", val)
+	}
+}
+
+// TestDefaultConfigInitialization tests that DefaultConfig is properly initialized
+func TestDefaultConfigInitialization(t *testing.T) {
+	// Test that DefaultConfig is not nil
+	if DefaultConfig == nil {
+		t.Fatal("DefaultConfig should not be nil")
+	}
+
+	// Test that AutoSign is true by default
+	if !DefaultConfig.AutoSign {
+		t.Error("Expected DefaultConfig.AutoSign to be true")
+	}
+
+	// Test that Relaunch is true by default
+	if !DefaultConfig.Relaunch {
+		t.Error("Expected DefaultConfig.Relaunch to be true")
+	}
+
+	// Test that Entitlements map is initialized
+	if DefaultConfig.Entitlements == nil {
+		t.Error("Expected DefaultConfig.Entitlements to be initialized")
+	}
+
+	// Test that PlistEntries map is initialized
+	if DefaultConfig.PlistEntries == nil {
+		t.Error("Expected DefaultConfig.PlistEntries to be initialized")
+	}
+
+	// Test default LSUIElement value
+	if val, exists := DefaultConfig.PlistEntries["LSUIElement"]; !exists || val != false {
+		t.Error("Expected LSUIElement to be false by default in DefaultConfig")
+	}
+}
+
+// TestAPIFunctionNilDefaultConfig tests API functions behavior when DefaultConfig is nil
+func TestAPIFunctionNilDefaultConfig(t *testing.T) {
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	// Test each function with nil DefaultConfig to ensure they don't panic
+	tests := []struct {
+		name string
+		fn   func()
+	}{
+		{
+			name: "RequestEntitlements with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				RequestEntitlements(EntCamera)
+			},
+		},
+		{
+			name: "RequestEntitlement with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				RequestEntitlement(EntCamera)
+			},
+		},
+		{
+			name: "EnableDockIcon with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				EnableDockIcon()
+			},
+		},
+		{
+			name: "SetAppName with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				SetAppName("Test")
+			},
+		},
+		{
+			name: "SetBundleID with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				SetBundleID("com.test")
+			},
+		},
+		{
+			name: "EnableKeepTemp with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				EnableKeepTemp()
+			},
+		},
+		{
+			name: "DisableRelaunch with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				DisableRelaunch()
+			},
+		},
+		{
+			name: "EnableSigning with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				EnableSigning("")
+			},
+		},
+		{
+			name: "LoadEntitlementsFromJSON with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				LoadEntitlementsFromJSON([]byte(`{"test": true}`))
+			},
+		},
+		{
+			name: "AddPlistEntry with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				AddPlistEntry("key", "value")
+			},
+		},
+		{
+			name: "SetIconFile with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				SetIconFile("/path/to/icon")
+			},
+		},
+		{
+			name: "SetCustomAppBundle with nil DefaultConfig",
+			fn: func() {
+				DefaultConfig = nil
+				// Should panic
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic when DefaultConfig is nil")
+					}
+				}()
+				SetCustomAppBundle(MockFS{})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.fn()
+		})
+	}
+}
+
+// TestRequestEntitlementsVariadicEdgeCases tests edge cases for variadic entitlements
+func TestRequestEntitlementsVariadicEdgeCases(t *testing.T) {
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	tests := []struct {
+		name         string
+		setup        func()
+		entitlements []interface{}
+		description  string
+		validate     func(t *testing.T)
+	}{
+		{
+			name: "mix of valid and invalid types",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			entitlements: []interface{}{
+				EntCamera,
+				123,
+				"com.apple.security.custom",
+				struct{}{},
+				EntMicrophone,
+				[]string{"invalid"},
+				Entitlement("com.apple.security.another"),
+				map[string]string{"invalid": "map"},
+				nil,
+			},
+			description: "should only add valid string and Entitlement types",
+			validate: func(t *testing.T) {
+				expected := map[Entitlement]bool{
+					EntCamera:                                true,
+					Entitlement("com.apple.security.custom"): true,
+					EntMicrophone:                            true,
+					Entitlement("com.apple.security.another"): true,
+				}
+				if len(DefaultConfig.Entitlements) != len(expected) {
+					t.Errorf("Expected %d entitlements, got %d", len(expected), len(DefaultConfig.Entitlements))
+				}
+				for ent := range expected {
+					if val, exists := DefaultConfig.Entitlements[ent]; !exists || val != true {
+						t.Errorf("Expected entitlement %s to be true", ent)
+					}
+				}
+			},
+		},
+		{
+			name: "duplicate entitlements",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			entitlements: []interface{}{
+				EntCamera,
+				EntCamera,
+				"com.apple.security.device.camera",
+				EntCamera,
+			},
+			description: "should handle duplicates gracefully",
+			validate: func(t *testing.T) {
+				if len(DefaultConfig.Entitlements) != 1 {
+					t.Errorf("Expected 1 entitlement, got %d", len(DefaultConfig.Entitlements))
+				}
+				if val, exists := DefaultConfig.Entitlements[EntCamera]; !exists || val != true {
+					t.Error("Expected EntCamera to be true")
+				}
+			},
+		},
+		{
+			name: "empty string entitlement",
+			setup: func() {
+				DefaultConfig = &Config{
+					Entitlements: map[Entitlement]bool{},
+				}
+			},
+			entitlements: []interface{}{
+				"",
+				EntCamera,
+				Entitlement(""),
+			},
+			description: "should add empty strings as entitlements",
+			validate: func(t *testing.T) {
+				if len(DefaultConfig.Entitlements) != 2 {
+					t.Errorf("Expected 2 entitlements, got %d", len(DefaultConfig.Entitlements))
+				}
+				if val, exists := DefaultConfig.Entitlements[Entitlement("")]; !exists || val != true {
+					t.Error("Expected empty entitlement to be true")
+				}
+				if val, exists := DefaultConfig.Entitlements[EntCamera]; !exists || val != true {
+					t.Error("Expected EntCamera to be true")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			RequestEntitlements(tt.entitlements...)
+			tt.validate(t)
+		})
+	}
+}
+
+// TestConfigureEdgeCases tests edge cases for Configure function
+func TestConfigureEdgeCases(t *testing.T) {
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	tests := []struct {
+		name           string
+		setup          func()
+		inputConfig    *Config
+		expectedChecks func(t *testing.T)
+	}{
+		{
+			name: "configure with AppTemplate when DefaultConfig has no AppTemplate",
+			setup: func() {
+				DefaultConfig = &Config{
+					AppTemplate: nil,
+				}
+			},
+			inputConfig: &Config{
+				AppTemplate: MockFS{},
+			},
+			expectedChecks: func(t *testing.T) {
+				if DefaultConfig.AppTemplate == nil {
+					t.Error("Expected AppTemplate to be set")
+				}
+			},
+		},
+		{
+			name: "configure preserves boolean false values",
+			setup: func() {
+				DefaultConfig = &Config{
+					Relaunch: true,
+					AutoSign: true,
+					KeepTemp: true,
+				}
+			},
+			inputConfig: &Config{
+				Relaunch: false,
+				AutoSign: false,
+				KeepTemp: false,
+			},
+			expectedChecks: func(t *testing.T) {
+				if DefaultConfig.Relaunch != false {
+					t.Error("Expected Relaunch to be false")
+				}
+				if DefaultConfig.AutoSign != false {
+					t.Error("Expected AutoSign to be false")
+				}
+				if DefaultConfig.KeepTemp != false {
+					t.Error("Expected KeepTemp to be false")
+				}
+			},
+		},
+		{
+			name: "configure with very long strings",
+			setup: func() {
+				DefaultConfig = &Config{}
+			},
+			inputConfig: &Config{
+				ApplicationName:          strings.Repeat("a", 1000),
+				BundleID:                 "com.test." + strings.Repeat("b", 500),
+				CustomDestinationAppPath: "/" + strings.Repeat("path/", 200),
+				SigningIdentity:          strings.Repeat("Developer ID ", 50),
+			},
+			expectedChecks: func(t *testing.T) {
+				if len(DefaultConfig.ApplicationName) != 1000 {
+					t.Error("Expected ApplicationName to be preserved with full length")
+				}
+				if !strings.HasPrefix(DefaultConfig.BundleID, "com.test.") {
+					t.Error("Expected BundleID to be preserved")
+				}
+				if !strings.HasPrefix(DefaultConfig.CustomDestinationAppPath, "/") {
+					t.Error("Expected CustomDestinationAppPath to be preserved")
+				}
+				if len(DefaultConfig.SigningIdentity) != 650 { // "Developer ID " is 13 chars * 50
+					t.Error("Expected SigningIdentity to be preserved with full length")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			Configure(tt.inputConfig)
+			tt.expectedChecks(t)
+		})
+	}
+}
+
+// TestLoadEntitlementsFromJSONFilePath tests loading entitlements from a file
+func TestLoadEntitlementsFromJSONFilePath(t *testing.T) {
+	// Create a temporary JSON file
+	tmpFile, err := os.CreateTemp("", "entitlements-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Write JSON data to file
+	jsonData := `{
+		"com.apple.security.device.camera": true,
+		"com.apple.security.device.microphone": false,
+		"com.apple.security.app-sandbox": true
+	}`
+	if _, err := tmpFile.Write([]byte(jsonData)); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	// Setup DefaultConfig
+	DefaultConfig = &Config{
+		Entitlements: map[Entitlement]bool{},
+	}
+
+	// Read file and load entitlements
+	data, err := os.ReadFile(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to read file: %v", err)
+	}
+
+	err = LoadEntitlementsFromJSON(data)
+	if err != nil {
+		t.Fatalf("Failed to load entitlements: %v", err)
+	}
+
+	// Verify entitlements were loaded
+	expected := map[Entitlement]bool{
+		EntCamera:     true,
+		EntMicrophone: false,
+		EntAppSandbox: true,
+	}
+
+	for ent, expectedVal := range expected {
+		if val, exists := DefaultConfig.Entitlements[ent]; !exists {
+			t.Errorf("Expected entitlement %s to be present", ent)
+		} else if val != expectedVal {
+			t.Errorf("Expected entitlement %s to have value %v, got %v", ent, expectedVal, val)
+		}
+	}
+}
+
+// TestMultipleAPICallsSequence tests a sequence of API calls
+func TestMultipleAPICallsSequence(t *testing.T) {
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	// Reset DefaultConfig
+	DefaultConfig = NewConfig()
+
+	// Sequence of API calls that might be used in a real application
+	SetAppName("TestApplication")
+	SetBundleID("com.example.testapp")
+	RequestEntitlements(EntCamera, EntMicrophone, EntLocation)
+	EnableDockIcon()
+	EnableSigning("Developer ID Application: Test")
+	AddPlistEntry("CFBundleVersion", "1.0.0")
+	AddPlistEntry("NSHighResolutionCapable", true)
+	SetIconFile("/Applications/TestApp.app/Contents/Resources/AppIcon.icns")
+	RequestEntitlement(EntAddressBook)
+	EnableKeepTemp()
+
+	// Verify all settings were applied correctly
+	if DefaultConfig.ApplicationName != "TestApplication" {
+		t.Error("ApplicationName not set correctly")
+	}
+	if DefaultConfig.BundleID != "com.example.testapp" {
+		t.Error("BundleID not set correctly")
+	}
+	if !DefaultConfig.AutoSign {
+		t.Error("AutoSign should be enabled")
+	}
+	if DefaultConfig.SigningIdentity != "Developer ID Application: Test" {
+		t.Error("SigningIdentity not set correctly")
+	}
+	if !DefaultConfig.KeepTemp {
+		t.Error("KeepTemp should be enabled")
+	}
+
+	// Check entitlements
+	expectedEntitlements := []Entitlement{EntCamera, EntMicrophone, EntLocation, EntAddressBook}
+	for _, ent := range expectedEntitlements {
+		if val, exists := DefaultConfig.Entitlements[ent]; !exists || val != true {
+			t.Errorf("Expected entitlement %s to be true", ent)
+		}
+	}
+
+	// Check plist entries
+	if val, exists := DefaultConfig.PlistEntries["LSUIElement"]; !exists || val != false {
+		t.Error("LSUIElement should be false (dock icon enabled)")
+	}
+	if val, exists := DefaultConfig.PlistEntries["CFBundleVersion"]; !exists || val != "1.0.0" {
+		t.Error("CFBundleVersion not set correctly")
+	}
+	if val, exists := DefaultConfig.PlistEntries["NSHighResolutionCapable"]; !exists || val != true {
+		t.Error("NSHighResolutionCapable not set correctly")
+	}
+	if val, exists := DefaultConfig.PlistEntries["CFBundleIconFile"]; !exists || val != "/Applications/TestApp.app/Contents/Resources/AppIcon.icns" {
+		t.Error("CFBundleIconFile not set correctly")
+	}
+}
+
+// TestRequestEntitlementWithCustomEntitlementConstant tests using custom entitlement constants
+func TestRequestEntitlementWithCustomEntitlementConstant(t *testing.T) {
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	// Define custom entitlement constants (as users might do)
+	const (
+		CustomEntVirtualization Entitlement = "com.apple.security.virtualization"
+		CustomEntHypervisor     Entitlement = "com.apple.security.hypervisor"
+		CustomEntScreenCapture  Entitlement = "com.apple.security.screencapture"
+	)
+
+	DefaultConfig = &Config{
+		Entitlements: map[Entitlement]bool{},
+	}
+
+	// Test adding custom constants
+	RequestEntitlements(
+		CustomEntVirtualization,
+		CustomEntHypervisor,
+		CustomEntScreenCapture,
+	)
+
+	// Verify they were added
+	expected := []Entitlement{
+		CustomEntVirtualization,
+		CustomEntHypervisor,
+		CustomEntScreenCapture,
+	}
+
+	for _, ent := range expected {
+		if val, exists := DefaultConfig.Entitlements[ent]; !exists || val != true {
+			t.Errorf("Expected custom entitlement %s to be true", ent)
+		}
+	}
+}
+
+// TestAPIThreadSafety tests API functions for basic thread safety
+func TestAPIThreadSafety(t *testing.T) {
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	DefaultConfig = NewConfig()
+
+	// Run multiple goroutines making API calls
+	done := make(chan bool, 5)
+
+	// Goroutine 1: Add entitlements
+	go func() {
+		for i := 0; i < 50; i++ {
+			RequestEntitlements(EntCamera, EntMicrophone)
+			time.Sleep(time.Microsecond)
+		}
+		done <- true
+	}()
+
+	// Goroutine 2: Set app name and bundle ID
+	go func() {
+		for i := 0; i < 50; i++ {
+			SetAppName(fmt.Sprintf("App%d", i))
+			SetBundleID(fmt.Sprintf("com.test.app%d", i))
+			time.Sleep(time.Microsecond)
+		}
+		done <- true
+	}()
+
+	// Goroutine 3: Add plist entries
+	go func() {
+		for i := 0; i < 50; i++ {
+			AddPlistEntry(fmt.Sprintf("Key%d", i), fmt.Sprintf("Value%d", i))
+			time.Sleep(time.Microsecond)
+		}
+		done <- true
+	}()
+
+	// Goroutine 4: Toggle settings
+	go func() {
+		for i := 0; i < 50; i++ {
+			if i%2 == 0 {
+				EnableDockIcon()
+				EnableKeepTemp()
+			} else {
+				DisableRelaunch()
+			}
+			time.Sleep(time.Microsecond)
+		}
+		done <- true
+	}()
+
+	// Goroutine 5: Request individual entitlements
+	go func() {
+		entitlements := []Entitlement{EntLocation, EntAddressBook, EntPhotos, EntCalendars}
+		for i := 0; i < 50; i++ {
+			RequestEntitlement(entitlements[i%len(entitlements)])
+			time.Sleep(time.Microsecond)
+		}
+		done <- true
+	}()
+
+	// Wait for all goroutines to complete
+	for i := 0; i < 5; i++ {
+		<-done
+	}
+
+	// Basic verification that config is not corrupted
+	if DefaultConfig.Entitlements == nil {
+		t.Error("Entitlements map should not be nil after concurrent access")
+	}
+	if DefaultConfig.PlistEntries == nil {
+		t.Error("PlistEntries map should not be nil after concurrent access")
+	}
+
+	// Check that some values were set
+	if len(DefaultConfig.Entitlements) == 0 {
+		t.Error("Expected some entitlements to be set")
+	}
+	if len(DefaultConfig.PlistEntries) == 0 {
+		t.Error("Expected some plist entries to be set")
+	}
+}
+
+// TestLoadEntitlementsFromJSONNilMapPanic tests that LoadEntitlementsFromJSON panics with nil map
+func TestLoadEntitlementsFromJSONNilMapPanic(t *testing.T) {
+	// Save original DefaultConfig
+	originalConfig := DefaultConfig
+	defer func() {
+		DefaultConfig = originalConfig
+	}()
+
+	// Set DefaultConfig with nil Entitlements map to trigger panic
+	DefaultConfig = &Config{
+		Entitlements: nil,
+	}
+
+	// This should panic when trying to assign to nil map
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic when LoadEntitlementsFromJSON is called with nil Entitlements map")
+		} else {
+			// Verify it's the expected panic
+			if _, ok := r.(runtime.Error); !ok {
+				t.Errorf("Expected runtime error panic, got %v", r)
+			}
+		}
+	}()
+
+	// This should panic
+	err := LoadEntitlementsFromJSON([]byte(`{"com.apple.security.device.camera": true}`))
+	if err != nil {
+		t.Errorf("Should have panicked before returning error: %v", err)
+	}
+}
+
+// TestDisableAutoInit is a placeholder to acknowledge the DisableAutoInit function
+// Note: DisableAutoInit is not defined in api.go, this test documents its absence
+func TestDisableAutoInit(t *testing.T) {
+	// This test verifies that DisableAutoInit is not implemented
+	// If it gets implemented in the future, this test will need to be updated
+	t.Skip("DisableAutoInit is not implemented in the current API")
 }

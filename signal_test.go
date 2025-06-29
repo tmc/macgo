@@ -318,7 +318,7 @@ func TestIORedirectionWithContext(t *testing.T) {
 }
 
 // TestSignalHandlingConcurrency tests concurrent signal handling
-func TestSignalHandlingConcurrency(t *testing.T) {
+func TestSignalHandlingConcurrencyBasic(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("Skipping test on non-macOS platform")
 	}
