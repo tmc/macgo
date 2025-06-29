@@ -6,7 +6,11 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"sync"
 )
+
+// configMutex protects concurrent access to DefaultConfig
+var configMutex sync.RWMutex
 
 // RequestEntitlements adds multiple entitlements at once.
 // All entitlements will be enabled (set to true).
@@ -22,6 +26,9 @@ import (
 //
 // This is the preferred method for requesting entitlements.
 func RequestEntitlements(entitlements ...interface{}) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
+	
 	for _, ent := range entitlements {
 		var entStr string
 		switch e := ent.(type) {
@@ -46,6 +53,9 @@ func RequestEntitlements(entitlements ...interface{}) {
 //
 //	macgo.RequestEntitlement(macgo.EntCamera)
 func RequestEntitlement(entitlement interface{}) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
+	
 	var entStr string
 	switch e := entitlement.(type) {
 	case string:
@@ -65,6 +75,9 @@ func RequestEntitlement(entitlement interface{}) {
 // EnableDockIcon enables showing the application in the dock and app switcher
 // By default, macgo applications run as background applications (LSUIElement=true)
 func EnableDockIcon() {
+	configMutex.Lock()
+	defer configMutex.Unlock()
+	
 	if DefaultConfig.PlistEntries == nil {
 		DefaultConfig.PlistEntries = make(map[string]any)
 	}
@@ -73,21 +86,29 @@ func EnableDockIcon() {
 
 // SetAppName sets the app name
 func SetAppName(name string) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	DefaultConfig.ApplicationName = name
 }
 
 // SetBundleID sets the bundle identifier
 func SetBundleID(bundleID string) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	DefaultConfig.BundleID = bundleID
 }
 
 // EnableKeepTemp enables keeping temporary app bundles
 func EnableKeepTemp() {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	DefaultConfig.KeepTemp = true
 }
 
 // DisableRelaunch disables auto-relaunching
 func DisableRelaunch() {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	DefaultConfig.Relaunch = false
 }
 
@@ -107,12 +128,16 @@ func EnableDebug() {
 //	    macgo.SetCustomAppBundle(appTemplate)
 //	}
 func SetCustomAppBundle(template fs.FS) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	DefaultConfig.AppTemplate = template
 }
 
 // EnableSigning enables app bundle signing with an optional identity.
 // If identity is empty, ad-hoc signing ("-") will be used.
 func EnableSigning(identity string) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	DefaultConfig.AutoSign = true
 	if identity != "" {
 		DefaultConfig.SigningIdentity = identity
@@ -139,6 +164,13 @@ func LoadEntitlementsFromJSON(data []byte) error {
 		return fmt.Errorf("macgo: parse entitlements JSON: %w", err)
 	}
 
+	configMutex.Lock()
+	defer configMutex.Unlock()
+	
+	if DefaultConfig.Entitlements == nil {
+		DefaultConfig.Entitlements = make(map[Entitlement]bool)
+	}
+	
 	for key, value := range entitlements {
 		DefaultConfig.Entitlements[Entitlement(key)] = value
 	}
@@ -148,12 +180,16 @@ func LoadEntitlementsFromJSON(data []byte) error {
 
 // AddPlistEntry adds a custom entry to the Info.plist file
 func AddPlistEntry(key string, value any) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	DefaultConfig.AddPlistEntry(key, value)
 }
 
 // SetIconFile sets a custom icon file for the app bundle
 // If not set, it defaults to "/System/./Library/CoreServices/CoreTypes.bundle/Contents/Resources/ExecutableBinaryIcon.icns"
 func SetIconFile(iconPath string) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	DefaultConfig.AddPlistEntry("CFBundleIconFile", iconPath)
 }
 
