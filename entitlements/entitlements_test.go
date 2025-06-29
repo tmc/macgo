@@ -402,8 +402,8 @@ func TestConvenienceFunctions(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name              string
-		fn                func()
+		name                 string
+		fn                   func()
 		expectedEntitlements []macgo.Entitlement
 	}{
 		{
@@ -565,7 +565,7 @@ func TestRegisterEntitlementsFromReaderError(t *testing.T) {
 	// Test with reader that returns an error
 	errorReader := &bytes.Buffer{}
 	errorReader.WriteString("invalid json")
-	
+
 	err := RegisterEntitlementsFromReader(errorReader)
 	if err == nil {
 		t.Error("Expected error when reading invalid JSON")

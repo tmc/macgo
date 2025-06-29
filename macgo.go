@@ -502,6 +502,10 @@ func NewConfig() *Config {
 // This merges the provided configuration with the existing defaults,
 // allowing partial configuration updates. Call this before Start().
 func Configure(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+
 	// Copy entitlements
 	if cfg.Entitlements != nil {
 		if DefaultConfig.Entitlements == nil {

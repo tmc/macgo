@@ -10,7 +10,7 @@ import (
 func TestAllPackageImportsAllEntitlements(t *testing.T) {
 	// The "all" package should import all the individual entitlement packages
 	// This means all their init() functions should have run, registering all entitlements
-	
+
 	// Create a backup of the original config
 	originalConfig := macgo.DefaultConfig
 	defer func() {
@@ -41,10 +41,10 @@ func TestAllPackageImportsAllEntitlements(t *testing.T) {
 func TestAllPackageDocumentation(t *testing.T) {
 	// The documentation says: import _ "github.com/tmc/misc/macgo/entitlements/all"
 	// This should enable all supported permissions
-	
+
 	// We can't re-test the init() function, but we can verify that all expected
 	// entitlements are present in the configuration
-	
+
 	allTCCEntitlements := []macgo.Entitlement{
 		macgo.Entitlement(entitlements.EntCamera),
 		macgo.Entitlement(entitlements.EntMicrophone),
@@ -65,7 +65,7 @@ func TestAllPackageDocumentation(t *testing.T) {
 func TestAllPackageImportsCorrectSubpackages(t *testing.T) {
 	// This test verifies that the "all" package correctly imports the expected subpackages
 	// by checking that their entitlements are registered
-	
+
 	// Mapping of expected subpackages to their entitlements
 	subpackageEntitlements := map[string]macgo.Entitlement{
 		"camera":    macgo.Entitlement(entitlements.EntCamera),
@@ -89,7 +89,7 @@ func TestAllPackageImportsCorrectSubpackages(t *testing.T) {
 func TestAllPackageEntitlementConsistency(t *testing.T) {
 	// Test that the entitlements registered by the "all" package are consistent
 	// with what we expect from the individual subpackages
-	
+
 	// Get all registered entitlements
 	registeredEntitlements := make(map[macgo.Entitlement]bool)
 	for ent, val := range macgo.DefaultConfig.Entitlements {
@@ -120,7 +120,7 @@ func TestAllPackageEntitlementConsistency(t *testing.T) {
 func TestAllPackageComparison(t *testing.T) {
 	// Test that importing the "all" package gives the same result as calling
 	// the convenience function SetAllTCCPermissions()
-	
+
 	// Create a backup of the original config
 	originalConfig := macgo.DefaultConfig
 	defer func() {
@@ -165,7 +165,7 @@ func TestAllPackageComparison(t *testing.T) {
 func TestAllPackageMultipleImports(t *testing.T) {
 	// Test that importing the "all" package multiple times doesn't cause issues
 	// This is mainly a sanity check since Go's import system handles this
-	
+
 	// Create a backup of the original config
 	originalConfig := macgo.DefaultConfig
 	defer func() {

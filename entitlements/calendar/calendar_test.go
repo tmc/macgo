@@ -11,7 +11,7 @@ func TestCalendarPackageInit(t *testing.T) {
 	// Test that the calendar entitlement is registered during package init
 	// Since init() already ran when the package was imported, we simulate this
 	// by creating a fresh config and calling the registration manually
-	
+
 	// Create a backup of the original config
 	originalConfig := macgo.DefaultConfig
 	defer func() {
@@ -42,7 +42,7 @@ func TestCalendarEntitlementValue(t *testing.T) {
 func TestCalendarEntitlementMatchesMainPackage(t *testing.T) {
 	// Verify that our calendar entitlement matches the main package
 	if string(entitlements.EntCalendars) != string(macgo.EntCalendars) {
-		t.Errorf("Calendar entitlement mismatch: entitlements package %q != macgo package %q", 
+		t.Errorf("Calendar entitlement mismatch: entitlements package %q != macgo package %q",
 			entitlements.EntCalendars, macgo.EntCalendars)
 	}
 }
@@ -50,7 +50,7 @@ func TestCalendarEntitlementMatchesMainPackage(t *testing.T) {
 func TestPackageImportSideEffect(t *testing.T) {
 	// Check that the calendar entitlement exists in the default config
 	calendarEnt := macgo.Entitlement(entitlements.EntCalendars)
-	
+
 	// The entitlement should be present and set to true
 	if val, exists := macgo.DefaultConfig.Entitlements[calendarEnt]; !exists {
 		t.Error("Calendar entitlement should be registered after package import")
@@ -84,7 +84,7 @@ func TestMultipleImports(t *testing.T) {
 func TestDocumentationExample(t *testing.T) {
 	// The documentation shows: import _ "github.com/tmc/misc/macgo/entitlements/calendar"
 	// This should enable calendar access by registering the entitlement during init()
-	
+
 	originalConfig := macgo.DefaultConfig
 	defer func() {
 		macgo.DefaultConfig = originalConfig

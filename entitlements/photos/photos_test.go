@@ -11,7 +11,7 @@ func TestPhotosPackageInit(t *testing.T) {
 	// Test that the photos entitlement is registered during package init
 	// Since init() already ran when the package was imported, we simulate this
 	// by creating a fresh config and calling the registration manually
-	
+
 	// Create a backup of the original config
 	originalConfig := macgo.DefaultConfig
 	defer func() {
@@ -42,7 +42,7 @@ func TestPhotosEntitlementValue(t *testing.T) {
 func TestPhotosEntitlementMatchesMainPackage(t *testing.T) {
 	// Verify that our photos entitlement matches the main package
 	if string(entitlements.EntPhotos) != string(macgo.EntPhotos) {
-		t.Errorf("Photos entitlement mismatch: entitlements package %q != macgo package %q", 
+		t.Errorf("Photos entitlement mismatch: entitlements package %q != macgo package %q",
 			entitlements.EntPhotos, macgo.EntPhotos)
 	}
 }
@@ -50,7 +50,7 @@ func TestPhotosEntitlementMatchesMainPackage(t *testing.T) {
 func TestPackageImportSideEffect(t *testing.T) {
 	// Check that the photos entitlement exists in the default config
 	photosEnt := macgo.Entitlement(entitlements.EntPhotos)
-	
+
 	// The entitlement should be present and set to true
 	if val, exists := macgo.DefaultConfig.Entitlements[photosEnt]; !exists {
 		t.Error("Photos entitlement should be registered after package import")
@@ -84,7 +84,7 @@ func TestMultipleImports(t *testing.T) {
 func TestDocumentationExample(t *testing.T) {
 	// The documentation shows: import _ "github.com/tmc/misc/macgo/entitlements/photos"
 	// This should enable photos access by registering the entitlement during init()
-	
+
 	originalConfig := macgo.DefaultConfig
 	defer func() {
 		macgo.DefaultConfig = originalConfig

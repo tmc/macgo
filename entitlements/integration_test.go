@@ -278,9 +278,9 @@ func TestMainPackageCompatibility(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Use both entitlements package and main package functions
-	SetCamera()                                    // From entitlements package
-	macgo.RequestEntitlement(macgo.EntMicrophone) // From main package
-	SetLocation()                                  // From entitlements package
+	SetCamera()                                              // From entitlements package
+	macgo.RequestEntitlement(macgo.EntMicrophone)            // From main package
+	SetLocation()                                            // From entitlements package
 	macgo.RequestEntitlements(macgo.EntPhotos, macgo.EntUSB) // From main package
 
 	// Verify all were registered
@@ -301,7 +301,7 @@ func TestMainPackageCompatibility(t *testing.T) {
 
 func TestLoadJSONComparedToMainPackage(t *testing.T) {
 	// Test that loading JSON through entitlements package gives same result as main package
-	
+
 	testJSON := `{
 		"com.apple.security.device.camera": true,
 		"com.apple.security.device.microphone": true,

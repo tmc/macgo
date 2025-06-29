@@ -55,7 +55,6 @@ func main() {
 	}
 	logMsg("---------------------------")
 
-
 	if wd, err := os.Getwd(); err == nil {
 		logMsg("Working dir: %s", wd)
 	} else {

@@ -11,7 +11,7 @@ func TestMicPackageInit(t *testing.T) {
 	// Test that the microphone entitlement is registered during package init
 	// Since init() already ran when the package was imported, we simulate this
 	// by creating a fresh config and calling the registration manually
-	
+
 	// Create a backup of the original config
 	originalConfig := macgo.DefaultConfig
 	defer func() {
@@ -42,7 +42,7 @@ func TestMicEntitlementValue(t *testing.T) {
 func TestMicEntitlementMatchesMainPackage(t *testing.T) {
 	// Verify that our microphone entitlement matches the main package
 	if string(entitlements.EntMicrophone) != string(macgo.EntMicrophone) {
-		t.Errorf("Microphone entitlement mismatch: entitlements package %q != macgo package %q", 
+		t.Errorf("Microphone entitlement mismatch: entitlements package %q != macgo package %q",
 			entitlements.EntMicrophone, macgo.EntMicrophone)
 	}
 }
@@ -50,7 +50,7 @@ func TestMicEntitlementMatchesMainPackage(t *testing.T) {
 func TestPackageImportSideEffect(t *testing.T) {
 	// Check that the microphone entitlement exists in the default config
 	micEnt := macgo.Entitlement(entitlements.EntMicrophone)
-	
+
 	// The entitlement should be present and set to true
 	if val, exists := macgo.DefaultConfig.Entitlements[micEnt]; !exists {
 		t.Error("Microphone entitlement should be registered after package import")
@@ -84,7 +84,7 @@ func TestMultipleImports(t *testing.T) {
 func TestDocumentationExample(t *testing.T) {
 	// The documentation shows: import _ "github.com/tmc/misc/macgo/entitlements/mic"
 	// This should enable microphone access by registering the entitlement during init()
-	
+
 	originalConfig := macgo.DefaultConfig
 	defer func() {
 		macgo.DefaultConfig = originalConfig

@@ -11,7 +11,7 @@ func TestContactsPackageInit(t *testing.T) {
 	// Test that the contacts entitlement is registered during package init
 	// Since init() already ran when the package was imported, we simulate this
 	// by creating a fresh config and calling the registration manually
-	
+
 	// Create a backup of the original config
 	originalConfig := macgo.DefaultConfig
 	defer func() {
@@ -42,7 +42,7 @@ func TestContactsEntitlementValue(t *testing.T) {
 func TestContactsEntitlementMatchesMainPackage(t *testing.T) {
 	// Verify that our contacts entitlement matches the main package
 	if string(entitlements.EntAddressBook) != string(macgo.EntAddressBook) {
-		t.Errorf("Contacts entitlement mismatch: entitlements package %q != macgo package %q", 
+		t.Errorf("Contacts entitlement mismatch: entitlements package %q != macgo package %q",
 			entitlements.EntAddressBook, macgo.EntAddressBook)
 	}
 }
@@ -50,7 +50,7 @@ func TestContactsEntitlementMatchesMainPackage(t *testing.T) {
 func TestPackageImportSideEffect(t *testing.T) {
 	// Check that the contacts entitlement exists in the default config
 	contactsEnt := macgo.Entitlement(entitlements.EntAddressBook)
-	
+
 	// The entitlement should be present and set to true
 	if val, exists := macgo.DefaultConfig.Entitlements[contactsEnt]; !exists {
 		t.Error("Contacts entitlement should be registered after package import")
@@ -84,7 +84,7 @@ func TestMultipleImports(t *testing.T) {
 func TestDocumentationExample(t *testing.T) {
 	// The documentation shows: import _ "github.com/tmc/misc/macgo/entitlements/contacts"
 	// This should enable contacts access by registering the entitlement during init()
-	
+
 	originalConfig := macgo.DefaultConfig
 	defer func() {
 		macgo.DefaultConfig = originalConfig

@@ -102,52 +102,52 @@ func TestAppBundleCreation(t *testing.T) {
 // TestNewConfig tests the NewConfig function
 func TestNewConfig(t *testing.T) {
 	cfg := NewConfig()
-	
+
 	// Test default values
 	if cfg.Relaunch != true {
 		t.Error("Expected Relaunch to be true by default")
 	}
-	
+
 	if cfg.AutoSign != true {
 		t.Error("Expected AutoSign to be true by default")
 	}
-	
+
 	// Test that Entitlements map is initialized
 	if cfg.Entitlements == nil {
 		t.Error("Expected Entitlements map to be initialized")
 	}
-	
+
 	// Test that PlistEntries map is initialized
 	if cfg.PlistEntries == nil {
 		t.Error("Expected PlistEntries map to be initialized")
 	}
-	
+
 	// Test default LSUIElement value
 	if val, exists := cfg.PlistEntries["LSUIElement"]; !exists || val != true {
 		t.Error("Expected LSUIElement to be true by default")
 	}
-	
+
 	// Test that other fields are empty/default
 	if cfg.ApplicationName != "" {
 		t.Error("Expected ApplicationName to be empty by default")
 	}
-	
+
 	if cfg.BundleID != "" {
 		t.Error("Expected BundleID to be empty by default")
 	}
-	
+
 	if cfg.CustomDestinationAppPath != "" {
 		t.Error("Expected CustomDestinationAppPath to be empty by default")
 	}
-	
+
 	if cfg.KeepTemp != false {
 		t.Error("Expected KeepTemp to be false by default")
 	}
-	
+
 	if cfg.AppTemplate != nil {
 		t.Error("Expected AppTemplate to be nil by default")
 	}
-	
+
 	if cfg.SigningIdentity != "" {
 		t.Error("Expected SigningIdentity to be empty by default")
 	}
@@ -190,18 +190,18 @@ func TestConfig_AddEntitlement(t *testing.T) {
 			expected:    true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.setup()
 			cfg.AddEntitlement(tt.entitlement)
-			
+
 			// Check that Entitlements map was initialized if needed
 			if cfg.Entitlements == nil {
 				t.Error("Expected Entitlements map to be initialized")
 				return
 			}
-			
+
 			// Check that the entitlement was added with correct value
 			if val, exists := cfg.Entitlements[tt.entitlement]; !exists {
 				t.Errorf("Expected entitlement %s to be added", tt.entitlement)
@@ -216,15 +216,15 @@ func TestConfig_AddEntitlement(t *testing.T) {
 func TestConfig_AddPermission(t *testing.T) {
 	cfg := &Config{}
 	permission := EntLocation
-	
+
 	cfg.AddPermission(permission)
-	
+
 	// Check that Entitlements map was initialized
 	if cfg.Entitlements == nil {
 		t.Error("Expected Entitlements map to be initialized")
 		return
 	}
-	
+
 	// Check that the permission was added via AddEntitlement
 	if val, exists := cfg.Entitlements[permission]; !exists {
 		t.Errorf("Expected permission %s to be added", permission)
@@ -296,18 +296,18 @@ func TestConfig_AddPlistEntry(t *testing.T) {
 			expected: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.setup()
 			cfg.AddPlistEntry(tt.key, tt.value)
-			
+
 			// Check that PlistEntries map was initialized if needed
 			if cfg.PlistEntries == nil {
 				t.Error("Expected PlistEntries map to be initialized")
 				return
 			}
-			
+
 			// Check that the entry was added with correct value
 			if val, exists := cfg.PlistEntries[tt.key]; !exists {
 				t.Errorf("Expected plist entry %s to be added", tt.key)
@@ -377,18 +377,18 @@ func TestConfig_RequestEntitlements(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.setup()
 			cfg.RequestEntitlements(tt.entitlements...)
-			
+
 			// Check that Entitlements map was initialized if needed
 			if cfg.Entitlements == nil && len(tt.expected) > 0 {
 				t.Error("Expected Entitlements map to be initialized")
 				return
 			}
-			
+
 			// Check that all expected entitlements are present
 			for expectedEnt, expectedVal := range tt.expected {
 				if val, exists := cfg.Entitlements[expectedEnt]; !exists {
@@ -397,7 +397,7 @@ func TestConfig_RequestEntitlements(t *testing.T) {
 					t.Errorf("Expected entitlement %s to have value %v, got %v", expectedEnt, expectedVal, val)
 				}
 			}
-			
+
 			// Check that no unexpected entitlements were added
 			for actualEnt := range cfg.Entitlements {
 				if _, expected := tt.expected[actualEnt]; !expected {
@@ -415,7 +415,7 @@ func TestConfigure(t *testing.T) {
 	defer func() {
 		DefaultConfig = originalConfig
 	}()
-	
+
 	tests := []struct {
 		name           string
 		setup          func()
@@ -445,7 +445,7 @@ func TestConfigure(t *testing.T) {
 				},
 				PlistEntries: map[string]any{
 					"CFBundleName": "TestApp",
-					"LSUIElement": false,
+					"LSUIElement":  false,
 				},
 			},
 			expectedChecks: func(t *testing.T) {
@@ -470,7 +470,7 @@ func TestConfigure(t *testing.T) {
 				if DefaultConfig.SigningIdentity != "TestIdentity" {
 					t.Errorf("Expected SigningIdentity to be 'TestIdentity', got %s", DefaultConfig.SigningIdentity)
 				}
-				
+
 				// Check entitlements
 				if val, exists := DefaultConfig.Entitlements[EntCamera]; !exists || val != true {
 					t.Error("Expected EntCamera to be true")
@@ -478,7 +478,7 @@ func TestConfigure(t *testing.T) {
 				if val, exists := DefaultConfig.Entitlements[EntMicrophone]; !exists || val != false {
 					t.Error("Expected EntMicrophone to be false")
 				}
-				
+
 				// Check plist entries
 				if val, exists := DefaultConfig.PlistEntries["CFBundleName"]; !exists || val != "TestApp" {
 					t.Error("Expected CFBundleName to be 'TestApp'")
@@ -509,12 +509,12 @@ func TestConfigure(t *testing.T) {
 				if DefaultConfig.ApplicationName != "TestApp" {
 					t.Errorf("Expected ApplicationName to be 'TestApp', got %s", DefaultConfig.ApplicationName)
 				}
-				
+
 				// Check that existing entitlements are preserved
 				if val, exists := DefaultConfig.Entitlements[EntNetworkClient]; !exists || val != true {
 					t.Error("Expected existing EntNetworkClient to be preserved")
 				}
-				
+
 				// Check that existing plist entries are preserved
 				if val, exists := DefaultConfig.PlistEntries["ExistingKey"]; !exists || val != "ExistingValue" {
 					t.Error("Expected existing plist entry to be preserved")
@@ -541,8 +541,8 @@ func TestConfigure(t *testing.T) {
 					EntMicrophone: true, // Should add
 				},
 				PlistEntries: map[string]any{
-					"LSUIElement": false,        // Should overwrite
-					"NewKey":      "NewValue",   // Should add
+					"LSUIElement": false,      // Should overwrite
+					"NewKey":      "NewValue", // Should add
 				},
 			},
 			expectedChecks: func(t *testing.T) {
@@ -556,7 +556,7 @@ func TestConfigure(t *testing.T) {
 				if val, exists := DefaultConfig.Entitlements[EntMicrophone]; !exists || val != true {
 					t.Error("Expected EntMicrophone to be added as true")
 				}
-				
+
 				// Check plist entries merging
 				if val, exists := DefaultConfig.PlistEntries["ExistingKey"]; !exists || val != "ExistingValue" {
 					t.Error("Expected existing plist entry to be preserved")
@@ -596,7 +596,7 @@ func TestConfigure(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
@@ -613,13 +613,13 @@ func TestConfigure_InitializeMaps(t *testing.T) {
 	defer func() {
 		DefaultConfig = originalConfig
 	}()
-	
+
 	// Set up DefaultConfig with nil maps
 	DefaultConfig = &Config{
 		Entitlements: nil,
 		PlistEntries: nil,
 	}
-	
+
 	inputConfig := &Config{
 		Entitlements: map[Entitlement]bool{
 			EntCamera: true,
@@ -628,9 +628,9 @@ func TestConfigure_InitializeMaps(t *testing.T) {
 			"TestKey": "TestValue",
 		},
 	}
-	
+
 	Configure(inputConfig)
-	
+
 	// Check that maps were initialized
 	if DefaultConfig.Entitlements == nil {
 		t.Error("Expected Entitlements map to be initialized")
@@ -638,7 +638,7 @@ func TestConfigure_InitializeMaps(t *testing.T) {
 	if DefaultConfig.PlistEntries == nil {
 		t.Error("Expected PlistEntries map to be initialized")
 	}
-	
+
 	// Check that values were copied
 	if val, exists := DefaultConfig.Entitlements[EntCamera]; !exists || val != true {
 		t.Error("Expected EntCamera to be copied")
@@ -663,11 +663,11 @@ func TestEntitlementConstants(t *testing.T) {
 		{EntUserSelectedReadOnly, "com.apple.security.files.user-selected.read-only"},
 		{EntUserSelectedReadWrite, "com.apple.security.files.user-selected.read-write"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(string(tt.entitlement), func(t *testing.T) {
 			if string(tt.entitlement) != tt.expected {
-				t.Errorf("Expected entitlement %s to have value %s, got %s", 
+				t.Errorf("Expected entitlement %s to have value %s, got %s",
 					tt.entitlement, tt.expected, string(tt.entitlement))
 			}
 		})
@@ -686,7 +686,7 @@ func TestConfigEdgeCases(t *testing.T) {
 		}()
 		cfg.AddEntitlement(EntCamera)
 	})
-	
+
 	t.Run("AddPlistEntry with nil config", func(t *testing.T) {
 		var cfg *Config
 		// This should panic if not handled properly
@@ -697,27 +697,27 @@ func TestConfigEdgeCases(t *testing.T) {
 		}()
 		cfg.AddPlistEntry("key", "value")
 	})
-	
+
 	t.Run("RequestEntitlements with empty slice", func(t *testing.T) {
 		cfg := &Config{}
 		cfg.RequestEntitlements()
-		
+
 		// Should not crash and should initialize empty map
 		if cfg.Entitlements == nil {
 			t.Error("Expected Entitlements map to be initialized even with empty input")
 		}
 	})
-	
+
 	t.Run("Configure with nil config", func(t *testing.T) {
 		// Save original DefaultConfig
 		originalConfig := DefaultConfig
 		defer func() {
 			DefaultConfig = originalConfig
 		}()
-		
+
 		// This should not crash and should be a no-op
 		Configure(nil)
-		
+
 		// DefaultConfig should remain unchanged
 		if DefaultConfig != originalConfig {
 			t.Error("Expected DefaultConfig to remain unchanged when Configure is called with nil")
@@ -1144,10 +1144,10 @@ func TestSetCustomAppBundle(t *testing.T) {
 
 	// Create a mock filesystem for testing
 	var mockFS MockFS
-	
+
 	DefaultConfig = &Config{}
 	SetCustomAppBundle(mockFS)
-	
+
 	if DefaultConfig.AppTemplate != mockFS {
 		t.Error("Expected AppTemplate to be set correctly")
 	}
@@ -1163,15 +1163,15 @@ func TestConfigureWithAppTemplate(t *testing.T) {
 
 	// Create a mock filesystem for testing
 	var mockFS MockFS
-	
+
 	DefaultConfig = &Config{}
-	
+
 	inputConfig := &Config{
 		AppTemplate: mockFS,
 	}
-	
+
 	Configure(inputConfig)
-	
+
 	if DefaultConfig.AppTemplate != mockFS {
 		t.Error("Expected AppTemplate to be set correctly via Configure")
 	}
@@ -1189,45 +1189,45 @@ func TestConfigMethodsWithNilMaps(t *testing.T) {
 	t.Run("AddEntitlement with nil Entitlements map", func(t *testing.T) {
 		cfg := &Config{Entitlements: nil}
 		cfg.AddEntitlement(EntCamera)
-		
+
 		if cfg.Entitlements == nil {
 			t.Error("Expected Entitlements map to be initialized")
 			return
 		}
-		
+
 		if val, exists := cfg.Entitlements[EntCamera]; !exists || val != true {
 			t.Error("Expected EntCamera to be added with value true")
 		}
 	})
-	
+
 	t.Run("AddPlistEntry with nil PlistEntries map", func(t *testing.T) {
 		cfg := &Config{PlistEntries: nil}
 		cfg.AddPlistEntry("TestKey", "TestValue")
-		
+
 		if cfg.PlistEntries == nil {
 			t.Error("Expected PlistEntries map to be initialized")
 			return
 		}
-		
+
 		if val, exists := cfg.PlistEntries["TestKey"]; !exists || val != "TestValue" {
 			t.Error("Expected TestKey to be added with correct value")
 		}
 	})
-	
+
 	t.Run("RequestEntitlements with nil Entitlements map", func(t *testing.T) {
 		cfg := &Config{Entitlements: nil}
 		cfg.RequestEntitlements(EntCamera, EntMicrophone)
-		
+
 		if cfg.Entitlements == nil {
 			t.Error("Expected Entitlements map to be initialized")
 			return
 		}
-		
+
 		expected := map[Entitlement]bool{
 			EntCamera:     true,
 			EntMicrophone: true,
 		}
-		
+
 		for ent, expectedVal := range expected {
 			if val, exists := cfg.Entitlements[ent]; !exists || val != expectedVal {
 				t.Errorf("Expected entitlement %s to have value %v, got %v", ent, expectedVal, val)
@@ -1241,17 +1241,17 @@ func TestEntitlementTypeConversion(t *testing.T) {
 	t.Run("String to Entitlement conversion", func(t *testing.T) {
 		customEntitlement := "com.example.custom.permission"
 		ent := Entitlement(customEntitlement)
-		
+
 		if string(ent) != customEntitlement {
 			t.Errorf("Expected string conversion to work, got %s", string(ent))
 		}
 	})
-	
+
 	t.Run("Entitlement constants as strings", func(t *testing.T) {
 		if string(EntCamera) != "com.apple.security.device.camera" {
 			t.Error("EntCamera constant has incorrect value")
 		}
-		
+
 		if string(EntAppSandbox) != "com.apple.security.app-sandbox" {
 			t.Error("EntAppSandbox constant has incorrect value")
 		}
@@ -1262,28 +1262,28 @@ func TestEntitlementTypeConversion(t *testing.T) {
 // This is a basic test to ensure no race conditions in simple scenarios
 func TestConfigConcurrentAccess(t *testing.T) {
 	cfg := NewConfig()
-	
+
 	// Test concurrent access to AddEntitlement
 	done := make(chan bool, 2)
-	
+
 	go func() {
 		for i := 0; i < 100; i++ {
 			cfg.AddEntitlement(EntCamera)
 		}
 		done <- true
 	}()
-	
+
 	go func() {
 		for i := 0; i < 100; i++ {
 			cfg.AddEntitlement(EntMicrophone)
 		}
 		done <- true
 	}()
-	
+
 	// Wait for both goroutines to complete
 	<-done
 	<-done
-	
+
 	// Verify both entitlements were added
 	if val, exists := cfg.Entitlements[EntCamera]; !exists || val != true {
 		t.Error("Expected EntCamera to be added")
@@ -1297,16 +1297,16 @@ func TestConfigConcurrentAccess(t *testing.T) {
 func TestDefaultConfigValues(t *testing.T) {
 	// Note: This test examines the package's DefaultConfig, which may be modified
 	// by other tests, but it still provides some basic validation
-	
+
 	if DefaultConfig == nil {
 		t.Fatal("DefaultConfig should not be nil")
 	}
-	
+
 	// These are basic sanity checks
 	if DefaultConfig.Entitlements == nil {
 		t.Error("DefaultConfig.Entitlements should be initialized")
 	}
-	
+
 	if DefaultConfig.PlistEntries == nil {
 		t.Error("DefaultConfig.PlistEntries should be initialized")
 	}
@@ -1315,18 +1315,18 @@ func TestDefaultConfigValues(t *testing.T) {
 // TestConfigFieldAssignment tests direct field assignment behavior
 func TestConfigFieldAssignment(t *testing.T) {
 	cfg := NewConfig()
-	
+
 	// Test string field assignments
 	cfg.ApplicationName = "TestApplication"
 	cfg.BundleID = "com.test.application"
 	cfg.CustomDestinationAppPath = "/custom/path/to/app"
 	cfg.SigningIdentity = "Developer ID Application: Test"
-	
+
 	// Test boolean field assignments
 	cfg.Relaunch = false
 	cfg.KeepTemp = true
 	cfg.AutoSign = false
-	
+
 	// Verify assignments
 	if cfg.ApplicationName != "TestApplication" {
 		t.Errorf("Expected ApplicationName to be 'TestApplication', got %s", cfg.ApplicationName)
@@ -1354,12 +1354,12 @@ func TestConfigFieldAssignment(t *testing.T) {
 // TestEntitlementsMapOperations tests map operations on Entitlements
 func TestEntitlementsMapOperations(t *testing.T) {
 	cfg := NewConfig()
-	
+
 	// Test direct map assignment
 	cfg.Entitlements[EntCamera] = true
 	cfg.Entitlements[EntMicrophone] = false
 	cfg.Entitlements[Entitlement("custom.entitlement")] = true
-	
+
 	// Test reading values
 	if val, exists := cfg.Entitlements[EntCamera]; !exists || val != true {
 		t.Error("Expected EntCamera to be true")
@@ -1370,12 +1370,12 @@ func TestEntitlementsMapOperations(t *testing.T) {
 	if val, exists := cfg.Entitlements[Entitlement("custom.entitlement")]; !exists || val != true {
 		t.Error("Expected custom.entitlement to be true")
 	}
-	
+
 	// Test map length
 	if len(cfg.Entitlements) != 3 {
 		t.Errorf("Expected Entitlements map to have 3 entries, got %d", len(cfg.Entitlements))
 	}
-	
+
 	// Test deleting an entitlement
 	delete(cfg.Entitlements, EntMicrophone)
 	if _, exists := cfg.Entitlements[EntMicrophone]; exists {

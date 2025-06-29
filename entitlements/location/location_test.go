@@ -11,7 +11,7 @@ func TestLocationPackageInit(t *testing.T) {
 	// Test that the location entitlement is registered during package init
 	// Since init() already ran when the package was imported, we simulate this
 	// by creating a fresh config and calling the registration manually
-	
+
 	// Create a backup of the original config
 	originalConfig := macgo.DefaultConfig
 	defer func() {
@@ -42,7 +42,7 @@ func TestLocationEntitlementValue(t *testing.T) {
 func TestLocationEntitlementMatchesMainPackage(t *testing.T) {
 	// Verify that our location entitlement matches the main package
 	if string(entitlements.EntLocation) != string(macgo.EntLocation) {
-		t.Errorf("Location entitlement mismatch: entitlements package %q != macgo package %q", 
+		t.Errorf("Location entitlement mismatch: entitlements package %q != macgo package %q",
 			entitlements.EntLocation, macgo.EntLocation)
 	}
 }
@@ -50,7 +50,7 @@ func TestLocationEntitlementMatchesMainPackage(t *testing.T) {
 func TestPackageImportSideEffect(t *testing.T) {
 	// Check that the location entitlement exists in the default config
 	locationEnt := macgo.Entitlement(entitlements.EntLocation)
-	
+
 	// The entitlement should be present and set to true
 	if val, exists := macgo.DefaultConfig.Entitlements[locationEnt]; !exists {
 		t.Error("Location entitlement should be registered after package import")
@@ -84,7 +84,7 @@ func TestMultipleImports(t *testing.T) {
 func TestDocumentationExample(t *testing.T) {
 	// The documentation shows: import _ "github.com/tmc/misc/macgo/entitlements/location"
 	// This should enable location access by registering the entitlement during init()
-	
+
 	originalConfig := macgo.DefaultConfig
 	defer func() {
 		macgo.DefaultConfig = originalConfig
