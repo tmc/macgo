@@ -125,12 +125,17 @@ func createBundle(execPath string) (string, error) {
 		return "", fmt.Errorf("write Info.plist file: %w", err)
 	}
 
-	// Write entitlements if any
-	if len(DefaultConfig.Entitlements) > 0 {
-		entitlements := make(map[Entitlement]any)
-		for k, v := range DefaultConfig.Entitlements {
-			entitlements[k] = v
+	// Write entitlements if any are enabled
+	hasEnabledEntitlements := false
+	entitlements := make(map[string]any)
+	for k, v := range DefaultConfig.Entitlements {
+		if v {
+			entitlements[string(k)] = v
+			hasEnabledEntitlements = true
 		}
+	}
+	
+	if hasEnabledEntitlements {
 		entPath := filepath.Join(contentsPath, "entitlements.plist")
 		if err := writePlist(entPath, entitlements); err != nil {
 			return "", fmt.Errorf("write entitlements.plist file: %w", err)
@@ -602,15 +607,23 @@ func createFromTemplate(template fs.FS, appPath, execPath, appName string) (stri
 		}
 
 		// Special handling for entitlements.plist
-		if strings.HasSuffix(path, "entitlements.plist") && len(DefaultConfig.Entitlements) > 0 {
-			// Create a map for entitlements
+		if strings.HasSuffix(path, "entitlements.plist") {
+			// Create a map for enabled entitlements only
 			entitlements := make(map[string]any)
+			hasEnabledEntitlements := false
 			for k, v := range DefaultConfig.Entitlements {
-				entitlements[string(k)] = v
+				if v {
+					entitlements[string(k)] = v
+					hasEnabledEntitlements = true
+				}
 			}
 
-			// Write the entitlements plist
-			return writePlist(targetPath, entitlements)
+			// Only write the entitlements plist if there are enabled entitlements
+			if hasEnabledEntitlements {
+				return writePlist(targetPath, entitlements)
+			}
+			// Skip writing the file if no entitlements are enabled
+			return nil
 		}
 
 		// For normal files, just copy them

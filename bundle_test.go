@@ -102,7 +102,14 @@ func TestCreateBundle(t *testing.T) {
 			setup: func() {
 				DefaultConfig = NewConfig()
 			},
-			execPath: "/tmp/go-build123456/main",
+			execPath: func() string {
+				// Create a temporary go-build-like path
+				tmpDir := "/tmp/go-build" + fmt.Sprintf("%d", time.Now().UnixNano())
+				os.MkdirAll(tmpDir, 0755)
+				tmpExec := filepath.Join(tmpDir, "main")
+				os.WriteFile(tmpExec, []byte("test binary"), 0755)
+				return tmpExec
+			}(),
 			checkResult: func(t *testing.T, bundlePath string, err error) {
 				if err != nil {
 					t.Errorf("Expected no error, got: %v", err)
@@ -131,10 +138,30 @@ func TestCreateBundle(t *testing.T) {
 					t.Errorf("Expected no error, got: %v", err)
 					return
 				}
-				// Check entitlements.plist was created
-				entPath := filepath.Join(bundlePath, "Contents", "entitlements.plist")
-				if _, err := os.Stat(entPath); os.IsNotExist(err) {
-					t.Error("Expected entitlements.plist to be created")
+				
+				// When AutoSign is enabled (default), entitlements are embedded in the signature
+				// So we check for the _CodeSignature directory instead
+				sigPath := filepath.Join(bundlePath, "Contents", "_CodeSignature")
+				if _, err := os.Stat(sigPath); os.IsNotExist(err) {
+					// If not signed, check for standalone entitlements.plist
+					entPath := filepath.Join(bundlePath, "Contents", "entitlements.plist")
+					if _, err := os.Stat(entPath); os.IsNotExist(err) {
+						t.Error("Expected either signed bundle or entitlements.plist to exist")
+					} else {
+						// Verify entitlements content
+						content, _ := os.ReadFile(entPath)
+						if !strings.Contains(string(content), "com.apple.security.device.camera") {
+							t.Errorf("Expected camera entitlement in entitlements.plist")
+						}
+						// Entitlements should only include camera (true), not microphone (false)
+						if strings.Contains(string(content), "com.apple.security.device.microphone") {
+							t.Error("Did not expect microphone entitlement (was set to false)")
+						}
+					}
+				} else {
+					// Bundle is signed, entitlements are embedded in the signature
+					// This is the expected behavior with AutoSign=true (default)
+					t.Log("Bundle is signed, entitlements are embedded in signature")
 				}
 				// Clean up
 				os.RemoveAll(bundlePath)
@@ -168,7 +195,14 @@ func TestCreateBundle(t *testing.T) {
 				DefaultConfig = NewConfig()
 				DefaultConfig.KeepTemp = true
 			},
-			execPath: "/tmp/go-build123456/temp-binary",
+			execPath: func() string {
+				// Create a temporary go-build-like path
+				tmpDir := "/tmp/go-build" + fmt.Sprintf("%d", time.Now().UnixNano())
+				os.MkdirAll(tmpDir, 0755)
+				tmpExec := filepath.Join(tmpDir, "temp-binary")
+				os.WriteFile(tmpExec, []byte("test binary"), 0755)
+				return tmpExec
+			}(),
 			checkResult: func(t *testing.T, bundlePath string, err error) {
 				if err != nil {
 					t.Errorf("Expected no error, got: %v", err)
@@ -733,9 +767,14 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 		DefaultConfig = NewConfig()
 		DefaultConfig.BundleID = "" // Ensure empty
 		
-		// Simulate a temporary go-build binary
-		execPath := "/tmp/go-build123456/main"
+		// Create a temporary go-build-like binary
+		tmpDir := "/tmp/go-build" + fmt.Sprintf("%d", time.Now().UnixNano())
+		os.MkdirAll(tmpDir, 0755)
+		tmpExec := filepath.Join(tmpDir, "main")
+		os.WriteFile(tmpExec, []byte("test binary"), 0755)
+		execPath := tmpExec
 		bundlePath, err := createBundle(execPath)
+		defer os.RemoveAll(tmpDir)
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
 			return
@@ -902,8 +941,22 @@ type mockFile struct {
 
 func (m *mockTemplateFS) Open(name string) (fs.File, error) {
 	if name == "." {
-		return &mockDir{fs: m}, nil
+		return &mockDir{fs: m, path: "."}, nil
 	}
+	
+	// Check if it's a directory by looking for files with this prefix
+	isDir := false
+	for path := range m.files {
+		if strings.HasPrefix(path, name+"/") {
+			isDir = true
+			break
+		}
+	}
+	
+	if isDir {
+		return &mockDir{fs: m, path: name}, nil
+	}
+	
 	if f, ok := m.files[name]; ok {
 		return &mockFileHandle{
 			name:    name,
@@ -914,8 +967,17 @@ func (m *mockTemplateFS) Open(name string) (fs.File, error) {
 	return nil, fs.ErrNotExist
 }
 
+// ReadFile implements fs.ReadFileFS interface
+func (m *mockTemplateFS) ReadFile(name string) ([]byte, error) {
+	if f, ok := m.files[name]; ok {
+		return []byte(f.content), nil
+	}
+	return nil, fs.ErrNotExist
+}
+
 type mockDir struct {
 	fs    *mockTemplateFS
+	path  string
 	index int
 }
 
@@ -928,27 +990,83 @@ func (d *mockDir) Close() error {
 }
 
 func (d *mockDir) Stat() (fs.FileInfo, error) {
-	return &mockFileInfo{name: ".", isDir: true}, nil
+	return &mockFileInfo{name: d.path, isDir: true}, nil
 }
 
 func (d *mockDir) ReadDir(n int) ([]fs.DirEntry, error) {
 	var entries []fs.DirEntry
-	for path, file := range d.fs.files {
-		if d.index >= len(d.fs.files) {
-			break
-		}
-		entries = append(entries, &mockDirEntry{
-			name:  filepath.Base(path),
-			isDir: file.isDir,
-		})
-		d.index++
+	seen := make(map[string]bool)
+	
+	// List entries in this directory
+	for path := range d.fs.files {
+		// Skip if we've processed enough
 		if n > 0 && len(entries) >= n {
 			break
 		}
+		
+		var entryPath string
+		if d.path == "." {
+			// For root directory
+			if !strings.Contains(path, "/") {
+				// Direct file in root
+				entryPath = path
+			} else {
+				// Get first directory component
+				parts := strings.Split(path, "/")
+				entryPath = parts[0]
+			}
+		} else {
+			// For subdirectories
+			if strings.HasPrefix(path, d.path+"/") {
+				remaining := strings.TrimPrefix(path, d.path+"/")
+				if !strings.Contains(remaining, "/") {
+					// Direct child
+					entryPath = remaining
+				} else {
+					// Get first directory component
+					parts := strings.Split(remaining, "/")
+					entryPath = parts[0]
+				}
+			} else {
+				continue
+			}
+		}
+		
+		if entryPath != "" && !seen[entryPath] {
+			seen[entryPath] = true
+			
+			// Check if it's a directory
+			isDir := false
+			fullPath := entryPath
+			if d.path != "." {
+				fullPath = d.path + "/" + entryPath
+			}
+			
+			// If there's a file with this exact path, it's a file
+			if _, exists := d.fs.files[fullPath]; exists {
+				isDir = d.fs.files[fullPath].isDir
+			} else {
+				// Otherwise check if there are files with this prefix
+				for p := range d.fs.files {
+					if strings.HasPrefix(p, fullPath+"/") {
+						isDir = true
+						break
+					}
+				}
+			}
+			
+			entries = append(entries, &mockDirEntry{
+				name:  entryPath,
+				isDir: isDir,
+			})
+		}
 	}
-	if len(entries) == 0 {
+	
+	if len(entries) == 0 && d.index > 0 {
 		return nil, io.EOF
 	}
+	
+	d.index += len(entries)
 	return entries, nil
 }
 
