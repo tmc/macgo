@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 package macgo
@@ -43,7 +44,7 @@ func TestBundleChecksum(t *testing.T) {
 	h := sha256.New()
 	h.Write([]byte(testContent))
 	expected := hex.EncodeToString(h.Sum(nil))
-	
+
 	if hash != expected {
 		t.Errorf("Expected hash %s, got %s", expected, hash)
 	}
@@ -132,7 +133,7 @@ func TestBundleWritePlist(t *testing.T) {
 	}
 
 	plistStr := string(content)
-	
+
 	// Check for expected content
 	checks := []string{
 		"<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
@@ -177,7 +178,7 @@ func TestBundleWritePlist(t *testing.T) {
 		t.Error("Missing true value for camera")
 	}
 	if !strings.Contains(entStr, "com.apple.security.device.microphone") {
-		t.Error("Missing microphone entitlement")  
+		t.Error("Missing microphone entitlement")
 	}
 	if !strings.Contains(entStr, "<false/>") {
 		t.Error("Missing false value for microphone")
@@ -212,7 +213,7 @@ func TestBundleCheckExisting(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(bundleExecPath), 0755); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	result = checkExisting(appPath, execPath)
 	if result {
 		t.Error("Expected false when bundle executable doesn't exist")
@@ -222,7 +223,7 @@ func TestBundleCheckExisting(t *testing.T) {
 	if err := copyFile(execPath, bundleExecPath); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	result = checkExisting(appPath, execPath)
 	if !result {
 		t.Error("Expected true when bundle exists with same content")
@@ -232,7 +233,7 @@ func TestBundleCheckExisting(t *testing.T) {
 	if err := os.WriteFile(execPath, []byte("modified content"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	result = checkExisting(appPath, execPath)
 	if result {
 		t.Error("Expected false when executable content differs")
@@ -374,7 +375,7 @@ func TestPipeIOContext(t *testing.T) {
 	// Test writing to pipe
 	t.Run("write to pipe", func(t *testing.T) {
 		done := make(chan error, 1)
-		
+
 		// Reader goroutine
 		go func() {
 			f, err := os.OpenFile(pipeName, os.O_RDONLY, 0)
@@ -413,4 +414,3 @@ func TestPipeIOContext(t *testing.T) {
 		}
 	})
 }
-

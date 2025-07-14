@@ -37,11 +37,11 @@ func TestCreateBundle(t *testing.T) {
 	os.Chmod(tmpExec.Name(), 0755)
 
 	tests := []struct {
-		name           string
-		setup          func()
-		execPath       string
-		expectError    bool
-		checkResult    func(t *testing.T, bundlePath string, err error)
+		name        string
+		setup       func()
+		execPath    string
+		expectError bool
+		checkResult func(t *testing.T, bundlePath string, err error)
 	}{
 		{
 			name: "create bundle with default config",
@@ -138,7 +138,7 @@ func TestCreateBundle(t *testing.T) {
 					t.Errorf("Expected no error, got: %v", err)
 					return
 				}
-				
+
 				// When AutoSign is enabled (default), entitlements are embedded in the signature
 				// So we check for the _CodeSignature directory instead
 				sigPath := filepath.Join(bundlePath, "Contents", "_CodeSignature")
@@ -740,7 +740,7 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 	t.Run("missing GOPATH fallback to home", func(t *testing.T) {
 		os.Unsetenv("GOPATH")
 		DefaultConfig = NewConfig()
-		
+
 		// Create a test executable
 		tmpExec, _ := os.CreateTemp("", "test-exec-*")
 		tmpExec.Close()
@@ -751,14 +751,14 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 			t.Errorf("Expected no error, got: %v", err)
 			return
 		}
-		
+
 		// Should fall back to ~/go/bin
 		home, _ := os.UserHomeDir()
 		expectedPath := filepath.Join(home, "go", "bin")
 		if !strings.Contains(bundlePath, expectedPath) {
 			t.Errorf("Expected bundle in %s, got %s", expectedPath, bundlePath)
 		}
-		
+
 		// Clean up
 		os.RemoveAll(bundlePath)
 	})
@@ -766,7 +766,7 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 	t.Run("bundle ID inference for temporary binary", func(t *testing.T) {
 		DefaultConfig = NewConfig()
 		DefaultConfig.BundleID = "" // Ensure empty
-		
+
 		// Create a temporary go-build-like binary
 		tmpDir := "/tmp/go-build" + fmt.Sprintf("%d", time.Now().UnixNano())
 		os.MkdirAll(tmpDir, 0755)
@@ -779,16 +779,16 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 			t.Errorf("Expected no error, got: %v", err)
 			return
 		}
-		
+
 		// Read Info.plist to check inferred bundle ID
 		infoPlist := filepath.Join(bundlePath, "Contents", "Info.plist")
 		content, _ := os.ReadFile(infoPlist)
-		
+
 		// Should contain com.macgo.main with hash suffix
 		if !strings.Contains(string(content), "com.macgo.main") {
 			t.Error("Expected inferred bundle ID with com.macgo prefix")
 		}
-		
+
 		// Clean up
 		os.RemoveAll(filepath.Dir(bundlePath))
 	})
@@ -798,14 +798,14 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 		if os.Geteuid() == 0 {
 			t.Skip("Cannot test permission errors when running as root")
 		}
-		
+
 		DefaultConfig = NewConfig()
 		DefaultConfig.CustomDestinationAppPath = "/root/forbidden/test.app"
-		
+
 		tmpExec, _ := os.CreateTemp("", "test-exec-*")
 		tmpExec.Close()
 		defer os.Remove(tmpExec.Name())
-		
+
 		_, err := createBundle(tmpExec.Name())
 		if err == nil {
 			t.Error("Expected permission error")
@@ -817,7 +817,7 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 func TestSignBundleIntegration(t *testing.T) {
 	// This test is tricky because it requires codesign to be available
 	// We'll test the function but may need to skip actual signing
-	
+
 	tmpDir, err := os.MkdirTemp("", "macgo-sign-test-*")
 	if err != nil {
 		t.Fatal(err)
@@ -827,11 +827,11 @@ func TestSignBundleIntegration(t *testing.T) {
 	// Create a minimal app bundle structure
 	appPath := filepath.Join(tmpDir, "TestApp.app")
 	os.MkdirAll(filepath.Join(appPath, "Contents", "MacOS"), 0755)
-	
+
 	// Create a dummy executable
 	execPath := filepath.Join(appPath, "Contents", "MacOS", "TestApp")
 	os.WriteFile(execPath, []byte("#!/bin/sh\necho test"), 0755)
-	
+
 	// Create Info.plist
 	infoPlist := filepath.Join(appPath, "Contents", "Info.plist")
 	plistData := map[string]any{
@@ -847,8 +847,8 @@ func TestSignBundleIntegration(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name   string
-		setup  func()
+		name     string
+		setup    func()
 		validate func(t *testing.T, err error)
 	}{
 		{
@@ -943,7 +943,7 @@ func (m *mockTemplateFS) Open(name string) (fs.File, error) {
 	if name == "." {
 		return &mockDir{fs: m, path: "."}, nil
 	}
-	
+
 	// Check if it's a directory by looking for files with this prefix
 	isDir := false
 	for path := range m.files {
@@ -952,11 +952,11 @@ func (m *mockTemplateFS) Open(name string) (fs.File, error) {
 			break
 		}
 	}
-	
+
 	if isDir {
 		return &mockDir{fs: m, path: name}, nil
 	}
-	
+
 	if f, ok := m.files[name]; ok {
 		return &mockFileHandle{
 			name:    name,
@@ -996,14 +996,14 @@ func (d *mockDir) Stat() (fs.FileInfo, error) {
 func (d *mockDir) ReadDir(n int) ([]fs.DirEntry, error) {
 	var entries []fs.DirEntry
 	seen := make(map[string]bool)
-	
+
 	// List entries in this directory
 	for path := range d.fs.files {
 		// Skip if we've processed enough
 		if n > 0 && len(entries) >= n {
 			break
 		}
-		
+
 		var entryPath string
 		if d.path == "." {
 			// For root directory
@@ -1031,17 +1031,17 @@ func (d *mockDir) ReadDir(n int) ([]fs.DirEntry, error) {
 				continue
 			}
 		}
-		
+
 		if entryPath != "" && !seen[entryPath] {
 			seen[entryPath] = true
-			
+
 			// Check if it's a directory
 			isDir := false
 			fullPath := entryPath
 			if d.path != "." {
 				fullPath = d.path + "/" + entryPath
 			}
-			
+
 			// If there's a file with this exact path, it's a file
 			if _, exists := d.fs.files[fullPath]; exists {
 				isDir = d.fs.files[fullPath].isDir
@@ -1054,18 +1054,18 @@ func (d *mockDir) ReadDir(n int) ([]fs.DirEntry, error) {
 					}
 				}
 			}
-			
+
 			entries = append(entries, &mockDirEntry{
 				name:  entryPath,
 				isDir: isDir,
 			})
 		}
 	}
-	
+
 	if len(entries) == 0 && d.index > 0 {
 		return nil, io.EOF
 	}
-	
+
 	d.index += len(entries)
 	return entries, nil
 }
@@ -1116,10 +1116,12 @@ type mockDirEntry struct {
 	isDir bool
 }
 
-func (m *mockDirEntry) Name() string               { return m.name }
-func (m *mockDirEntry) IsDir() bool                { return m.isDir }
-func (m *mockDirEntry) Type() fs.FileMode          { return 0 }
-func (m *mockDirEntry) Info() (fs.FileInfo, error) { return &mockFileInfo{name: m.name, isDir: m.isDir}, nil }
+func (m *mockDirEntry) Name() string      { return m.name }
+func (m *mockDirEntry) IsDir() bool       { return m.isDir }
+func (m *mockDirEntry) Type() fs.FileMode { return 0 }
+func (m *mockDirEntry) Info() (fs.FileInfo, error) {
+	return &mockFileInfo{name: m.name, isDir: m.isDir}, nil
+}
 
 // TestCreatePipe tests the createPipe function
 func TestCreatePipe(t *testing.T) {
@@ -1214,18 +1216,18 @@ func TestPlistValueTypes(t *testing.T) {
 func TestEnvironmentVariableDetectionIntegration(t *testing.T) {
 	// This test is tricky because init() runs before tests
 	// We can only verify the current state based on environment
-	
+
 	// Save and restore environment
 	envVars := []string{
 		"MACGO_CAMERA", "MACGO_MIC", "MACGO_LOCATION",
 		"MACGO_APP_SANDBOX", "MACGO_NETWORK_CLIENT",
 	}
-	
+
 	originalValues := make(map[string]string)
 	for _, env := range envVars {
 		originalValues[env] = os.Getenv(env)
 	}
-	
+
 	defer func() {
 		for env, val := range originalValues {
 			if val == "" {
@@ -1239,7 +1241,7 @@ func TestEnvironmentVariableDetectionIntegration(t *testing.T) {
 	// Note: We can't test the init() function directly,
 	// but we can verify that the mechanism works by checking
 	// if any current env vars are reflected in DefaultConfig
-	
+
 	if os.Getenv("MACGO_CAMERA") == "1" {
 		if _, exists := DefaultConfig.Entitlements[EntCamera]; !exists {
 			t.Error("MACGO_CAMERA=1 but camera entitlement not found")

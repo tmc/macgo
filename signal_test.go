@@ -82,7 +82,7 @@ func TestSetupSignalHandling(t *testing.T) {
 	// The setupSignalHandling should have created a goroutine that forwards signals
 	// We can't easily test this without actually sending signals to our test process,
 	// which could interfere with the test runner
-	
+
 	// Just verify the channel was created
 	if sigChan == nil {
 		t.Error("Expected non-nil signal channel")
@@ -138,7 +138,7 @@ func TestSignalForwardingBuffer(t *testing.T) {
 		// The forwardSignals function creates a channel with buffer size 16
 		// This should be sufficient for typical signal bursts
 		const expectedMinBuffer = 16
-		
+
 		// We can't directly inspect the channel, but we know from the code
 		// that it uses make(chan os.Signal, 16)
 		// This is a documentation test to ensure the buffer size is appropriate
@@ -149,7 +149,7 @@ func TestSignalForwardingBuffer(t *testing.T) {
 	t.Run("setupSignalHandling buffer", func(t *testing.T) {
 		// The setupSignalHandling function creates a channel with buffer size 100
 		const expectedBuffer = 100
-		
+
 		// This is a documentation test to ensure the buffer size is appropriate
 		t.Logf("setupSignalHandling uses buffer size %d for signal channel", expectedBuffer)
 	})
@@ -158,7 +158,7 @@ func TestSignalForwardingBuffer(t *testing.T) {
 	t.Run("improvedSignals buffer", func(t *testing.T) {
 		// The relaunchWithRobustSignalHandlingContext uses buffer size 100
 		const expectedBuffer = 100
-		
+
 		t.Logf("relaunchWithRobustSignalHandlingContext uses buffer size %d for signal channel", expectedBuffer)
 	})
 }
@@ -239,7 +239,7 @@ func TestProcessGroupSignaling(t *testing.T) {
 		// The negative PID means "send to entire process group"
 		pid := 12345 // Example PID
 		negativePid := -pid
-		
+
 		t.Logf("Signal forwarding uses negative PID (%d) to target process group of PID %d", negativePid, pid)
 	})
 }
@@ -344,10 +344,10 @@ func TestSignalHandlingConcurrencyBasic(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			pid := processes[idx].Process.Pid
-			
+
 			// This should not panic or cause issues
 			forwardSignals(pid)
-			
+
 			// Let it run briefly
 			time.Sleep(100 * time.Millisecond)
 		}(i)
@@ -472,7 +472,7 @@ func TestPipeIOContextBehavior(t *testing.T) {
 			// This simulates reading from stdin and writing to a pipe
 			// Note: pipeIOContext expects named pipes, not regular files
 			// For testing, we'll create a simplified version
-			
+
 			// Use the variables to avoid unused variable errors
 			_ = ctx
 			_ = &buf
@@ -493,7 +493,7 @@ func TestPipeIOContextBehavior(t *testing.T) {
 func TestSignalSkipping(t *testing.T) {
 	// This test verifies that SIGCHLD signals are not forwarded
 	// as documented in the forwardSignals function
-	
+
 	// SIGCHLD should be skipped in signal forwarding
 	t.Run("SIGCHLD skipping", func(t *testing.T) {
 		// The forwardSignals and relaunchWithRobustSignalHandlingContext
@@ -521,7 +521,7 @@ func TestSignalHandlingTimeout(t *testing.T) {
 func TestExitCodePropagation(t *testing.T) {
 	// This test documents that exit codes from child processes
 	// should be propagated to the parent process
-	
+
 	testCases := []struct {
 		name     string
 		exitCode int
@@ -543,7 +543,7 @@ func TestExitCodePropagation(t *testing.T) {
 // TestSignalHandlingSafety tests safety considerations
 func TestSignalHandlingSafety(t *testing.T) {
 	// This test documents important safety considerations
-	
+
 	t.Run("Signal buffer overflow", func(t *testing.T) {
 		// Channels have finite buffers - sending too many signals
 		// too quickly could potentially cause issues
@@ -604,11 +604,11 @@ func TestMockSignalForwarding(t *testing.T) {
 
 	// Test that we can track signal delivery
 	mock.Signal(os.Interrupt)
-	
+
 	if atomic.LoadInt32(&mock.signalCount) != 1 {
 		t.Error("Expected signal count to be 1")
 	}
-	
+
 	if mock.lastSignal != os.Interrupt {
 		t.Errorf("Expected last signal to be Interrupt, got %v", mock.lastSignal)
 	}

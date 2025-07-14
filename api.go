@@ -28,7 +28,7 @@ var configMutex sync.RWMutex
 func RequestEntitlements(entitlements ...interface{}) {
 	configMutex.Lock()
 	defer configMutex.Unlock()
-	
+
 	for _, ent := range entitlements {
 		var entStr string
 		switch e := ent.(type) {
@@ -55,7 +55,7 @@ func RequestEntitlements(entitlements ...interface{}) {
 func RequestEntitlement(entitlement interface{}) {
 	configMutex.Lock()
 	defer configMutex.Unlock()
-	
+
 	var entStr string
 	switch e := entitlement.(type) {
 	case string:
@@ -77,7 +77,7 @@ func RequestEntitlement(entitlement interface{}) {
 func EnableDockIcon() {
 	configMutex.Lock()
 	defer configMutex.Unlock()
-	
+
 	if DefaultConfig.PlistEntries == nil {
 		DefaultConfig.PlistEntries = make(map[string]any)
 	}
@@ -166,11 +166,11 @@ func LoadEntitlementsFromJSON(data []byte) error {
 
 	configMutex.Lock()
 	defer configMutex.Unlock()
-	
+
 	if DefaultConfig.Entitlements == nil {
 		DefaultConfig.Entitlements = make(map[Entitlement]bool)
 	}
-	
+
 	for key, value := range entitlements {
 		DefaultConfig.Entitlements[Entitlement(key)] = value
 	}

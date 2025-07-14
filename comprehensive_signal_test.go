@@ -31,7 +31,7 @@ func TestComprehensiveSignalHandling(t *testing.T) {
 
 func testCoreSignalHandling(t *testing.T) {
 	// Test basic signal handling setup and teardown
-	
+
 	// Test DisableSignalHandling flag manipulation
 	original := DisableSignalHandling
 	defer func() {
@@ -68,7 +68,7 @@ func testCoreSignalHandling(t *testing.T) {
 
 func testSignalConfiguration(t *testing.T) {
 	// Test that signal configurations are properly handled
-	
+
 	// Test signal constants
 	expectedSignals := []syscall.Signal{
 		syscall.SIGABRT, syscall.SIGALRM, syscall.SIGBUS, syscall.SIGCHLD,
@@ -91,21 +91,21 @@ func testSignalConfiguration(t *testing.T) {
 
 func testSignalForwarding(t *testing.T) {
 	// Test signal forwarding between processes
-	
+
 	// Test that forwardSignals can be started
 	t.Run("ForwardSignals_Startup", func(t *testing.T) {
 		pid := os.Getpid()
-		
+
 		started := make(chan bool)
 		go func() {
 			started <- true
 			forwardSignals(pid)
 		}()
-		
+
 		// Wait for startup
 		<-started
 		time.Sleep(50 * time.Millisecond)
-		
+
 		t.Log("forwardSignals started successfully")
 	})
 
@@ -129,14 +129,14 @@ func testSignalForwarding(t *testing.T) {
 
 func testContextCancellation(t *testing.T) {
 	// Test that signal handling respects context cancellation
-	
+
 	t.Run("Context_Timeout", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
 		// Wait for context timeout
 		<-ctx.Done()
-		
+
 		if ctx.Err() != context.DeadlineExceeded {
 			t.Errorf("Expected DeadlineExceeded, got %v", ctx.Err())
 		}
@@ -144,7 +144,7 @@ func testContextCancellation(t *testing.T) {
 
 	t.Run("Context_Cancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		
+
 		detected := make(chan bool, 1)
 		go func() {
 			select {
@@ -168,10 +168,10 @@ func testContextCancellation(t *testing.T) {
 
 func testErrorRecovery(t *testing.T) {
 	// Test error handling in signal operations
-	
+
 	t.Run("Invalid_PID_Handling", func(t *testing.T) {
 		invalidPIDs := []int{-1, 0, 999999}
-		
+
 		for _, pid := range invalidPIDs {
 			t.Run(fmt.Sprintf("PID_%d", pid), func(t *testing.T) {
 				// This should not panic
@@ -180,10 +180,10 @@ func testErrorRecovery(t *testing.T) {
 					started <- true
 					forwardSignals(pid)
 				}()
-				
+
 				<-started
 				time.Sleep(10 * time.Millisecond)
-				
+
 				t.Logf("Handled invalid PID %d without panic", pid)
 			})
 		}
@@ -192,23 +192,23 @@ func testErrorRecovery(t *testing.T) {
 	t.Run("Process_Not_Found", func(t *testing.T) {
 		// Test with a PID that definitely doesn't exist
 		nonExistentPID := 99999
-		
+
 		started := make(chan bool)
 		go func() {
 			started <- true
 			forwardSignals(nonExistentPID)
 		}()
-		
+
 		<-started
 		time.Sleep(10 * time.Millisecond)
-		
+
 		t.Log("Handled non-existent process without panic")
 	})
 }
 
 func testSignalBufferManagement(t *testing.T) {
 	// Test that signal buffers are appropriately sized
-	
+
 	bufferSpecs := []struct {
 		function string
 		size     int
@@ -222,11 +222,11 @@ func testSignalBufferManagement(t *testing.T) {
 	for _, spec := range bufferSpecs {
 		t.Run(spec.function, func(t *testing.T) {
 			t.Logf("%s: buffer size %d - %s", spec.function, spec.size, spec.purpose)
-			
+
 			if spec.size < 10 {
 				t.Errorf("Buffer size %d may be too small for %s", spec.size, spec.function)
 			}
-			
+
 			if spec.size > 1000 {
 				t.Errorf("Buffer size %d may be unnecessarily large for %s", spec.size, spec.function)
 			}
@@ -236,7 +236,7 @@ func testSignalBufferManagement(t *testing.T) {
 
 func testTerminalSignalHandling(t *testing.T) {
 	// Test special handling of terminal signals
-	
+
 	terminalSignals := []struct {
 		signal syscall.Signal
 		name   string
@@ -268,12 +268,12 @@ func testTerminalSignalHandling(t *testing.T) {
 
 func testProcessGroupManagement(t *testing.T) {
 	// Test process group management in signal handling
-	
+
 	t.Run("Process_Group_Signaling", func(t *testing.T) {
 		// Document the use of negative PIDs for process group signaling
 		examplePID := 12345
 		processGroupPID := -examplePID
-		
+
 		t.Logf("Using PID %d targets specific process", examplePID)
 		t.Logf("Using PID %d targets entire process group", processGroupPID)
 		t.Log("Process group signaling ensures all child processes receive signals")
@@ -302,16 +302,16 @@ func TestSignalHandlingConcurrency(t *testing.T) {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
-				
+
 				// Use different PIDs to avoid conflicts
 				pid := os.Getpid() + id
-				
+
 				started := make(chan bool)
 				go func() {
 					started <- true
 					forwardSignals(pid)
 				}()
-				
+
 				<-started
 				time.Sleep(10 * time.Millisecond)
 			}(i)
@@ -349,7 +349,7 @@ func TestSignalHandlingIntegration(t *testing.T) {
 
 		// Test that signal handling can be enabled without issues
 		EnableImprovedSignalHandling()
-		
+
 		// Test that signal disabling works
 		DisableSignals()
 		if !DisableSignalHandling {

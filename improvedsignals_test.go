@@ -128,7 +128,7 @@ func TestSignalForwardingRaceConditions(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			// Each goroutine sets up signal forwarding
 			// This should not cause panics or race conditions
 			done := make(chan bool)
@@ -257,7 +257,7 @@ func TestSignalHandlingStates(t *testing.T) {
 	t.Run("Process lifecycle", func(t *testing.T) {
 		states := []string{
 			"Pre-launch",
-			"Launching", 
+			"Launching",
 			"Running",
 			"Shutting down",
 			"Terminated",
@@ -326,7 +326,7 @@ func TestFallbackExecutionScenarios(t *testing.T) {
 // TestSignalMasking tests signal masking behavior
 func TestSignalMasking(t *testing.T) {
 	// Test that certain signals are properly handled or ignored
-	
+
 	t.Run("SIGCHLD masking", func(t *testing.T) {
 		// SIGCHLD should be skipped in forwarding
 		t.Log("SIGCHLD is explicitly skipped in signal forwarding")
@@ -413,7 +413,7 @@ func TestEnvironmentPropagation(t *testing.T) {
 
 		// The relaunch functions should set this
 		os.Unsetenv("MACGO_NO_RELAUNCH")
-		
+
 		// After relaunch functions are called, this should be set
 		// This prevents infinite relaunch loops
 		t.Log("MACGO_NO_RELAUNCH=1 prevents relaunch loops")
@@ -423,7 +423,7 @@ func TestEnvironmentPropagation(t *testing.T) {
 		// Test that custom env vars are preserved
 		testKey := "MACGO_TEST_VAR"
 		testValue := "test_value_123"
-		
+
 		os.Setenv(testKey, testValue)
 		defer os.Unsetenv(testKey)
 
@@ -508,7 +508,7 @@ func TestSignalBufferSizes(t *testing.T) {
 			purpose:  "Handle burst of common signals",
 		},
 		{
-			function: "setupSignalHandling", 
+			function: "setupSignalHandling",
 			size:     100,
 			purpose:  "Handle sustained signal activity",
 		},
@@ -522,7 +522,7 @@ func TestSignalBufferSizes(t *testing.T) {
 	for _, bs := range bufferSizes {
 		t.Run(bs.function, func(t *testing.T) {
 			t.Logf("%s uses buffer size %d: %s", bs.function, bs.size, bs.purpose)
-			
+
 			// Verify buffer is large enough for common scenarios
 			if bs.size < 10 {
 				t.Errorf("Buffer size %d may be too small for %s", bs.size, bs.function)
@@ -552,7 +552,7 @@ func TestErrorRecovery(t *testing.T) {
 	t.Run("Invalid PID handling", func(t *testing.T) {
 		// Test with various invalid PIDs
 		invalidPIDs := []int{-1, 0, 999999}
-		
+
 		for _, pid := range invalidPIDs {
 			t.Logf("Signal forwarding should handle invalid PID %d gracefully", pid)
 		}
@@ -564,10 +564,10 @@ func BenchmarkSignalChannelCreation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Create buffered channel as used in signal handling
 		c := make(chan os.Signal, 100)
-		
+
 		// Set up signal notification
 		signal.Notify(c, syscall.SIGINT)
-		
+
 		// Clean up
 		signal.Stop(c)
 		close(c)
@@ -701,7 +701,7 @@ func TestPipeCreation(t *testing.T) {
 		numPipes := 10
 		pipes := make([]string, numPipes)
 		errors := make([]error, numPipes)
-		
+
 		var wg sync.WaitGroup
 		for i := 0; i < numPipes; i++ {
 			wg.Add(1)
@@ -710,7 +710,7 @@ func TestPipeCreation(t *testing.T) {
 				pipes[idx], errors[idx] = createPipe(fmt.Sprintf("concurrent-%d", idx))
 			}(i)
 		}
-		
+
 		wg.Wait()
 
 		// Clean up and check results
@@ -721,7 +721,7 @@ func TestPipeCreation(t *testing.T) {
 			}
 			if pipe != "" {
 				defer os.Remove(pipe)
-				
+
 				// Verify each pipe is unique
 				for j := i + 1; j < numPipes; j++ {
 					if pipes[j] == pipe {

@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 package macgo
@@ -52,7 +53,7 @@ func TestBundleIDInference(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Skip actual bundle creation, just test the logic
 			// by checking what would be written to Info.plist
-			
+
 			tmpDir, err := os.MkdirTemp("", "bundle-id-test-*")
 			if err != nil {
 				t.Fatal(err)
@@ -170,7 +171,7 @@ func TestBundleTemporaryCleanup(t *testing.T) {
 	// We can't easily test the actual cleanup goroutine timing,
 	// but we can verify the logic paths
 	execPath := "/tmp/go-build123456/main"
-	
+
 	// Check that isTemp detection works
 	isTemp := strings.Contains(execPath, "go-build")
 	if !isTemp {
@@ -195,11 +196,11 @@ func TestBundlePlistEntryTypes(t *testing.T) {
 		{
 			name: "nil and empty values",
 			data: map[string]any{
-				"NilValue":   nil,
-				"EmptyStr":   "",
-				"ZeroInt":    0,
-				"ZeroFloat":  0.0,
-				"FalseBool":  false,
+				"NilValue":  nil,
+				"EmptyStr":  "",
+				"ZeroInt":   0,
+				"ZeroFloat": 0.0,
+				"FalseBool": false,
 			},
 			expected: []string{
 				"<string></string>", // nil becomes empty string

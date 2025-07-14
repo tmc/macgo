@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 package macgo
@@ -224,10 +225,10 @@ func TestMacOSIntegrationPlistGeneration(t *testing.T) {
 		{
 			name: "basic types",
 			plist: map[string]any{
-				"StringKey":  "StringValue",
-				"BoolKey":    true,
-				"IntKey":     42,
-				"FloatKey":   3.14,
+				"StringKey":   "StringValue",
+				"BoolKey":     true,
+				"IntKey":      42,
+				"FloatKey":    3.14,
 				"NSUIElement": true,
 			},
 			expected: []string{
@@ -431,9 +432,9 @@ func TestMacOSIntegrationSandboxConfiguration(t *testing.T) {
 	defer func() { DefaultConfig = origConfig }()
 
 	tests := []struct {
-		name        string
+		name         string
 		entitlements []Entitlement
-		verify      func(t *testing.T, cfg *Config)
+		verify       func(t *testing.T, cfg *Config)
 	}{
 		{
 			name: "sandbox with file access",
@@ -613,7 +614,7 @@ func TestMacOSIntegrationTCCPermissionHandling(t *testing.T) {
 
 	// This test verifies that TCC permissions are properly configured
 	// without actually triggering permission requests
-	
+
 	origConfig := DefaultConfig
 	defer func() { DefaultConfig = origConfig }()
 
@@ -633,7 +634,7 @@ func TestMacOSIntegrationTCCPermissionHandling(t *testing.T) {
 			desc: "Location access",
 		},
 		{
-			name: "contacts and calendar", 
+			name: "contacts and calendar",
 			ents: []Entitlement{EntAddressBook, EntCalendars},
 			desc: "Personal information access",
 		},
@@ -897,7 +898,7 @@ func verifyBundleStructure(t *testing.T, appPath string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	hasExecutable := false
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -905,7 +906,7 @@ func verifyBundleStructure(t *testing.T, appPath string) {
 			break
 		}
 	}
-	
+
 	if !hasExecutable {
 		t.Error("MacOS directory should contain at least one executable")
 	}
@@ -999,8 +1000,8 @@ func TestMacOSIntegrationErrorRecovery(t *testing.T) {
 	defer func() { DefaultConfig = origConfig }()
 
 	tests := []struct {
-		name  string
-		setup func() (string, func())
+		name        string
+		setup       func() (string, func())
 		expectError bool
 	}{
 		{
@@ -1015,11 +1016,11 @@ func TestMacOSIntegrationErrorRecovery(t *testing.T) {
 			setup: func() (string, func()) {
 				tmpExec, _ := ioutil.TempFile("", "test-*")
 				tmpExec.Close()
-				
+
 				cfg := NewConfig()
 				cfg.CustomDestinationAppPath = "/root/no-permission/Test.app"
 				DefaultConfig = cfg
-				
+
 				return tmpExec.Name(), func() { os.Remove(tmpExec.Name()) }
 			},
 			expectError: true,
@@ -1098,7 +1099,7 @@ func TestMacOSIntegrationConcurrentBundleCreation(t *testing.T) {
 			cfg := NewConfig()
 			cfg.ApplicationName = fmt.Sprintf("ConcurrentTest%d", idx)
 			cfg.CustomDestinationAppPath = filepath.Join(os.TempDir(), fmt.Sprintf("ConcurrentTest%d.app", idx))
-			
+
 			// Use a local copy to avoid race conditions
 			localConfig := *cfg
 			DefaultConfig = &localConfig

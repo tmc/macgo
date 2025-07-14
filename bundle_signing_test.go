@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 package macgo
@@ -34,7 +35,7 @@ func TestSignBundle(t *testing.T) {
 	appPath := filepath.Join(tmpDir, "TestApp.app")
 	contentsPath := filepath.Join(appPath, "Contents")
 	macosPath := filepath.Join(contentsPath, "MacOS")
-	
+
 	// Create bundle structure
 	if err := os.MkdirAll(macosPath, 0755); err != nil {
 		t.Fatal(err)
@@ -57,9 +58,9 @@ func TestSignBundle(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		setup           func()
-		expectError     bool
+		name             string
+		setup            func()
+		expectError      bool
 		skipIfNoIdentity bool
 	}{
 		{
@@ -107,7 +108,7 @@ func TestSignBundle(t *testing.T) {
 
 			tt.setup()
 			err := signBundle(appPath)
-			
+
 			if tt.expectError && err == nil {
 				t.Error("Expected error but got none")
 			} else if !tt.expectError && err != nil {
@@ -139,7 +140,7 @@ func TestCheckDeveloperEnvironment(t *testing.T) {
 
 	// This should not panic or cause errors
 	checkDeveloperEnvironment()
-	
+
 	// We can't easily test the actual warnings, but we can ensure it doesn't crash
 	t.Log("Developer environment check completed without crash")
 }
@@ -169,7 +170,7 @@ func TestDebugf(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("MACGO_DEBUG", tt.debugFlag)
-			
+
 			// Should not panic regardless of debug setting
 			debugf("Test message: %s", "value")
 			debugf("Test with multiple args: %s %d %v", "string", 42, true)
@@ -216,12 +217,12 @@ func TestCreateDebugLogFile(t *testing.T) {
 	} else {
 		defer stdoutLog.Close()
 		defer os.Remove(stdoutLog.Name())
-		
+
 		// Verify we can write to it
 		if _, err := stdoutLog.WriteString("test log entry\n"); err != nil {
 			t.Errorf("Failed to write to debug log: %v", err)
 		}
-		
+
 		// Verify filename pattern
 		if !strings.Contains(stdoutLog.Name(), "macgo-debug-stdout") {
 			t.Errorf("Unexpected debug log filename: %s", stdoutLog.Name())
@@ -235,7 +236,7 @@ func TestCreateDebugLogFile(t *testing.T) {
 	} else {
 		defer stderrLog.Close()
 		defer os.Remove(stderrLog.Name())
-		
+
 		// Verify filename includes PID
 		expectedPid := os.Getpid()
 		if !strings.Contains(stderrLog.Name(), fmt.Sprintf("%d", expectedPid)) {
@@ -248,7 +249,7 @@ func TestCreateDebugLogFile(t *testing.T) {
 func TestEnvironmentVariableDetection(t *testing.T) {
 	// We can't directly test init() since it runs before tests,
 	// but we can verify the mechanism works
-	
+
 	envMappings := map[string]Entitlement{
 		"MACGO_CAMERA":         EntCamera,
 		"MACGO_MIC":            EntMicrophone,

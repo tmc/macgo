@@ -144,7 +144,7 @@ func TestPipeIO(t *testing.T) {
 					return
 				}
 				defer f.Close()
-				
+
 				buf := make([]byte, len(testData))
 				n, err := f.Read(buf)
 				if err != nil && err != io.EOF {
@@ -197,7 +197,7 @@ func TestPipeIO(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to open pipe for writing: %v", err)
 		}
-		
+
 		_, err = f.Write(testData)
 		f.Close()
 		if err != nil {
@@ -309,7 +309,7 @@ func TestPipeIOContextFunction(t *testing.T) {
 				return
 			}
 			defer f.Close()
-			
+
 			buf := make([]byte, len(testData))
 			n, _ := f.Read(buf)
 			readDone <- buf[:n]
@@ -412,12 +412,12 @@ func TestPipeIOErrorHandling(t *testing.T) {
 
 	t.Run("Non-existent pipe", func(t *testing.T) {
 		nonExistentPipe := "/tmp/non-existent-pipe-12345"
-		
+
 		// Ensure it doesn't exist
 		os.Remove(nonExistentPipe)
 
 		var output bytes.Buffer
-		
+
 		// This should handle the error gracefully
 		done := make(chan bool)
 		go func() {
@@ -445,7 +445,7 @@ func TestPipeIOErrorHandling(t *testing.T) {
 		if err := os.Chmod(pipePath, 0000); err != nil {
 			t.Fatalf("Failed to change permissions: %v", err)
 		}
-		
+
 		// Restore permissions for cleanup
 		defer os.Chmod(pipePath, 0644)
 
@@ -486,7 +486,7 @@ func TestPipeCleanup(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create pipe %d: %v", i, err)
 		}
-		
+
 		// Use the pipe briefly
 		go func() {
 			f, _ := os.OpenFile(pipePath, os.O_WRONLY, 0)
@@ -542,7 +542,7 @@ func TestPipePerformance(t *testing.T) {
 				return
 			}
 			defer f.Close()
-			
+
 			io.Copy(&output, f)
 			done <- true
 		}()
@@ -597,7 +597,7 @@ func BenchmarkCreatePipe(b *testing.B) {
 	}
 
 	pipes := make([]string, 0, b.N)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pipe, err := createPipe("bench")
@@ -627,11 +627,11 @@ func BenchmarkPipeIO(b *testing.B) {
 	defer os.Remove(pipePath)
 
 	testData := []byte("Benchmark test data for pipe I/O operations")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		reader := bytes.NewReader(testData)
-		
+
 		// Reader goroutine
 		done := make(chan bool)
 		go func() {

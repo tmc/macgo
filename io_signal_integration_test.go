@@ -125,7 +125,7 @@ func main() {
 
 		// Start the test process
 		testCmd := exec.CommandContext(ctx, testBinary)
-		
+
 		// Open pipes for the process
 		stdinFile, _ := os.Open(stdinPipe)
 		defer stdinFile.Close()
@@ -275,7 +275,7 @@ func TestIOCleanupOnSignalTermination(t *testing.T) {
 
 		// Start I/O operations
 		var wg sync.WaitGroup
-		
+
 		for i, pipe := range pipes {
 			wg.Add(1)
 			go func(p string, idx int) {
@@ -331,7 +331,7 @@ func TestIOCleanupOnSignalTermination(t *testing.T) {
 
 		// Start a writer that will be abruptly terminated
 		ctx, cancel := context.WithCancel(context.Background())
-		
+
 		writerStarted := make(chan bool)
 		go func() {
 			writerStarted <- true
@@ -460,7 +460,7 @@ func main() {
 
 		// Start process
 		testCmd := exec.CommandContext(ctx, testBinary)
-		
+
 		stdinFile, _ := os.Open(stdinPipe)
 		defer stdinFile.Close()
 		stdoutFile, _ := os.OpenFile(stdoutPipe, os.O_WRONLY, 0)
@@ -572,7 +572,7 @@ func TestRelaunchWithSignalsIntegration(t *testing.T) {
 
 	t.Run("Simulated relaunch with signal forwarding", func(t *testing.T) {
 		// This simulates the full relaunch scenario with I/O and signals
-		
+
 		// Create the standard macgo pipes
 		pipes := make([]string, 3)
 		for i, name := range []string{"stdin", "stdout", "stderr"} {
@@ -774,7 +774,7 @@ func TestComplexScenarios(t *testing.T) {
 		go func() {
 			var input bytes.Buffer
 			pipeIOContext(ctx, abPipes[0], nil, &input)
-			
+
 			// Transform data
 			transformed := fmt.Sprintf("B transformed: %s", input.String())
 			reader := strings.NewReader(transformed)

@@ -18,11 +18,11 @@ import (
 
 // Cleanup manager for handling temporary resources safely
 type cleanupManager struct {
-	mu        sync.Mutex
-	cleanups  map[string]cleanupEntry
-	ctx       context.Context
-	cancel    context.CancelFunc
-	wg        sync.WaitGroup
+	mu       sync.Mutex
+	cleanups map[string]cleanupEntry
+	ctx      context.Context
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 type cleanupEntry struct {
@@ -469,7 +469,7 @@ func createBundle(execPath string) (string, error) {
 			hasEnabledEntitlements = true
 		}
 	}
-	
+
 	if hasEnabledEntitlements {
 		entPath, err := secureJoin(contentsPath, "entitlements.plist")
 		if err != nil {
@@ -601,7 +601,7 @@ func relaunch(appPath, execPath string) {
 	// Create pipes for IO redirection
 	pipes := make([]string, 3)
 	initCleanupManager() // Ensure cleanup manager is initialized
-	
+
 	for i, name := range []string{"stdin", "stdout", "stderr"} {
 		pipe, err := createPipe("macgo-" + name)
 		if err != nil {
@@ -609,7 +609,7 @@ func relaunch(appPath, execPath string) {
 			return
 		}
 		pipes[i] = pipe
-		
+
 		// Schedule secure cleanup for pipe and its parent directory
 		globalCleanupManager.scheduleCleanup(pipe, 5*time.Minute, false)
 		pipeDir := filepath.Dir(pipe)
@@ -779,7 +779,7 @@ func createPipe(prefix string) (string, error) {
 	// Create the named pipe atomically
 	cmd := exec.Command(cleanMkfifoPath, pipePath)
 	cmd.Env = []string{"PATH=/usr/bin:/bin"} // Restricted environment
-	
+
 	if err := cmd.Run(); err != nil {
 		os.RemoveAll(tmpDir)
 		return "", fmt.Errorf("create named pipe: %w", err)
@@ -1225,7 +1225,7 @@ func signBundle(appPath string) error {
 
 	// Execute codesign with validated binary and arguments
 	cmd := exec.Command(codesignPath, args...)
-	
+
 	// Set up secure execution environment
 	cmd.Env = []string{
 		"PATH=/usr/bin:/bin", // Restricted PATH to prevent binary hijacking

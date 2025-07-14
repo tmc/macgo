@@ -1490,7 +1490,7 @@ func TestLoadEntitlementsFromJSON_EdgeCases(t *testing.T) {
 			},
 			jsonData: `{"com.apple.security.device.camera\n": true, "com.apple.security.device\t.microphone": false}`,
 			expected: map[Entitlement]bool{
-				Entitlement("com.apple.security.device.camera\n"):   true,
+				Entitlement("com.apple.security.device.camera\n"):     true,
 				Entitlement("com.apple.security.device\t.microphone"): false,
 			},
 			expectError: false,
@@ -1827,9 +1827,9 @@ func TestRequestEntitlementsVariadicEdgeCases(t *testing.T) {
 			description: "should only add valid string and Entitlement types",
 			validate: func(t *testing.T) {
 				expected := map[Entitlement]bool{
-					EntCamera:                                true,
-					Entitlement("com.apple.security.custom"): true,
-					EntMicrophone:                            true,
+					EntCamera:                                 true,
+					Entitlement("com.apple.security.custom"):  true,
+					EntMicrophone:                             true,
 					Entitlement("com.apple.security.another"): true,
 				}
 				if len(DefaultConfig.Entitlements) != len(expected) {

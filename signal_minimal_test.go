@@ -58,7 +58,7 @@ func TestSignalHandlingMinimal(t *testing.T) {
 
 		// Wait for goroutine to start
 		<-started
-		
+
 		// Let it run briefly
 		time.Sleep(100 * time.Millisecond)
 
@@ -76,7 +76,7 @@ func TestSignalHandlingMinimal(t *testing.T) {
 
 		// Setup signal handling
 		sigChan := setupSignalHandling(proc)
-		
+
 		// Verify channel was created
 		if sigChan == nil {
 			t.Error("Expected non-nil signal channel")
@@ -139,8 +139,8 @@ func TestSignalConstants(t *testing.T) {
 // TestSignalBufferSizesMinimal documents expected buffer sizes
 func TestSignalBufferSizesMinimal(t *testing.T) {
 	expectedSizes := map[string]int{
-		"forwardSignals":                         16,
-		"setupSignalHandling":                    100,
+		"forwardSignals":                          16,
+		"setupSignalHandling":                     100,
 		"relaunchWithRobustSignalHandlingContext": 100,
 	}
 
@@ -156,13 +156,13 @@ func TestSignalBufferSizesMinimal(t *testing.T) {
 func TestSignalSkippingBehavior(t *testing.T) {
 	// SIGCHLD should be skipped
 	t.Log("SIGCHLD should be skipped in signal forwarding")
-	
+
 	// Terminal signals get special handling
 	terminalSignals := []string{"SIGTSTP", "SIGTTIN", "SIGTTOU"}
 	for _, sig := range terminalSignals {
 		t.Logf("%s should trigger SIGSTOP on parent process", sig)
 	}
-	
+
 	// Uncatchable signals
 	uncatchable := []string{"SIGKILL", "SIGSTOP"}
 	for _, sig := range uncatchable {

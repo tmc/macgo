@@ -109,7 +109,7 @@ func main() {
 
 		// Run the test program with pipes
 		testCmd := exec.CommandContext(ctx, testBinary)
-		
+
 		// Open pipes for the child process
 		stdinFile, err := os.Open(stdinPipe)
 		if err != nil {
@@ -258,7 +258,7 @@ func TestProcessCommunicationReliability(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			
+
 			// Write messages 0 and 2
 			for i := 0; i < len(messages); i += 2 {
 				reader := strings.NewReader(messages[i] + "\n")
@@ -268,7 +268,7 @@ func TestProcessCommunicationReliability(t *testing.T) {
 			// Read messages 1 and 3
 			var received bytes.Buffer
 			pipeIOContext(ctx, pipe2, nil, &received)
-			
+
 			// Verify received messages
 			lines := strings.Split(strings.TrimSpace(received.String()), "\n")
 			for i := 1; i < len(messages); i += 2 {
@@ -282,17 +282,17 @@ func TestProcessCommunicationReliability(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			
+
 			// Read messages 0 and 2
 			var received bytes.Buffer
 			pipeIOContext(ctx, pipe1, nil, &received)
-			
+
 			// Write messages 1 and 3
 			for i := 1; i < len(messages); i += 2 {
 				reader := strings.NewReader(messages[i] + "\n")
 				pipeIOContext(ctx, pipe2, reader, nil)
 			}
-			
+
 			// Verify received messages
 			lines := strings.Split(strings.TrimSpace(received.String()), "\n")
 			for i := 0; i < len(messages); i += 2 {
@@ -350,7 +350,7 @@ func TestPipeCleanupAndResourceManagement(t *testing.T) {
 		var wg sync.WaitGroup
 		for i, pipe := range pipes {
 			wg.Add(2)
-			
+
 			// Writer
 			go func(p string, idx int) {
 				defer wg.Done()
@@ -500,12 +500,12 @@ func TestErrorScenariosAndRecovery(t *testing.T) {
 				readerDone <- err
 				return
 			}
-			
+
 			// Read a small amount then close
 			buf := make([]byte, 1024)
 			f.Read(buf)
 			f.Close() // Simulate broken pipe
-			
+
 			readerDone <- nil
 		}()
 
@@ -670,10 +670,10 @@ func TestContextCancellationAndTimeouts(t *testing.T) {
 
 		// Both should stop when context times out
 		<-ctx.Done()
-		
+
 		// Verify operations stopped
 		time.Sleep(100 * time.Millisecond) // Give operations time to clean up
-		
+
 		select {
 		case <-writerDone:
 			// Writer stopped
@@ -700,7 +700,7 @@ func TestIntegrationWithRelaunchMechanism(t *testing.T) {
 		// This simulates the I/O setup that happens during relaunch
 		pipes := make([]string, 3)
 		pipeNames := []string{"stdin", "stdout", "stderr"}
-		
+
 		// Create pipes like relaunch does
 		for i, name := range pipeNames {
 			pipe, err := createPipe("macgo-" + name)
@@ -821,7 +821,7 @@ func TestIntegrationWithRelaunchMechanism(t *testing.T) {
 				// Create unique pipes for this process
 				pipes := make([]string, 3)
 				pipeNames := []string{"stdin", "stdout", "stderr"}
-				
+
 				for j, name := range pipeNames {
 					pipe, err := createPipe(fmt.Sprintf("proc%d-%s", processID, name))
 					if err != nil {
@@ -887,7 +887,7 @@ func TestIntegrationWithRelaunchMechanism(t *testing.T) {
 				case <-ioDone:
 					// Verify output
 					if outputBuf.String() != expectedOutput {
-						errors <- fmt.Errorf("Process %d: output mismatch: expected %q, got %q", 
+						errors <- fmt.Errorf("Process %d: output mismatch: expected %q, got %q",
 							processID, expectedOutput, outputBuf.String())
 					}
 				case <-ctx.Done():
@@ -931,9 +931,9 @@ func (r *slowReader) Read(p []byte) (n int, err error) {
 	if r.pos >= len(r.data) {
 		return 0, io.EOF
 	}
-	
+
 	time.Sleep(r.delay)
-	
+
 	n = copy(p, r.data[r.pos:])
 	r.pos += n
 	return n, nil
@@ -1006,10 +1006,10 @@ func TestPipeIOTeeWriter(t *testing.T) {
 		defer os.Remove(pipePath)
 
 		testData := "Test data for TeeWriter\n"
-		
+
 		// Create buffers for primary and debug output
 		var primaryBuf, debugBuf bytes.Buffer
-		
+
 		// Create a MultiWriter (TeeWriter)
 		teeWriter := io.MultiWriter(&primaryBuf, &debugBuf)
 
