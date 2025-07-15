@@ -1,0 +1,163 @@
+name: macOS Compatibility Testing
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM
+
+jobs:
+  compatibility-matrix:
+    name: macOS Compatibility
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Current stable macOS versions
+          - os: macos-14      # macOS Sonoma 14.x (Apple Silicon)
+            arch: arm64
+            name: "Sonoma (Apple Silicon)"
+          
+          - os: macos-13      # macOS Ventura 13.x (Intel)
+            arch: x86_64
+            name: "Ventura (Intel)"
+          
+          - os: macos-12      # macOS Monterey 12.x (Intel)
+            arch: x86_64
+            name: "Monterey (Intel)"
+            
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: System Information
+        run: |
+          echo "=== System Information ==="
+          sw_vers
+          echo "Architecture: $(uname -m)"
+          echo "Processor: $(sysctl -n machdep.cpu.brand_string)"
+          echo "========================="
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      
+      - name: Verify Architecture
+        run: |
+          if [[ "$(uname -m)" != "${{ matrix.arch }}" ]]; then
+            echo "Warning: Expected ${{ matrix.arch }} but got $(uname -m)"
+          fi
+      
+      - name: Build and Test
+        run: |
+          go build -v ./...
+          go test -v -race ./...
+        env:
+          CGO_ENABLED: 1
+      
+      - name: Test App Bundle Creation
+        run: |
+          # Test creating an app bundle
+          go test -v -run TestCreateBundle ./...
+      
+      - name: Test Entitlements
+        run: |
+          # Test entitlements functionality
+          go test -v ./entitlements/...
+      
+      - name: Test Signal Handling
+        run: |
+          # Test signal handling with timeout
+          go test -v -timeout=5m -run "TestSignal" ./...
+      
+      - name: Test Examples
+        run: |
+          # Build and run basic examples
+          go build -o /tmp/minimal-example ./examples/minimal/main.go
+          go build -o /tmp/simple-example ./examples/simple/main.go
+          
+          # Test minimal example
+          /tmp/minimal-example &
+          PID=$!
+          sleep 2
+          kill $PID 2>/dev/null || true
+          wait $PID 2>/dev/null || true
+      
+      - name: Sandbox Compatibility Test
+        run: |
+          # Test sandbox-specific functionality
+          go test -v -run "TestSandbox" ./...
+      
+      - name: System Framework Test
+        run: |
+          # Verify required system frameworks are available
+          echo "Checking for required frameworks..."
+          ls -la /System/Library/Frameworks/AppKit.framework 2>/dev/null || echo "AppKit not found"
+          ls -la /System/Library/Frameworks/CoreServices.framework 2>/dev/null || echo "CoreServices not found"
+      
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.name }}-${{ matrix.arch }}
+          path: |
+            *.log
+            test-results/
+
+  cross-compilation:
+    name: Cross Compilation Test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      
+      - name: Test Cross Compilation
+        run: |
+          echo "=== Testing cross compilation ==="
+          
+          # AMD64
+          GOOS=darwin GOARCH=amd64 go build -o macgo-amd64 ./cmd/macgo-debug
+          file macgo-amd64
+          
+          # ARM64
+          GOOS=darwin GOARCH=arm64 go build -o macgo-arm64 ./cmd/macgo-debug
+          file macgo-arm64
+          
+          # Create universal binary
+          lipo -create -output macgo-universal macgo-amd64 macgo-arm64
+          lipo -info macgo-universal
+          
+          echo "Cross compilation successful!"
+
+  permission-test:
+    name: TCC Permission Tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      
+      - name: Test Permission Status Checking
+        run: |
+          # Note: In CI, we can only test the permission checking code,
+          # not actually grant permissions
+          go test -v ./entitlements/... -run "TestCheckPermission"
+      
+      - name: Build Permission Examples
+        run: |
+          # Build examples that request various permissions
+          go build -o /tmp/camera-example ./examples/entitlements/main.go || true
+          
+          # Note: We can't actually test these in CI as they require
+          # user interaction for permission grants
