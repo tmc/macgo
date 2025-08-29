@@ -4,6 +4,23 @@ This directory contains examples demonstrating different ways to use the macgo p
 
 ## Core Examples
 
+### Getting Started
+[getting-started/main.go](getting-started/main.go) - The recommended starting point showing proper API usage patterns.
+
+```go
+import (
+    "github.com/tmc/misc/macgo"
+    "github.com/tmc/misc/macgo/entitlements"
+)
+
+func init() {
+    entitlements.SetAppSandbox()
+    entitlements.SetCamera()
+    macgo.EnableImprovedSignalHandling()
+    macgo.Start()
+}
+```
+
 ### Minimal Usage
 [minimal/main.go](minimal/main.go) - The simplest way to use macgo with a blank import of the auto package.
 
@@ -16,12 +33,21 @@ import (
 ### Simple Usage
 [simple/main.go](simple/main.go) - A basic example showing file access with the auto package.
 
+### Hello World
+[hello/main.go](hello/main.go) - A simple hello world example with debug package usage.
+
 ### Customization With Environment Variables
 [customization/main.go](customization/main.go) - Configure macgo through environment variables.
 
 ```
 MACGO_APP_NAME="CustomApp" MACGO_BUNDLE_ID="com.example.custom" MACGO_CAMERA=1 MACGO_MIC=1 MACGO_DEBUG=1 go run main.go
 ```
+
+### Auto-Initialization
+[auto-initialization/main.go](auto-initialization/main.go) - Demonstrates auto-initialization packages for simplified setup.
+
+### Entitlements Package Demo
+[entitlements-package-demo/main.go](entitlements-package-demo/main.go) - Shows how to use the entitlements package for semantic permission setting.
 
 ### Signal Handling
 [signal-handling/main.go](signal-handling/main.go) - Legacy signal handling example (now redundant as robust signal handling is enabled by default).
@@ -61,7 +87,13 @@ cfg.AddEntitlement(macgo.EntCamera)
 [custom-template/main.go](custom-template/main.go) - Using a custom app template with embedded files.
 
 ### Entitlements From JSON
-[entitlements/main.go](entitlements/main.go) - Loading entitlements from embedded JSON.
+[entitlements/main.go](entitlements/main.go) - Loading entitlements from embedded JSON and using entitlements package.
+
+### Comprehensive Features
+[comprehensive-features/main.go](comprehensive-features/main.go) - Shows all new features including SetIconFile, EnableImprovedSignalHandling, and entitlements package.
+
+### New Features Demo
+[new-features/main.go](new-features/main.go) - Demonstrates newly documented features like SetIconFile and StartWithContext.
 
 ## Sandbox Examples
 
