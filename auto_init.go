@@ -1,5 +1,7 @@
 package macgo
 
+import "github.com/tmc/misc/macgo/signal"
+
 // EnableAutoInit is deprecated and no longer has any effect.
 // For new code, use macgo.Start() explicitly.
 //
@@ -8,9 +10,6 @@ package macgo
 //	import (
 //	    _ "github.com/tmc/misc/macgo/auto"
 //	)
-func EnableAutoInit() {
-	// No-op for backward compatibility
-}
 
 // EnableImprovedSignalHandling sets up the improved signal handling
 // for better process control, especially for Ctrl+C handling.
@@ -40,8 +39,9 @@ func EnableImprovedSignalHandling() {
 	SetReLaunchFunction(improvedSignalAdapter)
 }
 
-// improvedSignalAdapter adapts relaunchWithIORedirection to the ReLaunchFunction signature
+// improvedSignalAdapter adapts signal handling to the ReLaunchFunction signature
 func improvedSignalAdapter(appPath, execPath string, args []string) {
-	// We ignore the args parameter since relaunchWithIORedirection builds its own
-	relaunchWithIORedirection(appPath, execPath)
+	debugf("macgo: using improved signal handling (adapter)")
+	// Use the consolidated signal package for robust signal handling
+	signal.RelaunchWithRobustSignalHandling(appPath, execPath, args)
 }

@@ -117,11 +117,11 @@ func TestEnvironmentVariableHandling(t *testing.T) {
 		{
 			name: "Multiple environment variables",
 			envVars: map[string]string{
-				"MACGO_APP_NAME":        "MultiEnvApp",
-				"MACGO_BUNDLE_ID":       "com.example.multienv",
-				"MACGO_KEEP_TEMP":       "1",
-				"MACGO_SHOW_DOCK_ICON":  "1",
-				"MACGO_DEBUG":           "1",
+				"MACGO_APP_NAME":       "MultiEnvApp",
+				"MACGO_BUNDLE_ID":      "com.example.multienv",
+				"MACGO_KEEP_TEMP":      "1",
+				"MACGO_SHOW_DOCK_ICON": "1",
+				"MACGO_DEBUG":          "1",
 			},
 			setup: func(cfg *Config) {
 				// No additional setup needed
@@ -594,18 +594,18 @@ func applyEnvironmentVariables(cfg *Config) {
 
 	// Apply entitlement environment variables
 	entitlementEnvVars := map[string]Entitlement{
-		"MACGO_CAMERA":                    entitlements.EntCamera,
-		"MACGO_MIC":                       entitlements.EntMicrophone,
-		"MACGO_LOCATION":                  entitlements.EntLocation,
-		"MACGO_CONTACTS":                  entitlements.EntAddressBook,
-		"MACGO_CALENDARS":                 entitlements.EntCalendars,
-		"MACGO_REMINDERS":                 entitlements.EntReminders,
-		"MACGO_PHOTOS":                    entitlements.EntPhotos,
-		"MACGO_SANDBOX":                   entitlements.EntAppSandbox,
-		"MACGO_NETWORK_CLIENT":            entitlements.EntNetworkClient,
-		"MACGO_NETWORK_SERVER":            entitlements.EntNetworkServer,
-		"MACGO_USER_SELECTED_READ_ONLY":   entitlements.EntUserSelectedReadOnly,
-		"MACGO_USER_SELECTED_READ_WRITE":  entitlements.EntUserSelectedReadWrite,
+		"MACGO_CAMERA":                   entitlements.EntCamera,
+		"MACGO_MIC":                      entitlements.EntMicrophone,
+		"MACGO_LOCATION":                 entitlements.EntLocation,
+		"MACGO_CONTACTS":                 entitlements.EntAddressBook,
+		"MACGO_CALENDARS":                entitlements.EntCalendars,
+		"MACGO_REMINDERS":                entitlements.EntReminders,
+		"MACGO_PHOTOS":                   entitlements.EntPhotos,
+		"MACGO_SANDBOX":                  entitlements.EntAppSandbox,
+		"MACGO_NETWORK_CLIENT":           entitlements.EntNetworkClient,
+		"MACGO_NETWORK_SERVER":           entitlements.EntNetworkServer,
+		"MACGO_USER_SELECTED_READ_ONLY":  entitlements.EntUserSelectedReadOnly,
+		"MACGO_USER_SELECTED_READ_WRITE": entitlements.EntUserSelectedReadWrite,
 	}
 
 	for envVar, ent := range entitlementEnvVars {
@@ -618,10 +618,6 @@ func applyEnvironmentVariables(cfg *Config) {
 	}
 }
 
-// Helper function to check if debug is enabled
-func isDebugEnabled() bool {
-	return os.Getenv("MACGO_DEBUG") == "1"
-}
 
 // Benchmark tests
 func BenchmarkEnvironmentVariableProcessing(b *testing.B) {
