@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 // This file simulates how macgo behaves on non-Darwin platforms.

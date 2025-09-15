@@ -618,7 +618,6 @@ func applyEnvironmentVariables(cfg *Config) {
 	}
 }
 
-
 // Benchmark tests
 func BenchmarkEnvironmentVariableProcessing(b *testing.B) {
 	// Set up environment variables
