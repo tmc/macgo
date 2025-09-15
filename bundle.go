@@ -323,6 +323,14 @@ func createBundle(execPath string) (string, error) {
 			return "", fmt.Errorf("invalid application name: %w", err)
 		}
 		appName = cleanAppName
+
+		// Ensure app name won't exceed filesystem limits when creating .app bundle
+		// Most filesystems have a 255 character limit, reserve 4 chars for ".app"
+		const maxAppNameLen = 251
+		if len(appName) > maxAppNameLen {
+			appName = appName[:maxAppNameLen]
+			debugf("Truncated long application name to %d characters: %s", maxAppNameLen, appName)
+		}
 	}
 
 	// Check if using go run (temporary binary)
@@ -963,6 +971,14 @@ func createFromTemplate(template fs.FS, appPath, execPath, appName string) (stri
 		return "", fmt.Errorf("invalid app name: %w", err)
 	}
 	appName = cleanAppName
+
+	// Ensure app name won't exceed filesystem limits when creating .app bundle
+	// Most filesystems have a 255 character limit, reserve 4 chars for ".app"
+	const maxAppNameLen = 251
+	if len(appName) > maxAppNameLen {
+		appName = appName[:maxAppNameLen]
+		debugf("Truncated long application name to %d characters: %s", maxAppNameLen, appName)
+	}
 
 	// Create the app bundle directory
 	if err := os.MkdirAll(appPath, 0755); err != nil {

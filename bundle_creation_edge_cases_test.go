@@ -699,7 +699,14 @@ func testBundleCreation(cfg *Config, execPath string) error {
 		defer os.RemoveAll(tmpDir)
 	}
 
-	bundlePath := filepath.Join(tmpDir, cfg.ApplicationName+".app")
+	// Apply the same filename length validation as the main bundle creation code
+	appName := cfg.ApplicationName
+	const maxAppNameLen = 251 // Reserve 4 chars for ".app"
+	if len(appName) > maxAppNameLen {
+		appName = appName[:maxAppNameLen]
+	}
+
+	bundlePath := filepath.Join(tmpDir, appName+".app")
 	contentsPath := filepath.Join(bundlePath, "Contents")
 	macOSPath := filepath.Join(contentsPath, "MacOS")
 
@@ -709,7 +716,7 @@ func testBundleCreation(cfg *Config, execPath string) error {
 	}
 
 	// Copy executable
-	execName := cfg.ApplicationName
+	execName := appName
 	if execName == "" {
 		execName = "app"
 	}
