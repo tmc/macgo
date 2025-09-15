@@ -6,11 +6,19 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"runtime"
 	"sync"
 )
 
 // configMutex protects concurrent access to DefaultConfig
 var configMutex sync.RWMutex
+
+// warnIfNotDarwin prints a warning if running on non-macOS platforms
+func warnIfNotDarwin(operation string) {
+	if runtime.GOOS != "darwin" {
+		debugf("macgo: %s has no effect on non-macOS platforms (current: %s)", operation, runtime.GOOS)
+	}
+}
 
 // RequestEntitlements adds multiple entitlements at once.
 // All entitlements will be enabled (set to true).
@@ -26,6 +34,8 @@ var configMutex sync.RWMutex
 //
 // This is the preferred method for requesting entitlements.
 func RequestEntitlements(entitlements ...interface{}) {
+	warnIfNotDarwin("requesting entitlements")
+
 	configMutex.Lock()
 	defer configMutex.Unlock()
 
@@ -53,6 +63,8 @@ func RequestEntitlements(entitlements ...interface{}) {
 //
 //	macgo.RequestEntitlement(macgo.EntCamera)
 func RequestEntitlement(entitlement interface{}) {
+	warnIfNotDarwin("requesting entitlement")
+
 	configMutex.Lock()
 	defer configMutex.Unlock()
 
@@ -136,6 +148,8 @@ func SetCustomAppBundle(template fs.FS) {
 // EnableSigning enables app bundle signing with an optional identity.
 // If identity is empty, ad-hoc signing ("-") will be used.
 func EnableSigning(identity string) {
+	warnIfNotDarwin("enabling code signing")
+
 	configMutex.Lock()
 	defer configMutex.Unlock()
 	DefaultConfig.AutoSign = true
