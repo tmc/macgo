@@ -729,7 +729,7 @@ func TestConfigEdgeCases(t *testing.T) {
 }
 
 // TestRequestEntitlements tests the package-level RequestEntitlements function
-func TestRequestEntitlements(t *testing.T) {
+func TestRequestEntitlementsOld(t *testing.T) {
 	// Save original DefaultConfig
 	originalConfig := DefaultConfig
 	defer func() {
@@ -843,7 +843,7 @@ func TestRequestEntitlements(t *testing.T) {
 }
 
 // TestRequestEntitlement tests the package-level RequestEntitlement function
-func TestRequestEntitlement(t *testing.T) {
+func TestRequestEntitlementOld(t *testing.T) {
 	// Save original DefaultConfig
 	originalConfig := DefaultConfig
 	defer func() {
@@ -941,7 +941,7 @@ func TestRequestEntitlement(t *testing.T) {
 }
 
 // TestLoadEntitlementsFromJSON tests the LoadEntitlementsFromJSON function
-func TestLoadEntitlementsFromJSON(t *testing.T) {
+func TestLoadEntitlementsFromJSONOld(t *testing.T) {
 	// Save original DefaultConfig
 	originalConfig := DefaultConfig
 	defer func() {
@@ -1138,7 +1138,7 @@ func TestAPIConvenienceFunctions(t *testing.T) {
 }
 
 // TestSetCustomAppBundle tests the SetCustomAppBundle function
-func TestSetCustomAppBundle(t *testing.T) {
+func TestSetCustomAppBundleOld(t *testing.T) {
 	// Save original DefaultConfig
 	originalConfig := DefaultConfig
 	defer func() {
@@ -1557,7 +1557,7 @@ func TestLoadEntitlementsFromJSON_EdgeCases(t *testing.T) {
 }
 
 // TestEnableDebug tests the EnableDebug function
-func TestEnableDebug(t *testing.T) {
+func TestEnableDebugOld(t *testing.T) {
 	// Save original env var
 	originalDebug := os.Getenv("MACGO_DEBUG")
 	defer func() {

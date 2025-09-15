@@ -38,110 +38,64 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tmc/misc/macgo/entitlements"
+	"github.com/tmc/misc/macgo/signal"
 )
 
-// Entitlement is a type for macOS entitlement identifiers.
-// Entitlements are special permissions that allow apps to access protected
-// resources and perform privileged operations on macOS.
-type Entitlement string
+// Type aliases for entitlements package types
+type Entitlement = entitlements.Entitlement
+type Entitlements = entitlements.Entitlements
 
-// Entitlements is a map of entitlement identifiers to boolean values.
-// When true, the entitlement is granted; when false, it is explicitly denied.
-type Entitlements map[Entitlement]bool
-
-// Available app sandbox entitlements
+// Entitlement constants from entitlements package for backward compatibility
 const (
-	// EntAppSandbox enables the macOS App Sandbox, which provides a secure environment
-	// by restricting access to system resources. Required for many other entitlements.
-	EntAppSandbox Entitlement = "com.apple.security.app-sandbox"
+	// App Sandbox entitlements
+	EntAppSandbox    = entitlements.EntAppSandbox
+	EntNetworkClient = entitlements.EntNetworkClient
+	EntNetworkServer = entitlements.EntNetworkServer
 
-	// Network entitlements
-	// NOTE: These network entitlements only affect Objective-C/Swift network APIs.
-	// Go's standard networking (net/http, etc.) bypasses these restrictions and will
-	// work regardless of these entitlements being present or not. To properly restrict
-	// network access in Go applications, additional measures are required.
+	// Device entitlements
+	EntCamera     = entitlements.EntCamera
+	EntMicrophone = entitlements.EntMicrophone
+	EntBluetooth  = entitlements.EntBluetooth
+	EntUSB        = entitlements.EntUSB
+	EntAudioInput = entitlements.EntAudioInput
+	EntPrint      = entitlements.EntPrint
 
-	// EntNetworkClient allows the app to make outgoing network connections
-	EntNetworkClient Entitlement = "com.apple.security.network.client"
-	// EntNetworkServer allows the app to listen for incoming network connections
-	EntNetworkServer Entitlement = "com.apple.security.network.server"
+	// Personal information entitlements
+	EntAddressBook = entitlements.EntAddressBook
+	EntLocation    = entitlements.EntLocation
+	EntCalendars   = entitlements.EntCalendars
+	EntPhotos      = entitlements.EntPhotos
+	EntReminders   = entitlements.EntReminders
 
-	// Device entitlements - provide access to hardware devices
+	// File entitlements
+	EntUserSelectedReadOnly  = entitlements.EntUserSelectedReadOnly
+	EntUserSelectedReadWrite = entitlements.EntUserSelectedReadWrite
+	EntDownloadsReadOnly     = entitlements.EntDownloadsReadOnly
+	EntDownloadsReadWrite    = entitlements.EntDownloadsReadWrite
+	EntPicturesReadOnly      = entitlements.EntPicturesReadOnly
+	EntPicturesReadWrite     = entitlements.EntPicturesReadWrite
+	EntMusicReadOnly         = entitlements.EntMusicReadOnly
+	EntMusicReadWrite        = entitlements.EntMusicReadWrite
+	EntMoviesReadOnly        = entitlements.EntMoviesReadOnly
+	EntMoviesReadWrite       = entitlements.EntMoviesReadWrite
 
-	// EntCamera allows access to the camera (requires user approval via TCC)
-	EntCamera Entitlement = "com.apple.security.device.camera"
-	// EntMicrophone allows access to the microphone (requires user approval via TCC)
-	EntMicrophone Entitlement = "com.apple.security.device.microphone"
-	// EntBluetooth allows access to Bluetooth devices
-	EntBluetooth Entitlement = "com.apple.security.device.bluetooth"
-	// EntUSB allows access to USB devices
-	EntUSB Entitlement = "com.apple.security.device.usb"
-	// EntAudioInput allows access to audio input devices
-	EntAudioInput Entitlement = "com.apple.security.device.audio-input"
-	// EntPrint allows access to printing services
-	EntPrint Entitlement = "com.apple.security.print"
-
-	// Personal information entitlements - provide access to user data
-
-	// EntAddressBook allows access to the user's contacts (requires user approval via TCC)
-	EntAddressBook Entitlement = "com.apple.security.personal-information.addressbook"
-	// EntLocation allows access to location services (requires user approval via TCC)
-	EntLocation Entitlement = "com.apple.security.personal-information.location"
-	// EntCalendars allows access to calendar data (requires user approval via TCC)
-	EntCalendars Entitlement = "com.apple.security.personal-information.calendars"
-	// EntPhotos allows access to the Photos library (requires user approval via TCC)
-	EntPhotos Entitlement = "com.apple.security.personal-information.photos-library"
-	// EntReminders allows access to reminders (requires user approval via TCC)
-	EntReminders Entitlement = "com.apple.security.personal-information.reminders"
-
-	// File entitlements - control access to specific file system locations
-
-	// EntUserSelectedReadOnly allows read-only access to files selected by the user
-	EntUserSelectedReadOnly Entitlement = "com.apple.security.files.user-selected.read-only"
-	// EntUserSelectedReadWrite allows read-write access to files selected by the user
-	EntUserSelectedReadWrite Entitlement = "com.apple.security.files.user-selected.read-write"
-	// EntDownloadsReadOnly allows read-only access to the Downloads folder
-	EntDownloadsReadOnly Entitlement = "com.apple.security.files.downloads.read-only"
-	// EntDownloadsReadWrite allows read-write access to the Downloads folder
-	EntDownloadsReadWrite Entitlement = "com.apple.security.files.downloads.read-write"
-	// EntPicturesReadOnly allows read-only access to the Pictures folder
-	EntPicturesReadOnly Entitlement = "com.apple.security.assets.pictures.read-only"
-	// EntPicturesReadWrite allows read-write access to the Pictures folder
-	EntPicturesReadWrite Entitlement = "com.apple.security.assets.pictures.read-write"
-	// EntMusicReadOnly allows read-only access to the Music folder
-	EntMusicReadOnly Entitlement = "com.apple.security.assets.music.read-only"
-	// EntMusicReadWrite allows read-write access to the Music folder
-	EntMusicReadWrite Entitlement = "com.apple.security.assets.music.read-write"
-	// EntMoviesReadOnly allows read-only access to the Movies folder
-	EntMoviesReadOnly Entitlement = "com.apple.security.assets.movies.read-only"
-	// EntMoviesReadWrite allows read-write access to the Movies folder
-	EntMoviesReadWrite Entitlement = "com.apple.security.assets.movies.read-write"
-
-	// Hardened Runtime entitlements - control code execution and security features
-
-	// EntAllowJIT allows Just-In-Time compilation (required for some interpreters)
-	EntAllowJIT Entitlement = "com.apple.security.cs.allow-jit"
-	// EntAllowUnsignedExecutableMemory allows unsigned executable memory pages
-	EntAllowUnsignedExecutableMemory Entitlement = "com.apple.security.cs.allow-unsigned-executable-memory"
-	// EntAllowDyldEnvVars allows DYLD environment variables to be used
-	EntAllowDyldEnvVars Entitlement = "com.apple.security.cs.allow-dyld-environment-variables"
-	// EntDisableLibraryValidation disables library validation allowing unsigned libraries
-	EntDisableLibraryValidation Entitlement = "com.apple.security.cs.disable-library-validation"
-	// EntDisableExecutablePageProtection disables executable page protection
-	EntDisableExecutablePageProtection Entitlement = "com.apple.security.cs.disable-executable-page-protection"
-	// EntDebugger allows other processes to attach as a debugger
-	EntDebugger Entitlement = "com.apple.security.cs.debugger"
+	// Hardened Runtime entitlements
+	EntHardenedRuntime                 = entitlements.EntHardenedRuntime
+	EntAllowJIT                        = entitlements.EntAllowJIT
+	EntAllowUnsignedExecutableMemory   = entitlements.EntAllowUnsignedExecutableMemory
+	EntAllowDyldEnvVars                = entitlements.EntAllowDyldEnvVars
+	EntDisableLibraryValidation        = entitlements.EntDisableLibraryValidation
+	EntDisableExecutablePageProtection = entitlements.EntDisableExecutablePageProtection
+	EntDebugger                        = entitlements.EntDebugger
 
 	// Virtualization entitlements
-
-	// EntVirtualization allows the app to use virtualization features
-	EntVirtualization Entitlement = "com.apple.security.virtualization"
-
-	// Custom entitlements: If you need to add more entitlements, you can simply cast string to Entitlement:
-	// Example: Entitlement("com.apple.security.some.new.entitlement")
+	EntVirtualization = entitlements.EntVirtualization
 )
 
 // DefaultConfig is the default configuration for macgo.
@@ -348,6 +302,12 @@ func DisableAutoInit() {
 // - Creation of new app bundles when needed
 // - Process relaunching with proper I/O and signal forwarding
 func initializeMacGo() {
+	// Skip on non-macOS platforms - macgo only works on Darwin
+	if runtime.GOOS != "darwin" {
+		debugf("macgo: skipping initialization on non-macOS platform (%s)", runtime.GOOS)
+		return
+	}
+
 	// Skip if already running inside an app bundle
 	if isRunningInBundle() {
 		debugf("Already running inside an app bundle")
@@ -400,9 +360,9 @@ func initializeMacGo() {
 			// Use robust signal handling by default with context
 			debugf("Using robust signal handling (default)")
 			if globalCtx != nil {
-				relaunchWithIORedirectionContext(globalCtx, appPath, execPath)
+				signal.RelaunchWithRobustSignalHandlingContext(globalCtx, appPath, execPath, os.Args[1:])
 			} else {
-				relaunchWithIORedirection(appPath, execPath)
+				signal.RelaunchWithRobustSignalHandling(appPath, execPath, os.Args[1:])
 			}
 		}
 	}
@@ -425,6 +385,9 @@ func isRunningInBundle() bool {
 // inside a macOS application bundle. This is a public API that
 // applications can use to detect their execution context.
 func IsInAppBundle() bool {
+	if runtime.GOOS != "darwin" {
+		return false
+	}
 	return isRunningInBundle()
 }
 
@@ -616,4 +579,62 @@ func getCurrentWorkingDir() string {
 		return fmt.Sprintf("Error: %v", err)
 	}
 	return dir
+}
+
+// Legacy Signal Handling Functions
+// These functions provide backward compatibility by wrapping the signal package functions.
+
+// DisableSignals disables signal handling - legacy compatibility function.
+func DisableSignals() {
+	signal.DisableSignals()
+}
+
+// DisableRobustSignals is for backward compatibility.
+func DisableRobustSignals() {
+	signal.DisableRobustSignals()
+}
+
+// EnableLegacySignalHandling is for backward compatibility.
+func EnableLegacySignalHandling() {
+	signal.EnableLegacySignalHandling()
+}
+
+// DisableSignalHandling provides access to the signal package's flag for tests
+// This is a local copy that needs to be kept in sync with signal.DisableSignalHandling
+var DisableSignalHandling = false
+
+// GetDisableSignalHandling returns the current value
+func GetDisableSignalHandling() bool {
+	return signal.DisableSignalHandling
+}
+
+// SetDisableSignalHandling sets the value in both places
+func SetDisableSignalHandling(value bool) {
+	DisableSignalHandling = value
+	signal.DisableSignalHandling = value
+}
+
+// Legacy signal handling functions for test compatibility
+func forwardSignals(pid int) {
+	// Placeholder for test compatibility
+}
+
+func setupSignalHandling(proc *os.Process) chan os.Signal {
+	// Legacy compatibility function for tests
+	handler := signal.NewHandler()
+	return handler.SetupSignalHandling(proc)
+}
+
+// Legacy compatibility functions for test support
+func relaunchWithRobustSignalHandlingContext(ctx context.Context, appPath, execPath string, args []string) {
+	signal.RelaunchWithRobustSignalHandlingContext(ctx, appPath, execPath, args)
+}
+
+func fallbackDirectExecutionContext(ctx context.Context, appPath, execPath string) {
+	signal.FallbackDirectExecutionContext(ctx, appPath, execPath)
+}
+
+func relaunchWithIORedirectionContext(ctx context.Context, appPath, execPath string) {
+	// Legacy compatibility - this was replaced by robust signal handling
+	signal.RelaunchWithRobustSignalHandlingContext(ctx, appPath, execPath, []string{})
 }

@@ -1,12 +1,9 @@
 package debug
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -28,13 +25,13 @@ func TestInitialize(t *testing.T) {
 func TestInitializeWithEnvironmentVariables(t *testing.T) {
 	// Reset state and set environment variables
 	resetDebugState()
-	
+
 	// Set environment variables
 	os.Setenv("MACGO_SIGNAL_DEBUG", "1")
 	os.Setenv("MACGO_DEBUG_LEVEL", "2")
 	os.Setenv("MACGO_PPROF", "1")
 	os.Setenv("MACGO_PPROF_PORT", "7070")
-	
+
 	defer func() {
 		// Clean up environment variables
 		os.Unsetenv("MACGO_SIGNAL_DEBUG")
@@ -61,7 +58,7 @@ func TestInitializeWithEnvironmentVariables(t *testing.T) {
 
 func TestInitializeWithInvalidDebugLevel(t *testing.T) {
 	resetDebugState()
-	
+
 	// Set invalid debug level
 	os.Setenv("MACGO_DEBUG_LEVEL", "invalid")
 	defer os.Unsetenv("MACGO_DEBUG_LEVEL")
@@ -75,7 +72,7 @@ func TestInitializeWithInvalidDebugLevel(t *testing.T) {
 
 func TestInitializeWithInvalidPprofPort(t *testing.T) {
 	resetDebugState()
-	
+
 	// Set invalid pprof port
 	os.Setenv("MACGO_PPROF", "1")
 	os.Setenv("MACGO_PPROF_PORT", "invalid")
@@ -93,7 +90,7 @@ func TestInitializeWithInvalidPprofPort(t *testing.T) {
 
 func TestInitializeWithCustomLogPath(t *testing.T) {
 	resetDebugState()
-	
+
 	// Create a temporary directory for the log file
 	tmpDir, err := os.MkdirTemp("", "macgo-debug-test-*")
 	if err != nil {
@@ -102,7 +99,7 @@ func TestInitializeWithCustomLogPath(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	customLogPath := filepath.Join(tmpDir, "custom-debug.log")
-	
+
 	os.Setenv("MACGO_SIGNAL_DEBUG", "1")
 	os.Setenv("MACGO_DEBUG_LOG", customLogPath)
 	defer func() {
@@ -124,10 +121,10 @@ func TestInitializeWithCustomLogPath(t *testing.T) {
 
 func TestInitializeWithUnwritableLogPath(t *testing.T) {
 	resetDebugState()
-	
+
 	// Try to write to a path that doesn't exist
 	unwritablePath := "/nonexistent/path/debug.log"
-	
+
 	os.Setenv("MACGO_SIGNAL_DEBUG", "1")
 	os.Setenv("MACGO_DEBUG_LOG", unwritablePath)
 	defer func() {
@@ -145,7 +142,7 @@ func TestInitializeWithUnwritableLogPath(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	resetDebugState()
-	
+
 	Init()
 
 	if !isInitialized {
@@ -155,7 +152,7 @@ func TestInit(t *testing.T) {
 
 func TestInitMultipleCalls(t *testing.T) {
 	resetDebugState()
-	
+
 	// Multiple calls should not cause issues
 	Init()
 	Init()
@@ -168,7 +165,7 @@ func TestInitMultipleCalls(t *testing.T) {
 
 func TestLogSystemInfo(t *testing.T) {
 	resetDebugState()
-	
+
 	// Enable signal debugging to activate logging
 	os.Setenv("MACGO_SIGNAL_DEBUG", "1")
 	defer os.Unsetenv("MACGO_SIGNAL_DEBUG")
@@ -197,7 +194,7 @@ func TestLogSystemInfo(t *testing.T) {
 	}
 
 	logContent := string(content)
-	
+
 	// Check that system info was logged
 	expectedEntries := []string{
 		"macgo debug logging initialized",
@@ -220,7 +217,7 @@ func TestLogSystemInfo(t *testing.T) {
 
 func TestLogSignal(t *testing.T) {
 	resetDebugState()
-	
+
 	// Enable signal debugging
 	os.Setenv("MACGO_SIGNAL_DEBUG", "1")
 	defer os.Unsetenv("MACGO_SIGNAL_DEBUG")
@@ -251,7 +248,7 @@ func TestLogSignal(t *testing.T) {
 	}
 
 	logContent := string(content)
-	
+
 	if !strings.Contains(logContent, "SIGNAL interrupt") {
 		t.Errorf("Expected log to contain signal information, got: %s", logContent)
 	}
@@ -262,7 +259,7 @@ func TestLogSignal(t *testing.T) {
 
 func TestLogSignalWithStackTrace(t *testing.T) {
 	resetDebugState()
-	
+
 	// Enable signal debugging with high debug level
 	os.Setenv("MACGO_SIGNAL_DEBUG", "1")
 	os.Setenv("MACGO_DEBUG_LEVEL", "2")
@@ -298,7 +295,7 @@ func TestLogSignalWithStackTrace(t *testing.T) {
 	}
 
 	logContent := string(content)
-	
+
 	if !strings.Contains(logContent, "SIGNAL terminated") {
 		t.Errorf("Expected log to contain signal information, got: %s", logContent)
 	}
@@ -309,7 +306,7 @@ func TestLogSignalWithStackTrace(t *testing.T) {
 
 func TestLogSignalDisabled(t *testing.T) {
 	resetDebugState()
-	
+
 	// Ensure signal debugging is disabled
 	signalDebugEnabled = false
 	debugLogger = nil
@@ -332,7 +329,7 @@ func TestLogSignalDisabled(t *testing.T) {
 	}
 
 	logContent := string(content)
-	
+
 	if strings.Contains(logContent, "This should not be logged") {
 		t.Errorf("Expected no logging when disabled, but got: %s", logContent)
 	}
@@ -340,7 +337,7 @@ func TestLogSignalDisabled(t *testing.T) {
 
 func TestLogDebug(t *testing.T) {
 	resetDebugState()
-	
+
 	// Enable signal debugging
 	os.Setenv("MACGO_SIGNAL_DEBUG", "1")
 	defer os.Unsetenv("MACGO_SIGNAL_DEBUG")
@@ -371,7 +368,7 @@ func TestLogDebug(t *testing.T) {
 	}
 
 	logContent := string(content)
-	
+
 	if !strings.Contains(logContent, "Test debug message with string and 42") {
 		t.Errorf("Expected log to contain debug message, got: %s", logContent)
 	}
@@ -379,7 +376,7 @@ func TestLogDebug(t *testing.T) {
 
 func TestLogDebugDisabled(t *testing.T) {
 	resetDebugState()
-	
+
 	// Ensure signal debugging is disabled
 	signalDebugEnabled = false
 	debugLogger = nil
@@ -402,7 +399,7 @@ func TestLogDebugDisabled(t *testing.T) {
 	}
 
 	logContent := string(content)
-	
+
 	if strings.Contains(logContent, "This should not be logged") {
 		t.Errorf("Expected no logging when disabled, but got: %s", logContent)
 	}
@@ -410,10 +407,10 @@ func TestLogDebugDisabled(t *testing.T) {
 
 func TestGetNextPprofPort(t *testing.T) {
 	resetDebugState()
-	
+
 	// Test port incrementing
 	originalPort := pprofBasePort
-	
+
 	port1 := GetNextPprofPort()
 	port2 := GetNextPprofPort()
 	port3 := GetNextPprofPort()
@@ -431,7 +428,7 @@ func TestGetNextPprofPort(t *testing.T) {
 
 func TestIsPprofEnabled(t *testing.T) {
 	resetDebugState()
-	
+
 	// Test when pprof is disabled
 	if IsPprofEnabled() {
 		t.Error("Expected pprof to be disabled by default")
@@ -446,7 +443,7 @@ func TestIsPprofEnabled(t *testing.T) {
 
 func TestIsTraceEnabled(t *testing.T) {
 	resetDebugState()
-	
+
 	// Test when trace is disabled
 	if IsTraceEnabled() {
 		t.Error("Expected trace to be disabled by default")
@@ -461,11 +458,11 @@ func TestIsTraceEnabled(t *testing.T) {
 
 func TestGetWorkingDir(t *testing.T) {
 	dir := getWorkingDir()
-	
+
 	if dir == "" {
 		t.Error("Expected working directory to be returned")
 	}
-	
+
 	// Should not contain error message for normal operation
 	if strings.Contains(dir, "Error getting working directory") {
 		t.Errorf("Expected valid working directory, got error: %s", dir)
@@ -474,7 +471,7 @@ func TestGetWorkingDir(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	resetDebugState()
-	
+
 	// Set up debug logger with a file
 	tmpFile, err := os.CreateTemp("", "macgo-debug-test-*")
 	if err != nil {
@@ -506,16 +503,16 @@ func TestStartPprofServerIntegration(t *testing.T) {
 	}
 
 	resetDebugState()
-	
+
 	// Start a pprof server on a high port to avoid conflicts
 	testPort := 9999
-	
+
 	// Start the server
 	startPprofServer(testPort)
-	
+
 	// Give it time to start
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Test that we can connect to the server
 	// Note: This is a basic integration test - in a real scenario
 	// you might want to make an HTTP request to verify the server is running
@@ -528,31 +525,31 @@ func TestRaceConditions(t *testing.T) {
 	}
 
 	resetDebugState()
-	
+
 	// Test concurrent access to debug functions
 	const numGoroutines = 10
-	
+
 	done := make(chan bool, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer func() { done <- true }()
-			
+
 			// Test concurrent initialization
 			Init()
-			
+
 			// Test concurrent port allocation
 			GetNextPprofPort()
-			
+
 			// Test concurrent flag checking
 			IsPprofEnabled()
 			IsTraceEnabled()
-			
+
 			// Test concurrent logging (if enabled)
 			LogDebug("Test message from goroutine %d", id)
 		}(i)
 	}
-	
+
 	// Wait for all goroutines to complete
 	for i := 0; i < numGoroutines; i++ {
 		<-done
@@ -610,12 +607,12 @@ func TestEnvironmentVariableParsing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resetDebugState()
-			
+
 			// Set environment variables
 			for key, value := range tt.envVars {
 				os.Setenv(key, value)
 			}
-			
+
 			// Clean up after test
 			defer func() {
 				for key := range tt.envVars {
@@ -642,19 +639,19 @@ func TestEnvironmentVariableParsing(t *testing.T) {
 func resetDebugState() {
 	debugMutex.Lock()
 	defer debugMutex.Unlock()
-	
+
 	isInitialized = false
 	signalDebugEnabled = false
 	advancedDebugLevel = 0
 	pprofEnabled = false
 	pprofBasePort = defaultPprofPort
 	TraceSignalHandling = false
-	
+
 	if debugLogFile != nil {
 		debugLogFile.Close()
 		debugLogFile = nil
 	}
-	
+
 	debugLogger = nil
 }
 
@@ -668,7 +665,7 @@ func BenchmarkInitialize(b *testing.B) {
 
 func BenchmarkGetNextPprofPort(b *testing.B) {
 	resetDebugState()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		GetNextPprofPort()
@@ -677,11 +674,11 @@ func BenchmarkGetNextPprofPort(b *testing.B) {
 
 func BenchmarkLogSignal(b *testing.B) {
 	resetDebugState()
-	
+
 	// Enable signal debugging
 	signalDebugEnabled = true
 	debugLogger = log.New(os.Stderr, "[macgo-debug] ", log.LstdFlags)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		LogSignal(syscall.SIGINT, "Benchmark test message %d", i)
@@ -690,11 +687,11 @@ func BenchmarkLogSignal(b *testing.B) {
 
 func BenchmarkLogDebug(b *testing.B) {
 	resetDebugState()
-	
+
 	// Enable signal debugging
 	signalDebugEnabled = true
 	debugLogger = log.New(os.Stderr, "[macgo-debug] ", log.LstdFlags)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		LogDebug("Benchmark test message %d", i)
@@ -705,9 +702,9 @@ func TestMain(m *testing.M) {
 	// Set up any global test state
 	// Run tests
 	code := m.Run()
-	
+
 	// Clean up
 	resetDebugState()
-	
+
 	os.Exit(code)
 }

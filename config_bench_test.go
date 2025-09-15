@@ -18,7 +18,7 @@ func BenchmarkConfigCreation(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		config := NewConfig()
-		
+
 		// Add some typical configuration
 		config.ApplicationName = "TestApp"
 		config.BundleID = "com.test.app"
@@ -26,7 +26,7 @@ func BenchmarkConfigCreation(b *testing.B) {
 		config.AddEntitlement(EntCamera)
 		config.AddPlistEntry("LSUIElement", false)
 		config.AddPlistEntry("NSHighResolutionCapable", true)
-		
+
 		// Avoid unused variable warning
 		_ = config
 	}
@@ -58,13 +58,13 @@ func BenchmarkConfigMerging(b *testing.B) {
 			mergeConfig := NewConfig()
 			mergeConfig.ApplicationName = "MergeApp"
 			mergeConfig.BundleID = "com.merge.app"
-			
+
 			// Add entitlements
 			for i := 0; i < size.entitlements; i++ {
 				entitlement := Entitlement(fmt.Sprintf("com.test.entitlement.%d", i))
 				mergeConfig.AddEntitlement(entitlement)
 			}
-			
+
 			// Add plist entries
 			for i := 0; i < size.plistEntries; i++ {
 				key := fmt.Sprintf("TestKey%d", i)
@@ -78,10 +78,10 @@ func BenchmarkConfigMerging(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				// Save original config
 				originalConfig := *DefaultConfig
-				
+
 				// Merge configuration
 				Configure(mergeConfig)
-				
+
 				// Restore original config
 				*DefaultConfig = originalConfig
 			}
@@ -121,7 +121,7 @@ func BenchmarkEnvironmentVariableParsing(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Create fresh config
 		config := NewConfig()
-		
+
 		// Parse environment variables (simulating init() function)
 		if name := os.Getenv("MACGO_APP_NAME"); name != "" {
 			config.ApplicationName = name
@@ -138,7 +138,7 @@ func BenchmarkEnvironmentVariableParsing(b *testing.B) {
 		if os.Getenv("MACGO_SHOW_DOCK_ICON") == "1" {
 			config.AddPlistEntry("LSUIElement", false)
 		}
-		
+
 		// Parse entitlement environment variables
 		envVars := map[string]string{
 			"MACGO_CAMERA":         string(EntCamera),
@@ -147,13 +147,13 @@ func BenchmarkEnvironmentVariableParsing(b *testing.B) {
 			"MACGO_APP_SANDBOX":    string(EntAppSandbox),
 			"MACGO_NETWORK_CLIENT": string(EntNetworkClient),
 		}
-		
+
 		for env, entitlement := range envVars {
 			if os.Getenv(env) == "1" {
 				config.AddEntitlement(Entitlement(entitlement))
 			}
 		}
-		
+
 		// Avoid unused variable warning
 		_ = config
 	}
@@ -174,7 +174,7 @@ func BenchmarkPlistGeneration(b *testing.B) {
 		b.Run(entryCount.name, func(b *testing.B) {
 			// Create test data
 			plistData := make(map[string]any)
-			
+
 			// Add various types of entries
 			for i := 0; i < entryCount.count; i++ {
 				switch i % 5 {
@@ -227,7 +227,7 @@ func BenchmarkEntitlementOperations(b *testing.B) {
 		{
 			name: "ManyEntitlements",
 			fn: func(config *Config) {
-				entitlements := []Entitlement{
+				entitlements := []interface{}{
 					EntAppSandbox, EntCamera, EntMicrophone, EntLocation, EntAddressBook,
 					EntCalendars, EntPhotos, EntReminders, EntNetworkClient, EntNetworkServer,
 					EntUserSelectedReadOnly, EntUserSelectedReadWrite, EntBluetooth, EntUSB,
@@ -311,17 +311,17 @@ func BenchmarkConfigurationConcurrency(b *testing.B) {
 					config := NewConfig()
 					config.ApplicationName = fmt.Sprintf("ConcurrentApp%d", idx)
 					config.BundleID = fmt.Sprintf("com.concurrent.app%d", idx)
-					
+
 					// Add entitlements
 					config.AddEntitlement(EntAppSandbox)
 					config.AddEntitlement(EntCamera)
 					config.AddEntitlement(EntMicrophone)
-					
+
 					// Add plist entries
 					config.AddPlistEntry("LSUIElement", false)
 					config.AddPlistEntry("NSHighResolutionCapable", true)
 					config.AddPlistEntry(fmt.Sprintf("CustomKey%d", idx), fmt.Sprintf("CustomValue%d", idx))
-					
+
 					// Test Configure function with concurrent access
 					Configure(config)
 				}(i)
@@ -345,20 +345,20 @@ func BenchmarkConfigurationMemoryUsage(b *testing.B) {
 		config := NewConfig()
 		config.ApplicationName = fmt.Sprintf("MemoryTestApp%d", i)
 		config.BundleID = fmt.Sprintf("com.memory.test%d", i)
-		
+
 		// Add many entitlements
 		for j := 0; j < 50; j++ {
 			entitlement := Entitlement(fmt.Sprintf("com.test.entitlement.%d.%d", i, j))
 			config.AddEntitlement(entitlement)
 		}
-		
+
 		// Add many plist entries
 		for j := 0; j < 50; j++ {
 			key := fmt.Sprintf("TestKey%d_%d", i, j)
 			value := fmt.Sprintf("TestValue%d_%d", i, j)
 			config.AddPlistEntry(key, value)
 		}
-		
+
 		// Merge configuration
 		Configure(config)
 	}
@@ -382,13 +382,13 @@ func BenchmarkConfigurationCloning(b *testing.B) {
 	sourceConfig.AutoSign = true
 	sourceConfig.SigningIdentity = "Developer ID Application: Test"
 	sourceConfig.CustomDestinationAppPath = "/tmp/test.app"
-	
+
 	// Add many entitlements
 	for i := 0; i < 20; i++ {
 		entitlement := Entitlement(fmt.Sprintf("com.test.entitlement.%d", i))
 		sourceConfig.AddEntitlement(entitlement)
 	}
-	
+
 	// Add many plist entries
 	for i := 0; i < 20; i++ {
 		key := fmt.Sprintf("TestKey%d", i)
@@ -402,7 +402,7 @@ func BenchmarkConfigurationCloning(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Clone configuration (manual deep copy)
 		clonedConfig := &Config{
-			ApplicationName:           sourceConfig.ApplicationName,
+			ApplicationName:          sourceConfig.ApplicationName,
 			BundleID:                 sourceConfig.BundleID,
 			Relaunch:                 sourceConfig.Relaunch,
 			KeepTemp:                 sourceConfig.KeepTemp,
@@ -413,17 +413,17 @@ func BenchmarkConfigurationCloning(b *testing.B) {
 			Entitlements:             make(map[Entitlement]bool),
 			PlistEntries:             make(map[string]any),
 		}
-		
+
 		// Copy entitlements
 		for k, v := range sourceConfig.Entitlements {
 			clonedConfig.Entitlements[k] = v
 		}
-		
+
 		// Copy plist entries
 		for k, v := range sourceConfig.PlistEntries {
 			clonedConfig.PlistEntries[k] = v
 		}
-		
+
 		// Avoid unused variable warning
 		_ = clonedConfig
 	}
@@ -511,12 +511,12 @@ func BenchmarkConfigurationWithContext(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		
+
 		// Simulate configuration operations with context
 		config := NewConfig()
 		config.ApplicationName = fmt.Sprintf("ContextApp%d", i)
 		config.BundleID = fmt.Sprintf("com.context.app%d", i)
-		
+
 		// Add entitlements with context awareness
 		select {
 		case <-ctx.Done():
@@ -526,7 +526,7 @@ func BenchmarkConfigurationWithContext(b *testing.B) {
 			config.AddEntitlement(EntAppSandbox)
 			config.AddEntitlement(EntCamera)
 		}
-		
+
 		// Add plist entries with context awareness
 		select {
 		case <-ctx.Done():
@@ -536,7 +536,7 @@ func BenchmarkConfigurationWithContext(b *testing.B) {
 			config.AddPlistEntry("LSUIElement", false)
 			config.AddPlistEntry("NSHighResolutionCapable", true)
 		}
-		
+
 		// Configure with context
 		select {
 		case <-ctx.Done():
@@ -545,7 +545,7 @@ func BenchmarkConfigurationWithContext(b *testing.B) {
 		default:
 			Configure(config)
 		}
-		
+
 		cancel()
 	}
 }
@@ -572,10 +572,10 @@ func BenchmarkEntitlementStringConversion(b *testing.B) {
 		for _, entStr := range testEntitlements {
 			// Convert string to Entitlement
 			entitlement := Entitlement(entStr)
-			
+
 			// Convert back to string
 			converted := string(entitlement)
-			
+
 			// Verify conversion (simple check)
 			if converted != entStr {
 				b.Errorf("String conversion failed: expected %s, got %s", entStr, converted)

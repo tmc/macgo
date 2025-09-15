@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -97,7 +98,7 @@ func BenchmarkSignalHandling(b *testing.B) {
 
 		// Simulate signal handling setup
 		startTime := time.Now()
-		
+
 		// Create a mock process for signal forwarding
 		cmd := exec.Command("sleep", "0.1")
 		if err := cmd.Start(); err != nil {
@@ -106,7 +107,7 @@ func BenchmarkSignalHandling(b *testing.B) {
 
 		// Test signal forwarding setup time
 		forwardSignals(cmd.Process.Pid)
-		
+
 		signalTime := time.Since(startTime)
 		b.ReportMetric(float64(signalTime.Nanoseconds()), "ns/signal-setup")
 
@@ -126,8 +127,8 @@ func BenchmarkIORedirection(b *testing.B) {
 		dataSize  int
 		pipeCount int
 	}{
-		{"Small", 1024, 1},       // 1KB, 1 pipe
-		{"Medium", 64 * 1024, 3}, // 64KB, 3 pipes (stdin/stdout/stderr)
+		{"Small", 1024, 1},        // 1KB, 1 pipe
+		{"Medium", 64 * 1024, 3},  // 64KB, 3 pipes (stdin/stdout/stderr)
 		{"Large", 1024 * 1024, 3}, // 1MB, 3 pipes
 	}
 
@@ -149,7 +150,7 @@ func BenchmarkIORedirection(b *testing.B) {
 
 				// Test I/O redirection performance
 				startTime := time.Now()
-				
+
 				// Create test data
 				testData := make([]byte, size.dataSize)
 				for k := range testData {
@@ -252,7 +253,7 @@ func BenchmarkRelaunchWithIORedirection(b *testing.B) {
 
 		// Benchmark relaunch setup (without actually relaunching)
 		startTime := time.Now()
-		
+
 		// Create pipes for IO redirection
 		pipes := make([]string, 3)
 		for j, name := range []string{"stdin", "stdout", "stderr"} {
@@ -317,10 +318,10 @@ func BenchmarkImprovedSignalHandling(b *testing.B) {
 
 		// Test improved signal handling setup
 		startTime := time.Now()
-		
+
 		// Simulate improved signal handling setup
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		
+
 		// Mock the improved signal handling process
 		cmd := exec.Command("sleep", "0.1")
 		if err := cmd.Start(); err != nil {
@@ -413,7 +414,7 @@ func BenchmarkLaunchWithDifferentEntitlements(b *testing.B) {
 
 				// Benchmark launch preparation
 				startTime := time.Now()
-				
+
 				// Create pipes for launch
 				pipes := make([]string, 3)
 				for j, name := range []string{"stdin", "stdout", "stderr"} {
@@ -541,13 +542,16 @@ func BenchmarkProcessGroupSetup(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Simulate process group setup
 		cmd := exec.Command("sleep", "0.01")
-		
+
 		// This is the setup we benchmark
 		startTime := time.Now()
-		
-		// Process group setup would happen here
-		// (we can't actually set it up without running the command)
-		
+
+		// Process group setup
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true,
+			Pgid:    0,
+		}
+
 		setupTime := time.Since(startTime)
 		b.ReportMetric(float64(setupTime.Nanoseconds()), "ns/process-group-setup")
 	}
@@ -627,10 +631,10 @@ func BenchmarkIORedirectionContext(b *testing.B) {
 
 		// Test I/O redirection with context
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		
+
 		// Test data
 		testData := strings.NewReader("test data for I/O redirection")
-		
+
 		// Simulate pipeIOContext
 		go func() {
 			pipeIOContext(ctx, pipe, testData, io.Discard)

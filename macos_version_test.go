@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 // macOSVersion represents a macOS version
@@ -48,7 +47,7 @@ func getMacOSVersion() (macOSVersion, error) {
 
 	versionStr := strings.TrimSpace(string(output))
 	parts := strings.Split(versionStr, ".")
-	
+
 	if len(parts) < 2 {
 		return macOSVersion{}, fmt.Errorf("invalid version format: %s", versionStr)
 	}
@@ -89,82 +88,82 @@ func TestMacOSVersionCompatibility(t *testing.T) {
 
 	// Test basic functionality across different version expectations
 	tests := []struct {
-		name           string
-		minVersion     macOSVersion
-		testFunc       func(*testing.T)
-		skipReason     string
-		description    string
+		name        string
+		minVersion  macOSVersion
+		testFunc    func(*testing.T)
+		skipReason  string
+		description string
 	}{
 		{
-			name:       "Basic bundle creation",
-			minVersion: macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
-			testFunc:   testBasicBundleCreation,
+			name:        "Basic bundle creation",
+			minVersion:  macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
+			testFunc:    testBasicBundleCreation,
 			description: "Test basic app bundle creation functionality",
 		},
 		{
-			name:       "App sandbox entitlements",
-			minVersion: macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
-			testFunc:   testAppSandboxEntitlements,
+			name:        "App sandbox entitlements",
+			minVersion:  macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
+			testFunc:    testAppSandboxEntitlements,
 			description: "Test app sandbox entitlements functionality",
 		},
 		{
-			name:       "TCC permissions",
-			minVersion: macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
-			testFunc:   testTCCPermissions,
+			name:        "TCC permissions",
+			minVersion:  macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
+			testFunc:    testTCCPermissions,
 			description: "Test TCC (Transparency, Consent, and Control) permissions",
 		},
 		{
-			name:       "Code signing",
-			minVersion: macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
-			testFunc:   testCodeSigning,
+			name:        "Code signing",
+			minVersion:  macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
+			testFunc:    testCodeSigning,
 			description: "Test code signing functionality",
 		},
 		{
-			name:       "Notarization requirements",
-			minVersion: macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
-			testFunc:   testNotarizationRequirements,
+			name:        "Notarization requirements",
+			minVersion:  macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
+			testFunc:    testNotarizationRequirements,
 			description: "Test notarization requirements and handling",
 		},
 		{
-			name:       "System Integrity Protection (SIP)",
-			minVersion: macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
-			testFunc:   testSIPCompatibility,
+			name:        "System Integrity Protection (SIP)",
+			minVersion:  macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
+			testFunc:    testSIPCompatibility,
 			description: "Test System Integrity Protection compatibility",
 		},
 		{
-			name:       "Hardened Runtime",
-			minVersion: macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
-			testFunc:   testHardenedRuntime,
+			name:        "Hardened Runtime",
+			minVersion:  macOSVersion{Major: 10, Minor: 15, Patch: 0}, // macOS Catalina
+			testFunc:    testHardenedRuntime,
 			description: "Test Hardened Runtime compatibility",
 		},
 		{
-			name:       "macOS Big Sur specific features",
-			minVersion: macOSVersion{Major: 11, Minor: 0, Patch: 0}, // macOS Big Sur
-			testFunc:   testBigSurFeatures,
+			name:        "macOS Big Sur specific features",
+			minVersion:  macOSVersion{Major: 11, Minor: 0, Patch: 0}, // macOS Big Sur
+			testFunc:    testBigSurFeatures,
 			description: "Test macOS Big Sur specific features",
 		},
 		{
-			name:       "macOS Monterey specific features",
-			minVersion: macOSVersion{Major: 12, Minor: 0, Patch: 0}, // macOS Monterey
-			testFunc:   testMontereyFeatures,
+			name:        "macOS Monterey specific features",
+			minVersion:  macOSVersion{Major: 12, Minor: 0, Patch: 0}, // macOS Monterey
+			testFunc:    testMontereyFeatures,
 			description: "Test macOS Monterey specific features",
 		},
 		{
-			name:       "macOS Ventura specific features",
-			minVersion: macOSVersion{Major: 13, Minor: 0, Patch: 0}, // macOS Ventura
-			testFunc:   testVenturaFeatures,
+			name:        "macOS Ventura specific features",
+			minVersion:  macOSVersion{Major: 13, Minor: 0, Patch: 0}, // macOS Ventura
+			testFunc:    testVenturaFeatures,
 			description: "Test macOS Ventura specific features",
 		},
 		{
-			name:       "macOS Sonoma specific features",
-			minVersion: macOSVersion{Major: 14, Minor: 0, Patch: 0}, // macOS Sonoma
-			testFunc:   testSonomaFeatures,
+			name:        "macOS Sonoma specific features",
+			minVersion:  macOSVersion{Major: 14, Minor: 0, Patch: 0}, // macOS Sonoma
+			testFunc:    testSonomaFeatures,
 			description: "Test macOS Sonoma specific features",
 		},
 		{
-			name:       "macOS Sequoia specific features",
-			minVersion: macOSVersion{Major: 15, Minor: 0, Patch: 0}, // macOS Sequoia
-			testFunc:   testSequoiaFeatures,
+			name:        "macOS Sequoia specific features",
+			minVersion:  macOSVersion{Major: 15, Minor: 0, Patch: 0}, // macOS Sequoia
+			testFunc:    testSequoiaFeatures,
 			description: "Test macOS Sequoia specific features",
 		},
 	}
@@ -193,7 +192,7 @@ func testBasicBundleCreation(t *testing.T) {
 	cfg.ApplicationName = "VersionTestApp"
 	cfg.BundleID = "com.example.versiontest"
 	cfg.KeepTemp = true
-	
+
 	// Create a temporary executable
 	tmpExec, err := createTempExecutable(t)
 	if err != nil {
@@ -400,7 +399,7 @@ func testNotarizationRequirements(t *testing.T) {
 func testSIPCompatibility(t *testing.T) {
 	// Test System Integrity Protection compatibility
 	// This test checks if macgo respects SIP restrictions
-	
+
 	// Check if SIP is enabled
 	cmd := exec.Command("csrutil", "status")
 	output, err := cmd.Output()
@@ -483,7 +482,7 @@ func testHardenedRuntime(t *testing.T) {
 func testBigSurFeatures(t *testing.T) {
 	// Test macOS Big Sur specific features
 	t.Log("Testing macOS Big Sur specific features")
-	
+
 	// Big Sur introduced stricter notarization requirements
 	cfg := NewConfig()
 	cfg.ApplicationName = "BigSurTestApp"
@@ -514,7 +513,7 @@ func testBigSurFeatures(t *testing.T) {
 func testMontereyFeatures(t *testing.T) {
 	// Test macOS Monterey specific features
 	t.Log("Testing macOS Monterey specific features")
-	
+
 	// Monterey has enhanced privacy features
 	cfg := NewConfig()
 	cfg.ApplicationName = "MontereyTestApp"
@@ -545,7 +544,7 @@ func testMontereyFeatures(t *testing.T) {
 func testVenturaFeatures(t *testing.T) {
 	// Test macOS Ventura specific features
 	t.Log("Testing macOS Ventura specific features")
-	
+
 	// Ventura has updated security requirements
 	cfg := NewConfig()
 	cfg.ApplicationName = "VenturaTestApp"
@@ -576,7 +575,7 @@ func testVenturaFeatures(t *testing.T) {
 func testSonomaFeatures(t *testing.T) {
 	// Test macOS Sonoma specific features
 	t.Log("Testing macOS Sonoma specific features")
-	
+
 	// Sonoma has enhanced app permissions
 	cfg := NewConfig()
 	cfg.ApplicationName = "SonomaTestApp"
@@ -607,7 +606,7 @@ func testSonomaFeatures(t *testing.T) {
 func testSequoiaFeatures(t *testing.T) {
 	// Test macOS Sequoia specific features
 	t.Log("Testing macOS Sequoia specific features")
-	
+
 	// Sequoia has the latest security and privacy features
 	cfg := NewConfig()
 	cfg.ApplicationName = "SequoiaTestApp"
@@ -681,7 +680,7 @@ func fileExists(path string) bool {
 func createAppBundle(cfg *Config, executablePath string) (string, error) {
 	// This is a simplified implementation for testing
 	// In a real scenario, this would use the actual bundle creation logic
-	
+
 	// Create a temporary directory for the bundle
 	tmpDir, err := os.MkdirTemp("", "macgo-test-bundle-*")
 	if err != nil {
@@ -689,11 +688,11 @@ func createAppBundle(cfg *Config, executablePath string) (string, error) {
 	}
 
 	bundlePath := tmpDir + "/" + cfg.ApplicationName + ".app"
-	
+
 	// Create bundle structure
 	contentsPath := bundlePath + "/Contents"
 	macOSPath := contentsPath + "/MacOS"
-	
+
 	if err := os.MkdirAll(macOSPath, 0755); err != nil {
 		return "", err
 	}
@@ -704,8 +703,8 @@ func createAppBundle(cfg *Config, executablePath string) (string, error) {
 		execName = "app"
 	}
 	destExec := macOSPath + "/" + execName
-	
-	if err := copyFile(executablePath, destExec); err != nil {
+
+	if err := copyFileTest(executablePath, destExec); err != nil {
 		return "", err
 	}
 
@@ -754,7 +753,7 @@ func createAppBundle(cfg *Config, executablePath string) (string, error) {
 	return bundlePath, nil
 }
 
-func copyFile(src, dst string) error {
+func copyFileTest(src, dst string) error {
 	srcFile, err := os.Open(src)
 	if err != nil {
 		return err
@@ -777,7 +776,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	return os.Chmod(dst, srcInfo.Mode())
 }
 
