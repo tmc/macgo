@@ -7,7 +7,6 @@ import (
 
 	"github.com/tmc/misc/macgo"
 	"github.com/tmc/misc/macgo/debug" // Using the dedicated debug package
-	"github.com/tmc/misc/macgo/entitlements"
 )
 
 func init() {
@@ -21,17 +20,19 @@ func init() {
 	// Configure macgo (optional, defaults will be used if not set)
 	macgo.SetAppName("HelloMacgoApp")
 	macgo.SetBundleID("com.example.hellomacgo")
-	
+
 	// Set custom icon
 	macgo.SetIconFile("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ToolbarCustomizeIcon.icns")
-	
+
 	// Enable improved signal handling
 	macgo.EnableImprovedSignalHandling()
-	
-	// Example: Request some entitlements using the entitlements package
-	entitlements.SetAppSandbox()
-	entitlements.SetCamera()  // Example: if camera needed
-	entitlements.SetMic()     // Example: if microphone needed
+
+	// Example: Request some entitlements using macgo
+	macgo.RequestEntitlements(
+		macgo.EntAppSandbox,
+		macgo.EntCamera,     // Example: if camera needed
+		macgo.EntMicrophone, // Example: if microphone needed
+	)
 
 	// Start macgo - creates bundle and relaunches if necessary
 	macgo.Start()
@@ -64,13 +65,13 @@ func main() {
 
 	fmt.Println("Application will run for 5 seconds then exit.")
 	fmt.Println("Press Ctrl+C to test signal handling...")
-	
+
 	// Simple countdown with signal handling
 	for i := 5; i > 0; i-- {
 		fmt.Printf("\rCountdown: %d", i)
 		time.Sleep(1 * time.Second)
 	}
-	
+
 	fmt.Println("\nExiting HelloMacgoApp.")
 	// Clean up debug package resources if it was used for logging to file
 	debug.Close()

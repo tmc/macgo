@@ -174,22 +174,22 @@ func TestAllPackageMultipleImports(t *testing.T) {
 
 	// Simulate multiple imports by calling the registration functions multiple times
 	// (since we can't actually re-import the package in tests)
-	entitlements.Register(entitlements.EntCamera, true)
-	entitlements.Register(entitlements.EntMicrophone, true)
-	entitlements.Register(entitlements.EntLocation, true)
-	entitlements.Register(entitlements.EntAddressBook, true)
-	entitlements.Register(entitlements.EntPhotos, true)
-	entitlements.Register(entitlements.EntCalendars, true)
-	entitlements.Register(entitlements.EntReminders, true)
+	macgo.RequestEntitlement(entitlements.EntCamera)
+	macgo.RequestEntitlement(entitlements.EntMicrophone)
+	macgo.RequestEntitlement(entitlements.EntLocation)
+	macgo.RequestEntitlement(entitlements.EntAddressBook)
+	macgo.RequestEntitlement(entitlements.EntPhotos)
+	macgo.RequestEntitlement(entitlements.EntCalendars)
+	macgo.RequestEntitlement(entitlements.EntReminders)
 
 	// Repeat the registrations
-	entitlements.Register(entitlements.EntCamera, true)
-	entitlements.Register(entitlements.EntMicrophone, true)
-	entitlements.Register(entitlements.EntLocation, true)
-	entitlements.Register(entitlements.EntAddressBook, true)
-	entitlements.Register(entitlements.EntPhotos, true)
-	entitlements.Register(entitlements.EntCalendars, true)
-	entitlements.Register(entitlements.EntReminders, true)
+	macgo.RequestEntitlement(entitlements.EntCamera)
+	macgo.RequestEntitlement(entitlements.EntMicrophone)
+	macgo.RequestEntitlement(entitlements.EntLocation)
+	macgo.RequestEntitlement(entitlements.EntAddressBook)
+	macgo.RequestEntitlement(entitlements.EntPhotos)
+	macgo.RequestEntitlement(entitlements.EntCalendars)
+	macgo.RequestEntitlement(entitlements.EntReminders)
 
 	// All entitlements should still be correctly registered
 	expectedEntitlements := []macgo.Entitlement{

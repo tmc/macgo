@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tmc/misc/macgo"
-	"github.com/tmc/misc/macgo/entitlements"
 )
 
 func init() {
@@ -20,14 +19,14 @@ func init() {
 
 	// Enable improved signal handling with IO redirection
 	macgo.EnableImprovedSignalHandling()
-	
+
 	// Set custom icon
 	macgo.SetIconFile("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ToolbarCustomizeIcon.icns")
-	
+
 	// Add some basic entitlements for testing
-	entitlements.SetAppSandbox()
-	entitlements.SetCamera()
-	entitlements.SetMic()
+	macgo.RequestEntitlement(macgo.EntAppSandbox)
+	macgo.RequestEntitlement(macgo.EntCamera)
+	macgo.RequestEntitlement(macgo.EntMicrophone)
 
 	// Enable debug output to see what's happening
 	macgo.EnableDebug()

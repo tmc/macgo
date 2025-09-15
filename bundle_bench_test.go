@@ -281,8 +281,8 @@ func BenchmarkBundleChecksumCalculation(b *testing.B) {
 		name string
 		size int64
 	}{
-		{"Small", 1024},        // 1KB
-		{"Medium", 1024 * 1024}, // 1MB
+		{"Small", 1024},             // 1KB
+		{"Medium", 1024 * 1024},     // 1MB
 		{"Large", 10 * 1024 * 1024}, // 10MB
 	}
 
@@ -371,11 +371,11 @@ func BenchmarkCleanupManagerPerformance(b *testing.B) {
 
 func createTestExecutable(b *testing.B) string {
 	b.Helper()
-	
+
 	// Create a temporary Go file
 	tempDir := b.TempDir()
 	goFile := filepath.Join(tempDir, "test.go")
-	
+
 	goCode := `package main
 
 import "fmt"
@@ -384,49 +384,49 @@ func main() {
 	fmt.Println("Hello from test executable")
 }
 `
-	
+
 	err := os.WriteFile(goFile, []byte(goCode), 0644)
 	if err != nil {
 		b.Fatalf("Failed to create test Go file: %v", err)
 	}
-	
+
 	// Compile it
 	execPath := filepath.Join(tempDir, "test")
 	if runtime.GOOS == "windows" {
 		execPath += ".exe"
 	}
-	
+
 	// Use go build to create the executable
 	cmd := fmt.Sprintf("cd %s && go build -o %s %s", tempDir, execPath, goFile)
 	err = runCommand(cmd)
 	if err != nil {
 		b.Fatalf("Failed to compile test executable: %v", err)
 	}
-	
+
 	return execPath
 }
 
 func createTestFileWithSize(b *testing.B, size int64) string {
 	b.Helper()
-	
+
 	tempFile := fmt.Sprintf("/tmp/macgo-bench-file-%d", time.Now().UnixNano())
 	f, err := os.Create(tempFile)
 	if err != nil {
 		b.Fatalf("Failed to create test file: %v", err)
 	}
 	defer f.Close()
-	
+
 	// Write random data
 	data := make([]byte, size)
 	for i := range data {
 		data[i] = byte(i % 256)
 	}
-	
+
 	_, err = f.Write(data)
 	if err != nil {
 		b.Fatalf("Failed to write test data: %v", err)
 	}
-	
+
 	return tempFile
 }
 
@@ -436,7 +436,7 @@ func runCommand(cmd string) error {
 	if len(parts) == 0 {
 		return fmt.Errorf("empty command")
 	}
-	
+
 	// Extract cd command if present
 	if len(parts) >= 2 && parts[0] == "cd" {
 		// Skip cd command for now, just run the rest
@@ -446,11 +446,11 @@ func runCommand(cmd string) error {
 			return nil
 		}
 	}
-	
+
 	if len(parts) == 0 {
 		return nil
 	}
-	
+
 	cmd2 := exec.Command(parts[0], parts[1:]...)
 	return cmd2.Run()
 }
@@ -525,8 +525,8 @@ func BenchmarkContextualOperations(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		
+		_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
 		DefaultConfig = &Config{
 			Relaunch:     false,
 			Entitlements: make(map[Entitlement]bool),

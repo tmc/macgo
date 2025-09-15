@@ -4,8 +4,8 @@
 //	import _ "github.com/tmc/misc/macgo/entitlements/calendar"
 package calendar
 
-import "github.com/tmc/misc/macgo/entitlements"
+import "github.com/tmc/misc/macgo/entitlement"
 
 func init() {
-	entitlements.Register(entitlements.EntCalendars, true)
+	entitlement.EnableCalendars()
 }

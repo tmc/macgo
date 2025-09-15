@@ -22,7 +22,7 @@ func TestMicPackageInit(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntMicrophone, true)
+	macgo.RequestEntitlement(entitlements.EntMicrophone)
 
 	// Check if it's registered
 	expectedEntitlement := macgo.Entitlement(entitlements.EntMicrophone)
@@ -70,9 +70,9 @@ func TestMultipleImports(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate multiple registrations (like multiple imports)
-	entitlements.Register(entitlements.EntMicrophone, true)
-	entitlements.Register(entitlements.EntMicrophone, true)
-	entitlements.Register(entitlements.EntMicrophone, true)
+	macgo.RequestEntitlement(entitlements.EntMicrophone)
+	macgo.RequestEntitlement(entitlements.EntMicrophone)
+	macgo.RequestEntitlement(entitlements.EntMicrophone)
 
 	// Should still work correctly
 	micEnt := macgo.Entitlement(entitlements.EntMicrophone)
@@ -94,7 +94,7 @@ func TestDocumentationExample(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntMicrophone, true)
+	macgo.RequestEntitlement(entitlements.EntMicrophone)
 
 	// Verify the entitlement is registered
 	micEnt := macgo.Entitlement(entitlements.EntMicrophone)

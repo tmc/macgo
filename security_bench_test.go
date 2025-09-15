@@ -81,8 +81,8 @@ func BenchmarkSecureJoin(b *testing.B) {
 		{"test.app"},
 		{"test", "app.app"},
 		{"deep", "path", "to", "app.app"},
-		{"../test.app"},         // Should fail
-		{"/absolute/path.app"},  // Should fail
+		{"../test.app"},        // Should fail
+		{"/absolute/path.app"}, // Should fail
 	}
 
 	for i, base := range basePaths {
@@ -204,9 +204,9 @@ func BenchmarkChecksumCalculation(b *testing.B) {
 		name string
 		size int64
 	}{
-		{"Tiny", 100},           // 100 bytes
-		{"Small", 1024},         // 1KB
-		{"Medium", 1024 * 1024}, // 1MB
+		{"Tiny", 100},               // 100 bytes
+		{"Small", 1024},             // 1KB
+		{"Medium", 1024 * 1024},     // 1MB
 		{"Large", 10 * 1024 * 1024}, // 10MB
 	}
 
@@ -392,7 +392,7 @@ func BenchmarkCleanupManagerSecurity(b *testing.B) {
 			cleanupAt: time.Now().Add(50 * time.Millisecond),
 			isDir:     false,
 		}
-		
+
 		// Simulate safe removal validation
 		if _, err := securePath(cleanupEntry.path); err != nil {
 			// Expected for some paths
@@ -429,13 +429,13 @@ func BenchmarkEntitlementSecurity(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				// Validate entitlement string
 				entStr := string(testEnt.entitlement)
-				
+
 				// Check for dangerous patterns
 				dangerous := strings.Contains(entStr, "allow-jit") ||
 					strings.Contains(entStr, "allow-unsigned-executable-memory") ||
 					strings.Contains(entStr, "disable-library-validation") ||
 					strings.Contains(entStr, "disable-executable-page-protection")
-				
+
 				if dangerous != testEnt.dangerous {
 					b.Errorf("Dangerous entitlement detection failed for %s", entStr)
 				}
@@ -511,26 +511,26 @@ func BenchmarkPlistSecurityValidation(b *testing.B) {
 
 func createTestFileWithChecksum(b *testing.B, size int64) string {
 	b.Helper()
-	
+
 	tempFile := fmt.Sprintf("/tmp/macgo-bench-checksum-%d-%d", time.Now().UnixNano(), size)
 	f, err := os.Create(tempFile)
 	if err != nil {
 		b.Fatalf("Failed to create test file: %v", err)
 	}
 	defer f.Close()
-	
+
 	// Write random data for more realistic checksum calculation
 	data := make([]byte, size)
 	_, err = rand.Read(data)
 	if err != nil {
 		b.Fatalf("Failed to generate random data: %v", err)
 	}
-	
+
 	_, err = f.Write(data)
 	if err != nil {
 		b.Fatalf("Failed to write test data: %v", err)
 	}
-	
+
 	return tempFile
 }
 

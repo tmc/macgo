@@ -22,7 +22,7 @@ func TestCameraPackageInit(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntCamera, true)
+	macgo.RequestEntitlement(entitlements.EntCamera)
 
 	// Check if it's registered
 	expectedEntitlement := macgo.Entitlement(entitlements.EntCamera)
@@ -77,9 +77,9 @@ func TestMultipleImports(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate multiple registrations (like multiple imports)
-	entitlements.Register(entitlements.EntCamera, true)
-	entitlements.Register(entitlements.EntCamera, true)
-	entitlements.Register(entitlements.EntCamera, true)
+	macgo.RequestEntitlement(entitlements.EntCamera)
+	macgo.RequestEntitlement(entitlements.EntCamera)
+	macgo.RequestEntitlement(entitlements.EntCamera)
 
 	// Should still work correctly
 	cameraEnt := macgo.Entitlement(entitlements.EntCamera)
@@ -103,7 +103,7 @@ func TestDocumentationExample(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntCamera, true)
+	macgo.RequestEntitlement(entitlements.EntCamera)
 
 	// Verify the entitlement is registered
 	cameraEnt := macgo.Entitlement(entitlements.EntCamera)

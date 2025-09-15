@@ -727,8 +727,8 @@ func TestCreateFromTemplate(t *testing.T) {
 	}
 }
 
-// TestBundleCreationEdgeCases tests edge cases for bundle creation
-func TestBundleCreationEdgeCases(t *testing.T) {
+// TestBundleCreationEdgeCasesOld tests edge cases for bundle creation (duplicate - see bundle_creation_edge_cases_test.go)
+func TestBundleCreationEdgeCasesOld(t *testing.T) {
 	// Save original config and environment
 	originalConfig := DefaultConfig
 	originalGOPATH := os.Getenv("GOPATH")
@@ -1236,12 +1236,12 @@ func TestPlistXMLEscaping(t *testing.T) {
 		{
 			name: "string values with special characters",
 			data: map[string]any{
-				"NormalKey": "normal value",
+				"NormalKey":    "normal value",
 				"AmpersandKey": "A & B",
-				"LessKey": "a < b",
-				"GreaterKey": "a > b",
-				"QuoteKey": "say \"hello\"",
-				"AposKey": "it's working",
+				"LessKey":      "a < b",
+				"GreaterKey":   "a > b",
+				"QuoteKey":     "say \"hello\"",
+				"AposKey":      "it's working",
 			},
 			expected: []string{
 				"<string>normal value</string>",
@@ -1262,9 +1262,9 @@ func TestPlistXMLEscaping(t *testing.T) {
 		{
 			name: "keys with special characters",
 			data: map[string]any{
-				"Key<with>brackets": "value1",
+				"Key<with>brackets":  "value1",
 				"Key&with&ampersand": "value2",
-				"Key\"with\"quotes": "value3",
+				"Key\"with\"quotes":  "value3",
 			},
 			expected: []string{
 				"<key>Key&lt;with&gt;brackets</key>",
@@ -1281,7 +1281,7 @@ func TestPlistXMLEscaping(t *testing.T) {
 			name: "XML injection attempt in values",
 			data: map[string]any{
 				"InjectionKey": "</string><key>injected</key><string>malicious",
-				"ScriptKey": "<script>alert('xss')</script>",
+				"ScriptKey":    "<script>alert('xss')</script>",
 			},
 			expected: []string{
 				"<string>&lt;/string&gt;&lt;key&gt;injected&lt;/key&gt;&lt;string&gt;malicious</string>",
@@ -1296,7 +1296,7 @@ func TestPlistXMLEscaping(t *testing.T) {
 			name: "complex structures (converted to string)",
 			data: map[string]any{
 				"StructKey": struct{ Field string }{Field: "<value>"},
-				"ArrayKey": []string{"<item1>", "item2&more"},
+				"ArrayKey":  []string{"<item1>", "item2&more"},
 			},
 			expected: []string{
 				"<string>{&lt;value&gt;}</string>",
@@ -1544,9 +1544,9 @@ func TestPlistEscapingEdgeCases(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	tests := []struct {
-		name   string
-		data   map[string]any
-		check  func(t *testing.T, content string)
+		name  string
+		data  map[string]any
+		check func(t *testing.T, content string)
 	}{
 		{
 			name: "empty strings",
@@ -1622,11 +1622,11 @@ func TestXMLEscapingBeforeAfterDemo(t *testing.T) {
 
 	// Test data with potentially malicious XML content
 	testData := map[string]any{
-		"NormalKey": "normal value",
-		"InjectionKey": "</string><key>injected</key><string>malicious",
-		"ScriptKey": "<script>alert('xss')</script>",
-		"BundleKey": "com.evil.app</string><key>LSUIElement</key><false/>",
-		"MultiChar": "A & B < C > D \"quoted\" 'apostrophe'",
+		"NormalKey":         "normal value",
+		"InjectionKey":      "</string><key>injected</key><string>malicious",
+		"ScriptKey":         "<script>alert('xss')</script>",
+		"BundleKey":         "com.evil.app</string><key>LSUIElement</key><false/>",
+		"MultiChar":         "A & B < C > D \"quoted\" 'apostrophe'",
 		"Key<with>brackets": "value with & symbols",
 	}
 
@@ -1667,11 +1667,11 @@ func TestXMLEscapingBeforeAfterDemo(t *testing.T) {
 	// Verify escaping works
 	t.Logf("\n=== ESCAPING VERIFICATION ===")
 	escapingChecks := map[string]bool{
-		"&amp; (escaped &)": strings.Contains(contentStr, "&amp;"),
-		"&lt; (escaped <)": strings.Contains(contentStr, "&lt;"),
-		"&gt; (escaped >)": strings.Contains(contentStr, "&gt;"),
+		"&amp; (escaped &)":   strings.Contains(contentStr, "&amp;"),
+		"&lt; (escaped <)":    strings.Contains(contentStr, "&lt;"),
+		"&gt; (escaped >)":    strings.Contains(contentStr, "&gt;"),
 		"&quot; (escaped \")": strings.Contains(contentStr, "&quot;"),
-		"&apos; (escaped ')": strings.Contains(contentStr, "&apos;"),
+		"&apos; (escaped ')":  strings.Contains(contentStr, "&apos;"),
 	}
 
 	for check, found := range escapingChecks {

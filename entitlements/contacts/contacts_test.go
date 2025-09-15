@@ -22,7 +22,7 @@ func TestContactsPackageInit(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntAddressBook, true)
+	macgo.RequestEntitlement(entitlements.EntAddressBook)
 
 	// Check if it's registered
 	expectedEntitlement := macgo.Entitlement(entitlements.EntAddressBook)
@@ -70,9 +70,9 @@ func TestMultipleImports(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate multiple registrations (like multiple imports)
-	entitlements.Register(entitlements.EntAddressBook, true)
-	entitlements.Register(entitlements.EntAddressBook, true)
-	entitlements.Register(entitlements.EntAddressBook, true)
+	macgo.RequestEntitlement(entitlements.EntAddressBook)
+	macgo.RequestEntitlement(entitlements.EntAddressBook)
+	macgo.RequestEntitlement(entitlements.EntAddressBook)
 
 	// Should still work correctly
 	contactsEnt := macgo.Entitlement(entitlements.EntAddressBook)
@@ -94,7 +94,7 @@ func TestDocumentationExample(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntAddressBook, true)
+	macgo.RequestEntitlement(entitlements.EntAddressBook)
 
 	// Verify the entitlement is registered
 	contactsEnt := macgo.Entitlement(entitlements.EntAddressBook)

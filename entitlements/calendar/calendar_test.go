@@ -22,7 +22,7 @@ func TestCalendarPackageInit(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntCalendars, true)
+	macgo.RequestEntitlement(entitlements.EntCalendars)
 
 	// Check if it's registered
 	expectedEntitlement := macgo.Entitlement(entitlements.EntCalendars)
@@ -70,9 +70,9 @@ func TestMultipleImports(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate multiple registrations (like multiple imports)
-	entitlements.Register(entitlements.EntCalendars, true)
-	entitlements.Register(entitlements.EntCalendars, true)
-	entitlements.Register(entitlements.EntCalendars, true)
+	macgo.RequestEntitlement(entitlements.EntCalendars)
+	macgo.RequestEntitlement(entitlements.EntCalendars)
+	macgo.RequestEntitlement(entitlements.EntCalendars)
 
 	// Should still work correctly
 	calendarEnt := macgo.Entitlement(entitlements.EntCalendars)
@@ -94,7 +94,7 @@ func TestDocumentationExample(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntCalendars, true)
+	macgo.RequestEntitlement(entitlements.EntCalendars)
 
 	// Verify the entitlement is registered
 	calendarEnt := macgo.Entitlement(entitlements.EntCalendars)

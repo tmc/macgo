@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tmc/misc/macgo"
-	"github.com/tmc/misc/macgo/entitlements"
 )
 
 func init() {
@@ -29,24 +28,24 @@ func init() {
 
 	// Use entitlements package for semantic permission setting
 	// This is more readable than using macgo.RequestEntitlements()
-	entitlements.SetAppSandbox()      // Enable app sandbox
-	entitlements.SetCamera()          // Request camera access
-	entitlements.SetMic()             // Request microphone access
-	entitlements.SetLocation()        // Request location access
-	entitlements.SetContacts()        // Request contacts access
-	entitlements.SetPhotos()          // Request photos access
-	entitlements.SetCalendar()        // Request calendar access
-	entitlements.SetReminders()       // Request reminders access
+	macgo.RequestEntitlement(macgo.EntAppSandbox)  // Enable app sandbox
+	macgo.RequestEntitlement(macgo.EntCamera)      // Request camera access
+	macgo.RequestEntitlement(macgo.EntMicrophone)  // Request microphone access
+	macgo.RequestEntitlement(macgo.EntLocation)    // Request location access
+	macgo.RequestEntitlement(macgo.EntAddressBook) // Request contacts access
+	macgo.RequestEntitlement(macgo.EntPhotos)      // Request photos access
+	macgo.RequestEntitlement(macgo.EntCalendars)   // Request calendar access
+	macgo.RequestEntitlement(macgo.EntReminders)   // Request reminders access
 
 	// Network entitlements (note: these don't affect Go's net/http)
-	entitlements.SetNetworkClient()   // Allow outgoing network connections
-	entitlements.SetNetworkServer()   // Allow incoming network connections
+	macgo.RequestEntitlement(macgo.EntNetworkClient) // Allow outgoing network connections
+	macgo.RequestEntitlement(macgo.EntNetworkServer) // Allow incoming network connections
 
 	// Device access
-	entitlements.SetBluetooth()       // Allow Bluetooth access
-	entitlements.SetUSB()             // Allow USB device access
-	entitlements.SetAudioInput()      // Allow audio input access
-	entitlements.SetPrinting()        // Allow printing
+	macgo.RequestEntitlement(macgo.EntBluetooth)  // Allow Bluetooth access
+	macgo.RequestEntitlement(macgo.EntUSB)        // Allow USB device access
+	macgo.RequestEntitlement(macgo.EntAudioInput) // Allow audio input access
+	macgo.RequestEntitlement(macgo.EntPrint)      // Allow printing
 
 	// You can also use convenience functions
 	// entitlements.SetAllTCCPermissions()  // Enable all TCC permissions

@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -44,16 +45,16 @@ func main() {
 	fmt.Println("=" * 50)
 
 	results := make(map[string]string)
-	
+
 	for _, bench := range benchmarks {
 		fmt.Printf("Running %s...\n", bench.name)
-		
+
 		cmd := exec.Command("go", "test", "-bench", bench.pattern, "-benchmem", "-count=1", "-timeout", bench.timeout.String())
 		cmd.Dir = "."
-		
+
 		output, err := cmd.CombinedOutput()
 		outputStr := string(output)
-		
+
 		if err != nil {
 			if bench.expected {
 				fmt.Printf("  ❌ FAILED: %s\n", bench.name)
@@ -69,7 +70,7 @@ func main() {
 			fmt.Printf("  ✅ SUCCESS: %s\n", bench.name)
 			results[bench.name] = extractBenchmarkResults(outputStr)
 		}
-		
+
 		fmt.Println()
 	}
 
@@ -77,7 +78,7 @@ func main() {
 	fmt.Println("=" * 50)
 	fmt.Println("BENCHMARK SUMMARY")
 	fmt.Println("=" * 50)
-	
+
 	for _, bench := range benchmarks {
 		result := results[bench.name]
 		status := "✅"
@@ -103,7 +104,7 @@ func truncateOutput(output string) string {
 func extractBenchmarkResults(output string) string {
 	lines := strings.Split(output, "\n")
 	var benchResults []string
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, "Benchmark") && strings.Contains(line, "ns/op") {
 			// Extract just the benchmark name and performance
@@ -113,10 +114,10 @@ func extractBenchmarkResults(output string) string {
 			}
 		}
 	}
-	
+
 	if len(benchResults) == 0 {
 		return "No benchmark results found"
 	}
-	
+
 	return strings.Join(benchResults, "; ")
 }

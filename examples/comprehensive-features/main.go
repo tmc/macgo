@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/tmc/misc/macgo"
-	"github.com/tmc/misc/macgo/entitlements"
 )
 
 func init() {
@@ -25,15 +24,15 @@ func init() {
 
 	// Request various entitlements using the entitlements package
 	// This is more readable and semantic than using macgo.RequestEntitlements()
-	entitlements.SetAppSandbox()
-	entitlements.SetCamera()
-	entitlements.SetMic()
-	entitlements.SetLocation()
-	entitlements.SetPhotos()
-	entitlements.SetContacts()
-	entitlements.SetNetworkClient()
-	entitlements.SetNetworkServer()
-	
+	macgo.RequestEntitlement(macgo.EntAppSandbox)
+	macgo.RequestEntitlement(macgo.EntCamera)
+	macgo.RequestEntitlement(macgo.EntMicrophone)
+	macgo.RequestEntitlement(macgo.EntLocation)
+	macgo.RequestEntitlement(macgo.EntPhotos)
+	macgo.RequestEntitlement(macgo.EntAddressBook)
+	macgo.RequestEntitlement(macgo.EntNetworkClient)
+	macgo.RequestEntitlement(macgo.EntNetworkServer)
+
 	// Also demonstrate the direct API approach
 	macgo.RequestEntitlements(
 		macgo.EntUserSelectedReadOnly,

@@ -22,7 +22,7 @@ func TestPhotosPackageInit(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntPhotos, true)
+	macgo.RequestEntitlement(entitlements.EntPhotos)
 
 	// Check if it's registered
 	expectedEntitlement := macgo.Entitlement(entitlements.EntPhotos)
@@ -70,9 +70,9 @@ func TestMultipleImports(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate multiple registrations (like multiple imports)
-	entitlements.Register(entitlements.EntPhotos, true)
-	entitlements.Register(entitlements.EntPhotos, true)
-	entitlements.Register(entitlements.EntPhotos, true)
+	macgo.RequestEntitlement(entitlements.EntPhotos)
+	macgo.RequestEntitlement(entitlements.EntPhotos)
+	macgo.RequestEntitlement(entitlements.EntPhotos)
 
 	// Should still work correctly
 	photosEnt := macgo.Entitlement(entitlements.EntPhotos)
@@ -94,7 +94,7 @@ func TestDocumentationExample(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntPhotos, true)
+	macgo.RequestEntitlement(entitlements.EntPhotos)
 
 	// Verify the entitlement is registered
 	photosEnt := macgo.Entitlement(entitlements.EntPhotos)

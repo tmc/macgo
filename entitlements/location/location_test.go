@@ -22,7 +22,7 @@ func TestLocationPackageInit(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntLocation, true)
+	macgo.RequestEntitlement(entitlements.EntLocation)
 
 	// Check if it's registered
 	expectedEntitlement := macgo.Entitlement(entitlements.EntLocation)
@@ -70,9 +70,9 @@ func TestMultipleImports(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate multiple registrations (like multiple imports)
-	entitlements.Register(entitlements.EntLocation, true)
-	entitlements.Register(entitlements.EntLocation, true)
-	entitlements.Register(entitlements.EntLocation, true)
+	macgo.RequestEntitlement(entitlements.EntLocation)
+	macgo.RequestEntitlement(entitlements.EntLocation)
+	macgo.RequestEntitlement(entitlements.EntLocation)
 
 	// Should still work correctly
 	locationEnt := macgo.Entitlement(entitlements.EntLocation)
@@ -94,7 +94,7 @@ func TestDocumentationExample(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntLocation, true)
+	macgo.RequestEntitlement(entitlements.EntLocation)
 
 	// Verify the entitlement is registered
 	locationEnt := macgo.Entitlement(entitlements.EntLocation)

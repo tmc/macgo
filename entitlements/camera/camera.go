@@ -4,8 +4,8 @@
 //	import _ "github.com/tmc/misc/macgo/entitlements/camera"
 package camera
 
-import "github.com/tmc/misc/macgo/entitlements"
+import "github.com/tmc/misc/macgo/entitlement"
 
 func init() {
-	entitlements.Register(entitlements.EntCamera, true)
+	entitlement.EnableCamera()
 }

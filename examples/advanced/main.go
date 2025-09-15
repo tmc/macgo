@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tmc/misc/macgo"
-	"github.com/tmc/misc/macgo/entitlements"
 )
 
 func init() {
@@ -36,9 +35,9 @@ func init() {
 
 	// You can also mix Config API with entitlements package
 	// (this will be applied to the DefaultConfig)
-	entitlements.SetPhotos()
-	entitlements.SetContacts()
-	entitlements.SetNetworkClient()
+	macgo.RequestEntitlement(macgo.EntPhotos)
+	macgo.RequestEntitlement(macgo.EntAddressBook)
+	macgo.RequestEntitlement(macgo.EntNetworkClient)
 
 	// Make this a proper GUI application to control dock behavior
 	cfg.AddPlistEntry("LSUIElement", false) // Show in dock
@@ -59,13 +58,13 @@ func init() {
 
 	// Enable improved signal handling for better Ctrl+C support
 	macgo.EnableImprovedSignalHandling()
-	
+
 	// Set custom icon
 	macgo.SetIconFile("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ToolbarCustomizeIcon.icns")
-	
+
 	// Enable debug logging (optional)
 	macgo.EnableDebug()
-	
+
 	// Start the application
 	macgo.Start()
 }
@@ -127,9 +126,9 @@ func main() {
 	// Demonstrate StartWithContext for better control
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	fmt.Println("\nPress Ctrl+C to test signal handling, or wait for timeout...")
-	
+
 	// Wait for signal or timeout
 	select {
 	case sig := <-c:
@@ -138,6 +137,6 @@ func main() {
 	case <-ctx.Done():
 		fmt.Println("\nTimeout reached")
 	}
-	
+
 	fmt.Println("Shutting down...")
 }

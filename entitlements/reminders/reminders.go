@@ -4,8 +4,11 @@
 //	import _ "github.com/tmc/misc/macgo/entitlements/reminders"
 package reminders
 
-import "github.com/tmc/misc/macgo/entitlements"
+import (
+	"github.com/tmc/misc/macgo"
+	"github.com/tmc/misc/macgo/entitlements"
+)
 
 func init() {
-	entitlements.Register(entitlements.EntReminders, true)
+	macgo.RequestEntitlement(entitlements.EntReminders)
 }

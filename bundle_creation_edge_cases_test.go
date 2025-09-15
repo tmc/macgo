@@ -157,10 +157,10 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 				}
 				tmpFile.WriteString("#!/bin/bash\necho 'test'\n")
 				tmpFile.Close()
-				
+
 				// Remove execute permissions
 				os.Chmod(tmpFile.Name(), 0644)
-				
+
 				return tmpFile.Name(), func() { os.Remove(tmpFile.Name()) }
 			},
 			expectError: false, // Should handle gracefully
@@ -172,13 +172,13 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 				cfg := NewConfig()
 				cfg.ApplicationName = "TestApp"
 				cfg.BundleID = "com.example.massive"
-				
+
 				// Add many entitlements
 				cfg.Entitlements = make(map[Entitlement]bool)
 				for i := 0; i < 100; i++ {
 					cfg.Entitlements[Entitlement(fmt.Sprintf("com.example.entitlement%d", i))] = true
 				}
-				
+
 				return cfg
 			},
 			setupFiles: func(t *testing.T) (string, func()) {
@@ -193,13 +193,13 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 				cfg := NewConfig()
 				cfg.ApplicationName = "TestApp"
 				cfg.BundleID = "com.example.massiveplist"
-				
+
 				// Add many plist entries
 				cfg.PlistEntries = make(map[string]any)
 				for i := 0; i < 100; i++ {
 					cfg.PlistEntries[fmt.Sprintf("CustomKey%d", i)] = fmt.Sprintf("CustomValue%d", i)
 				}
-				
+
 				return cfg
 			},
 			setupFiles: func(t *testing.T) (string, func()) {
@@ -214,7 +214,7 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 				cfg := NewConfig()
 				cfg.ApplicationName = "TestApp"
 				cfg.BundleID = "com.example.invalidplist"
-				
+
 				// Add invalid plist entry types
 				cfg.PlistEntries = make(map[string]any)
 				cfg.PlistEntries["ValidString"] = "string value"
@@ -224,7 +224,7 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 				cfg.PlistEntries["ValidArray"] = []string{"a", "b", "c"}
 				cfg.PlistEntries["ComplexMap"] = map[string]string{"key": "value"}
 				cfg.PlistEntries["NilValue"] = nil
-				
+
 				return cfg
 			},
 			setupFiles: func(t *testing.T) (string, func()) {
@@ -260,14 +260,14 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create temp directory: %v", err)
 				}
-				
+
 				link1 := filepath.Join(tmpDir, "link1")
 				link2 := filepath.Join(tmpDir, "link2")
-				
+
 				// Create circular symbolic links
 				os.Symlink(link2, link1)
 				os.Symlink(link1, link2)
-				
+
 				return link1, func() { os.RemoveAll(tmpDir) }
 			},
 			expectError: true,
@@ -349,10 +349,10 @@ func TestBundleCreationEdgeCases(t *testing.T) {
 				}
 				tmpFile.WriteString("#!/bin/bash\necho 'test'\n")
 				tmpFile.Close()
-				
+
 				// Set special permissions
 				os.Chmod(tmpFile.Name(), 0755)
-				
+
 				return tmpFile.Name(), func() { os.Remove(tmpFile.Name()) }
 			},
 			expectError: false,
@@ -625,17 +625,17 @@ func createTempExecutableFile(t *testing.T) (string, func()) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	
+
 	execContent := `#!/bin/bash
 echo "Test executable"
 exit 0
 `
 	tmpFile.WriteString(execContent)
 	tmpFile.Close()
-	
+
 	// Make it executable
 	os.Chmod(tmpFile.Name(), 0755)
-	
+
 	return tmpFile.Name(), func() { os.Remove(tmpFile.Name()) }
 }
 
@@ -644,88 +644,88 @@ func createLargeExecutableFile(t *testing.T) (string, func()) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	
+
 	// Create a large executable (10MB)
 	execContent := `#!/bin/bash
 echo "Large test executable"
 # Large comment section to increase file size
 `
 	tmpFile.WriteString(execContent)
-	
+
 	// Add padding to make it large
 	padding := strings.Repeat("# Padding line to make file large\n", 100000)
 	tmpFile.WriteString(padding)
 	tmpFile.WriteString("exit 0\n")
-	
+
 	tmpFile.Close()
-	
+
 	// Make it executable
 	os.Chmod(tmpFile.Name(), 0755)
-	
+
 	return tmpFile.Name(), func() { os.Remove(tmpFile.Name()) }
 }
 
 func testBundleCreation(cfg *Config, execPath string) error {
 	// This is a simplified test of bundle creation
 	// In the real implementation, this would call the actual bundle creation logic
-	
+
 	// Basic validation
 	if cfg.ApplicationName == "" {
 		cfg.ApplicationName = "DefaultApp"
 	}
-	
+
 	if cfg.BundleID == "" {
 		cfg.BundleID = "com.example.default"
 	}
-	
+
 	// Check if executable exists
 	if _, err := os.Stat(execPath); err != nil {
 		return fmt.Errorf("executable file does not exist: %v", err)
 	}
-	
+
 	// Check if it's a directory
 	if info, err := os.Stat(execPath); err == nil && info.IsDir() {
 		return fmt.Errorf("path is a directory, not an executable")
 	}
-	
+
 	// Simulate bundle creation
 	tmpDir, err := os.MkdirTemp("", "macgo-test-bundle-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %v", err)
 	}
-	
+
 	// Clean up unless KeepTemp is true
 	if !cfg.KeepTemp {
 		defer os.RemoveAll(tmpDir)
 	}
-	
+
 	bundlePath := filepath.Join(tmpDir, cfg.ApplicationName+".app")
 	contentsPath := filepath.Join(bundlePath, "Contents")
 	macOSPath := filepath.Join(contentsPath, "MacOS")
-	
+
 	// Create bundle structure
 	if err := os.MkdirAll(macOSPath, 0755); err != nil {
 		return fmt.Errorf("failed to create bundle structure: %v", err)
 	}
-	
+
 	// Copy executable
 	execName := cfg.ApplicationName
 	if execName == "" {
 		execName = "app"
 	}
 	destExec := filepath.Join(macOSPath, execName)
-	
+
 	if err := copyExecutable(execPath, destExec); err != nil {
 		return fmt.Errorf("failed to copy executable: %v", err)
 	}
-	
+
 	// Create Info.plist
 	infoPlist := createInfoPlist(cfg)
 	infoPlistPath := filepath.Join(contentsPath, "Info.plist")
 	if err := os.WriteFile(infoPlistPath, []byte(infoPlist), 0644); err != nil {
 		return fmt.Errorf("failed to create Info.plist: %v", err)
 	}
-	
+
 	// Create entitlements if needed
 	if cfg.Entitlements != nil && len(cfg.Entitlements) > 0 {
 		entitlements := createEntitlementsPlist(cfg)
@@ -734,7 +734,7 @@ func testBundleCreation(cfg *Config, execPath string) error {
 			return fmt.Errorf("failed to create entitlements: %v", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -744,24 +744,24 @@ func copyExecutable(src, dst string) error {
 		return err
 	}
 	defer srcFile.Close()
-	
+
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
 	defer dstFile.Close()
-	
+
 	_, err = dstFile.ReadFrom(srcFile)
 	if err != nil {
 		return err
 	}
-	
+
 	// Copy permissions
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
-	
+
 	return os.Chmod(dst, srcInfo.Mode())
 }
 
@@ -779,14 +779,14 @@ func createInfoPlist(cfg *Config) string {
 	<key>CFBundleExecutable</key>
 	<string>%s</string>
 `
-	
+
 	execName := cfg.ApplicationName
 	if execName == "" {
 		execName = "app"
 	}
-	
+
 	plistContent := fmt.Sprintf(plist, cfg.ApplicationName, cfg.BundleID, execName)
-	
+
 	// Add custom plist entries
 	if cfg.PlistEntries != nil {
 		for key, value := range cfg.PlistEntries {
@@ -794,10 +794,10 @@ func createInfoPlist(cfg *Config) string {
 			plistContent += formatPlistValue(value)
 		}
 	}
-	
+
 	plistContent += `</dict>
 </plist>`
-	
+
 	return plistContent
 }
 
@@ -807,7 +807,7 @@ func createEntitlementsPlist(cfg *Config) string {
 <plist version="1.0">
 <dict>
 `
-	
+
 	for ent, value := range cfg.Entitlements {
 		plist += fmt.Sprintf("	<key>%s</key>\n", ent)
 		if value {
@@ -816,10 +816,10 @@ func createEntitlementsPlist(cfg *Config) string {
 			plist += "	<false/>\n"
 		}
 	}
-	
+
 	plist += `</dict>
 </plist>`
-	
+
 	return plist
 }
 
@@ -850,65 +850,7 @@ func formatPlistValue(value interface{}) string {
 	}
 }
 
-// Benchmark tests
-func BenchmarkBundleCreation(b *testing.B) {
-	if runtime.GOOS != "darwin" {
-		b.Skip("Skipping bundle creation benchmark on non-macOS platform")
-	}
-
-	// Create temporary executable
-	tmpFile, err := os.CreateTemp("", "macgo-bench-exec-*")
-	if err != nil {
-		b.Fatalf("Failed to create temp file: %v", err)
-	}
-	tmpFile.WriteString("#!/bin/bash\necho 'test'\nexit 0\n")
-	tmpFile.Close()
-	os.Chmod(tmpFile.Name(), 0755)
-	defer os.Remove(tmpFile.Name())
-
-	cfg := NewConfig()
-	cfg.ApplicationName = "BenchmarkApp"
-	cfg.BundleID = "com.example.benchmark"
-	cfg.KeepTemp = false
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		err := testBundleCreation(cfg, tmpFile.Name())
-		if err != nil {
-			b.Fatalf("Bundle creation failed: %v", err)
-		}
-	}
-}
-
-func BenchmarkBundleCreationWithEntitlements(b *testing.B) {
-	if runtime.GOOS != "darwin" {
-		b.Skip("Skipping bundle creation with entitlements benchmark on non-macOS platform")
-	}
-
-	// Create temporary executable
-	tmpFile, err := os.CreateTemp("", "macgo-bench-exec-*")
-	if err != nil {
-		b.Fatalf("Failed to create temp file: %v", err)
-	}
-	tmpFile.WriteString("#!/bin/bash\necho 'test'\nexit 0\n")
-	tmpFile.Close()
-	os.Chmod(tmpFile.Name(), 0755)
-	defer os.Remove(tmpFile.Name())
-
-	cfg := NewConfig()
-	cfg.ApplicationName = "BenchmarkApp"
-	cfg.BundleID = "com.example.benchmark"
-	cfg.KeepTemp = false
-	cfg.RequestEntitlements(EntCamera, EntMicrophone, EntAppSandbox)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		err := testBundleCreation(cfg, tmpFile.Name())
-		if err != nil {
-			b.Fatalf("Bundle creation with entitlements failed: %v", err)
-		}
-	}
-}
+// Benchmark tests moved to bundle_bench_test.go to avoid duplicates
 
 func BenchmarkLargeExecutableBundleCreation(b *testing.B) {
 	if runtime.GOOS != "darwin" {
@@ -920,16 +862,16 @@ func BenchmarkLargeExecutableBundleCreation(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp file: %v", err)
 	}
-	
+
 	// Write large executable content
 	execContent := "#!/bin/bash\necho 'large test executable'\n"
 	tmpFile.WriteString(execContent)
-	
+
 	// Add padding
 	padding := strings.Repeat("# Padding line\n", 10000)
 	tmpFile.WriteString(padding)
 	tmpFile.WriteString("exit 0\n")
-	
+
 	tmpFile.Close()
 	os.Chmod(tmpFile.Name(), 0755)
 	defer os.Remove(tmpFile.Name())

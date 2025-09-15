@@ -22,7 +22,7 @@ func TestRemindersPackageInit(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntReminders, true)
+	macgo.RequestEntitlement(entitlements.EntReminders)
 
 	// Check if it's registered
 	expectedEntitlement := macgo.Entitlement(entitlements.EntReminders)
@@ -70,9 +70,9 @@ func TestMultipleImports(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate multiple registrations (like multiple imports)
-	entitlements.Register(entitlements.EntReminders, true)
-	entitlements.Register(entitlements.EntReminders, true)
-	entitlements.Register(entitlements.EntReminders, true)
+	macgo.RequestEntitlement(entitlements.EntReminders)
+	macgo.RequestEntitlement(entitlements.EntReminders)
+	macgo.RequestEntitlement(entitlements.EntReminders)
 
 	// Should still work correctly
 	remindersEnt := macgo.Entitlement(entitlements.EntReminders)
@@ -94,7 +94,7 @@ func TestDocumentationExample(t *testing.T) {
 	macgo.DefaultConfig = macgo.NewConfig()
 
 	// Simulate what init() does
-	entitlements.Register(entitlements.EntReminders, true)
+	macgo.RequestEntitlement(entitlements.EntReminders)
 
 	// Verify the entitlement is registered
 	remindersEnt := macgo.Entitlement(entitlements.EntReminders)

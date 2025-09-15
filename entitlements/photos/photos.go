@@ -4,8 +4,8 @@
 //	import _ "github.com/tmc/misc/macgo/entitlements/photos"
 package photos
 
-import "github.com/tmc/misc/macgo/entitlements"
+import "github.com/tmc/misc/macgo/entitlement"
 
 func init() {
-	entitlements.Register(entitlements.EntPhotos, true)
+	entitlement.EnablePhotos()
 }

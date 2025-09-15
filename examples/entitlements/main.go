@@ -13,7 +13,6 @@ import (
 
 	// Import both macgo and entitlements packages
 	"github.com/tmc/misc/macgo"
-	"github.com/tmc/misc/macgo/entitlements"
 )
 
 // Define custom entitlements in a JSON file and embed it
@@ -28,18 +27,18 @@ var entitlementsFS embed.FS
 
 func init() {
 	// This example demonstrates two approaches to setting entitlements:
-	
+
 	// Approach 1: Using entitlements package (recommended for most use cases)
 	fmt.Println("Setting up entitlements using the entitlements package...")
-	entitlements.SetAppSandbox()
-	entitlements.SetCamera()
-	entitlements.SetMic()
-	entitlements.SetLocation()
-	entitlements.SetPhotos()
-	entitlements.SetNetworkClient()
-	entitlements.SetNetworkServer()
-	entitlements.SetVirtualization()
-	
+	macgo.RequestEntitlement(macgo.EntAppSandbox)
+	macgo.RequestEntitlement(macgo.EntCamera)
+	macgo.RequestEntitlement(macgo.EntMicrophone)
+	macgo.RequestEntitlement(macgo.EntLocation)
+	macgo.RequestEntitlement(macgo.EntPhotos)
+	macgo.RequestEntitlement(macgo.EntNetworkClient)
+	macgo.RequestEntitlement(macgo.EntNetworkServer)
+	macgo.RequestEntitlement(macgo.EntVirtualization)
+
 	// Approach 2: Using go:embed with JSON configuration
 	// This approach is useful when you want to maintain entitlements in a separate file
 	fmt.Println("Loading additional entitlements from embedded JSON data...")
@@ -51,7 +50,7 @@ func init() {
 	macgo.SetAppName("MacGoEmbed")
 	macgo.SetBundleID("com.example.macgo.embed")
 	macgo.EnableDebug() // Enable debug output
-	
+
 	// Start macgo
 	macgo.Start()
 }
