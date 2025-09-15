@@ -4,8 +4,13 @@
 //	import _ "github.com/tmc/misc/macgo/entitlements/location"
 package location
 
-import "github.com/tmc/misc/macgo/entitlement"
+import (
+	"github.com/tmc/misc/macgo"
+	"github.com/tmc/misc/macgo/entitlement"
+)
 
 func init() {
 	entitlement.EnableLocation()
+	// Also sync with main package for compatibility
+	macgo.RequestEntitlement(macgo.EntLocation)
 }
