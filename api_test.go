@@ -9,6 +9,33 @@ import (
 	"testing/fstest"
 )
 
+// Helper function to compare entitlement maps properly
+func entitlementsEqual(actual, expected map[Entitlement]bool) bool {
+	// Handle nil vs empty map cases
+	actualEmpty := actual == nil || len(actual) == 0
+	expectedEmpty := expected == nil || len(expected) == 0
+
+	if actualEmpty && expectedEmpty {
+		return true
+	}
+
+	if actualEmpty != expectedEmpty {
+		return false
+	}
+
+	if len(actual) != len(expected) {
+		return false
+	}
+
+	for k, v := range expected {
+		if actualV, exists := actual[k]; !exists || actualV != v {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Helper function to reset DefaultConfig state between tests
 func resetDefaultConfig() {
 	configMutex.Lock()
@@ -73,7 +100,7 @@ func TestRequestEntitlements(t *testing.T) {
 		{
 			name:         "Empty entitlements",
 			entitlements: []interface{}{},
-			expected:     nil,
+			expected:     map[Entitlement]bool{},
 		},
 	}
 
@@ -83,7 +110,7 @@ func TestRequestEntitlements(t *testing.T) {
 
 			RequestEntitlements(tt.entitlements...)
 
-			if !reflect.DeepEqual(DefaultConfig.Entitlements, tt.expected) {
+			if !entitlementsEqual(DefaultConfig.Entitlements, tt.expected) {
 				t.Errorf("Expected entitlements %v, got %v", tt.expected, DefaultConfig.Entitlements)
 			}
 		})
@@ -125,7 +152,7 @@ func TestRequestEntitlement(t *testing.T) {
 
 			RequestEntitlement(tt.entitlement)
 
-			if !reflect.DeepEqual(DefaultConfig.Entitlements, tt.expected) {
+			if !entitlementsEqual(DefaultConfig.Entitlements, tt.expected) {
 				t.Errorf("Expected entitlements %v, got %v", tt.expected, DefaultConfig.Entitlements)
 			}
 		})
@@ -337,7 +364,7 @@ func TestLoadEntitlementsFromJSON(t *testing.T) {
 				t.Errorf("Expected no error but got: %v", err)
 			}
 
-			if !tt.expectError && !reflect.DeepEqual(DefaultConfig.Entitlements, tt.expected) {
+			if !tt.expectError && !entitlementsEqual(DefaultConfig.Entitlements, tt.expected) {
 				t.Errorf("Expected entitlements %v, got %v", tt.expected, DefaultConfig.Entitlements)
 			}
 		})
@@ -365,7 +392,7 @@ func TestLoadEntitlementsFromJSONMerging(t *testing.T) {
 		"com.apple.security.network.client": false,
 	}
 
-	if !reflect.DeepEqual(DefaultConfig.Entitlements, expected) {
+	if !entitlementsEqual(DefaultConfig.Entitlements, expected) {
 		t.Errorf("Expected merged entitlements %v, got %v", expected, DefaultConfig.Entitlements)
 	}
 }
@@ -449,7 +476,7 @@ func TestConfigRequestEntitlements(t *testing.T) {
 		EntAppSandbox:                   true,
 	}
 
-	if !reflect.DeepEqual(config.Entitlements, expected) {
+	if !entitlementsEqual(config.Entitlements, expected) {
 		t.Errorf("Expected entitlements %v, got %v", expected, config.Entitlements)
 	}
 }
@@ -469,7 +496,7 @@ func TestConfigRequestEntitlementsWithExisting(t *testing.T) {
 		EntAppSandbox: true,
 	}
 
-	if !reflect.DeepEqual(config.Entitlements, expected) {
+	if !entitlementsEqual(config.Entitlements, expected) {
 		t.Errorf("Expected entitlements %v, got %v", expected, config.Entitlements)
 	}
 }
@@ -542,7 +569,7 @@ func TestAPIFunctionChaining(t *testing.T) {
 		EntMicrophone: true,
 	}
 
-	if !reflect.DeepEqual(DefaultConfig.Entitlements, expectedEntitlements) {
+	if !entitlementsEqual(DefaultConfig.Entitlements, expectedEntitlements) {
 		t.Errorf("Expected entitlements %v, got %v", expectedEntitlements, DefaultConfig.Entitlements)
 	}
 
