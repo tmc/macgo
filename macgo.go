@@ -586,17 +586,20 @@ func getCurrentWorkingDir() string {
 
 // DisableSignals disables signal handling - legacy compatibility function.
 func DisableSignals() {
-	signal.DisableSignals()
+	DisableSignalHandling = true
+	signal.DisableSignalHandling = true
 }
 
 // DisableRobustSignals is for backward compatibility.
 func DisableRobustSignals() {
-	signal.DisableRobustSignals()
+	DisableSignalHandling = true
+	signal.DisableSignalHandling = true
 }
 
 // EnableLegacySignalHandling is for backward compatibility.
 func EnableLegacySignalHandling() {
-	signal.EnableLegacySignalHandling()
+	DisableSignalHandling = true
+	signal.DisableSignalHandling = true
 }
 
 // DisableSignalHandling provides access to the signal package's flag for tests

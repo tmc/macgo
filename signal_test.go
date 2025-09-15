@@ -574,10 +574,6 @@ type MockProcess struct {
 	signalHandler func(os.Signal) error
 }
 
-func (m *MockProcess) Pid() int {
-	return m.pid
-}
-
 func (m *MockProcess) Signal(sig os.Signal) error {
 	atomic.AddInt32(&m.signalCount, 1)
 	m.lastSignal = sig
@@ -585,10 +581,6 @@ func (m *MockProcess) Signal(sig os.Signal) error {
 		return m.signalHandler(sig)
 	}
 	return nil
-}
-
-func (m *MockProcess) Kill() error {
-	return m.Signal(os.Kill)
 }
 
 // TestMockSignalForwarding tests signal forwarding with mock processes

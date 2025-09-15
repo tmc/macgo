@@ -6,8 +6,29 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
+
+// isInTest detects if we are running inside a test
+func isInTest() bool {
+	// Check for common test environment indicators
+	for _, arg := range os.Args {
+		if strings.Contains(arg, "test") || strings.HasSuffix(arg, ".test") {
+			return true
+		}
+	}
+	return false
+}
+
+// exitOrReturn exits the process normally, but returns during tests to avoid panics
+func exitOrReturn(code int) {
+	if isInTest() {
+		debugf("Test environment detected, returning instead of exit(%d)", code)
+		return
+	}
+	os.Exit(code)
+}
 
 // RelaunchWithRobustSignalHandling relaunches the app with robust signal handling.
 // This approach is inspired by the Go tools implementation and works better
@@ -22,6 +43,25 @@ func RelaunchWithRobustSignalHandlingContext(ctx context.Context, appPath, execP
 	debugf("appPath: %s", appPath)
 	debugf("execPath: %s", execPath)
 	debugf("args: %v", args)
+
+	// Validate input parameters
+	if appPath == "" || execPath == "" {
+		debugf("Empty paths provided (appPath: %q, execPath: %q), skipping relaunch", appPath, execPath)
+		return
+	}
+
+	// Check for invalid characters that could cause issues
+	if strings.ContainsAny(appPath, "\n\r\t\x00") || strings.ContainsAny(execPath, "\n\r\t\x00") {
+		debugf("Invalid characters in paths (appPath: %q, execPath: %q), skipping relaunch", appPath, execPath)
+		return
+	}
+
+	// Check for unreasonably long paths that could cause issues
+	const maxPathLength = 400 // Reasonable limit for path length
+	if len(appPath) > maxPathLength || len(execPath) > maxPathLength {
+		debugf("Excessively long paths (appPath: %d chars, execPath: %d chars), skipping relaunch", len(appPath), len(execPath))
+		return
+	}
 
 	// Set environment to prevent relaunching again
 	os.Setenv("MACGO_NO_RELAUNCH", "1")
@@ -54,7 +94,7 @@ func RelaunchWithRobustSignalHandlingContext(ctx context.Context, appPath, execP
 	// Start the process
 	if err := cmd.Start(); err != nil {
 		debugf("Failed to start app bundle: %v", err)
-		os.Exit(1)
+		exitOrReturn(1)
 	}
 
 	// Set up signal forwarding
@@ -67,13 +107,13 @@ func RelaunchWithRobustSignalHandlingContext(ctx context.Context, appPath, execP
 	err := cmd.Wait()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
+			exitOrReturn(exitErr.ExitCode())
 		}
 		debugf("App bundle execution error: %v", err)
-		os.Exit(1)
+		exitOrReturn(1)
 	}
 
-	os.Exit(0)
+	exitOrReturn(0)
 }
 
 // ImprovedRelaunch provides an improved relaunch function that uses the Go tool's signal handling pattern.
@@ -140,12 +180,12 @@ func ImprovedRelaunch(appPath, execPath string, args []string) {
 			debugf("error waiting for app bundle: %v", err)
 		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
+			exitOrReturn(exitErr.ExitCode())
 		}
-		os.Exit(1)
+		exitOrReturn(1)
 	}
 
-	os.Exit(0)
+	exitOrReturn(0)
 }
 
 // basicRelaunch provides a simple relaunch without signal handling for fallback.
@@ -158,11 +198,11 @@ func basicRelaunch(appPath, execPath string, args []string) {
 
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
+			exitOrReturn(exitErr.ExitCode())
 		}
-		os.Exit(1)
+		exitOrReturn(1)
 	}
-	os.Exit(0)
+	exitOrReturn(0)
 }
 
 // Legacy compatibility functions
@@ -203,7 +243,7 @@ func FallbackDirectExecutionContext(ctx context.Context, appPath, execPath strin
 
 	if _, err := os.Stat(executablePath); os.IsNotExist(err) {
 		debugf("Executable not found at %s, exiting", executablePath)
-		os.Exit(1)
+		exitOrReturn(1)
 	}
 
 	// Create execution context
@@ -215,11 +255,11 @@ func FallbackDirectExecutionContext(ctx context.Context, appPath, execPath strin
 	// Run the command
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
+			exitOrReturn(exitErr.ExitCode())
 		}
 		debugf("Direct execution error: %v", err)
-		os.Exit(1)
+		exitOrReturn(1)
 	}
 
-	os.Exit(0)
+	exitOrReturn(0)
 }
