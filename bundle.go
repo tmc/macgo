@@ -747,6 +747,11 @@ func pipeIOContext(ctx context.Context, pipe string, in io.Reader, out io.Writer
 
 // createPipe creates a named pipe securely to prevent race conditions.
 func createPipe(prefix string) (string, error) {
+	// Use a default prefix if empty
+	if prefix == "" {
+		prefix = "macgo-pipe"
+	}
+
 	// Validate prefix to prevent injection
 	cleanPrefix, err := securePath(prefix)
 	if err != nil {

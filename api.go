@@ -178,6 +178,11 @@ func LoadEntitlementsFromJSON(data []byte) error {
 		return fmt.Errorf("macgo: parse entitlements JSON: %w", err)
 	}
 
+	// Reject null JSON values
+	if entitlements == nil {
+		return fmt.Errorf("macgo: parse entitlements JSON: invalid null value")
+	}
+
 	configMutex.Lock()
 	defer configMutex.Unlock()
 

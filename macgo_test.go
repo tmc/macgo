@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -2244,7 +2243,7 @@ func TestAPIThreadSafety(t *testing.T) {
 	}
 }
 
-// TestLoadEntitlementsFromJSONNilMapPanic tests that LoadEntitlementsFromJSON panics with nil map
+// TestLoadEntitlementsFromJSONNilMapPanic tests that LoadEntitlementsFromJSON handles nil map correctly
 func TestLoadEntitlementsFromJSONNilMapPanic(t *testing.T) {
 	// Save original DefaultConfig
 	originalConfig := DefaultConfig
@@ -2252,27 +2251,24 @@ func TestLoadEntitlementsFromJSONNilMapPanic(t *testing.T) {
 		DefaultConfig = originalConfig
 	}()
 
-	// Set DefaultConfig with nil Entitlements map to trigger panic
+	// Set DefaultConfig with nil Entitlements map
 	DefaultConfig = &Config{
 		Entitlements: nil,
 	}
 
-	// This should panic when trying to assign to nil map
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic when LoadEntitlementsFromJSON is called with nil Entitlements map")
-		} else {
-			// Verify it's the expected panic
-			if _, ok := r.(runtime.Error); !ok {
-				t.Errorf("Expected runtime error panic, got %v", r)
-			}
-		}
-	}()
-
-	// This should panic
+	// This should NOT panic - the function should create a new map
 	err := LoadEntitlementsFromJSON([]byte(`{"com.apple.security.device.camera": true}`))
 	if err != nil {
-		t.Errorf("Should have panicked before returning error: %v", err)
+		t.Errorf("LoadEntitlementsFromJSON should handle nil map gracefully, got error: %v", err)
+	}
+
+	// Verify that the map was created and the entitlement was added
+	if DefaultConfig.Entitlements == nil {
+		t.Error("Expected Entitlements map to be created")
+	}
+
+	if !DefaultConfig.Entitlements[EntCamera] {
+		t.Error("Expected camera entitlement to be added")
 	}
 }
 
