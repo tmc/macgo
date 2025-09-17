@@ -132,6 +132,55 @@ Macgo provides several auto-initialization packages for different use cases:
 - `github.com/tmc/misc/macgo/auto/sandbox/readonly` - App sandbox with user read access
 - `github.com/tmc/misc/macgo/auto/sandbox/signalhandler` - (Legacy) Kept for backward compatibility, but redundant as robust signal handling is now enabled by default
 
+## New Examples
+
+### File Processor
+[file-processor/main.go](file-processor/main.go) - CLI tool for batch file processing with proper sandbox permissions.
+- Read/write file access with user selection
+- Batch processing with glob patterns
+- Text transformations (uppercase, lowercase, reverse)
+- Proper sandbox configuration for file operations
+
+### Screen Recorder
+[screen-recorder/main.go](screen-recorder/main.go) - Screen recording application with TCC permissions.
+- Screen capture permission handling
+- Optional microphone and camera overlay
+- Hardware-accelerated encoding
+- Configurable output format and quality
+
+### Network Service
+[network-service/main.go](network-service/main.go) - HTTP/WebSocket server with sandbox networking.
+- Both client and server network entitlements
+- REST API endpoints
+- WebSocket support
+- External connectivity testing
+- Optional background mode
+
+### Background Agent
+[background-agent/main.go](background-agent/main.go) - Long-running background service without dock icon.
+- Runs as background daemon
+- File system monitoring
+- Periodic health checks
+- JSON status file output
+- Launch agent configuration
+
+### Development Tools
+[dev-tools/main.go](dev-tools/main.go) - Developer utility for project analysis and building.
+- Language detection (Go, JavaScript, Python, Rust, etc.)
+- Build and test execution
+- File watching with auto-format
+- IDE integration (VSCode, Xcode, IntelliJ)
+- Development server support
+
+### Media Processor
+[media-processor/main.go](media-processor/main.go) - Audio/video processing with hardware acceleration.
+- Hardware video encoding/decoding (VideoToolbox)
+- Format conversion (MP4, WebM, MOV, MP3, etc.)
+- Live capture from camera/microphone
+- Batch processing
+- Thumbnail generation
+- Resolution and quality adjustment
+
 ## Running the Examples
 
 To run any example with debug output enabled:
