@@ -70,8 +70,19 @@ func createSimpleBundle(execPath string, cfg *Config) (string, error) {
 		bundleID = inferBundleID(appName)
 	}
 
+	// Determine bundle location - prefer ~/go/bin/ if it exists
+	bundleBaseDir := os.TempDir()
+	if goPath := os.Getenv("GOPATH"); goPath != "" {
+		bundleBaseDir = filepath.Join(goPath, "bin")
+	} else if homeDir, err := os.UserHomeDir(); err == nil {
+		goBinDir := filepath.Join(homeDir, "go", "bin")
+		if _, err := os.Stat(goBinDir); err == nil {
+			bundleBaseDir = goBinDir
+		}
+	}
+
 	// Create bundle directory
-	bundleDir := filepath.Join(os.TempDir(), appName+".app")
+	bundleDir := filepath.Join(bundleBaseDir, appName+".app")
 	if err := os.RemoveAll(bundleDir); err != nil && !os.IsNotExist(err) {
 		return "", err
 	}
