@@ -3,6 +3,7 @@ package macgo
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -160,8 +161,32 @@ func cleanAppName(name string) string {
 	return result.String()
 }
 
-// relaunchInBundle launches the app bundle and forwards signals/IO.
+// relaunchInBundle launches the app bundle using macOS 'open' command.
 func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Config) error {
+	// For simple CLI tools, we can use direct execution for better I/O handling
+	// But for apps that need proper TCC dialogs, we should use 'open'
+
+	// Check if we need LaunchServices (for TCC permissions)
+	needsLaunchServices := false
+	for _, perm := range cfg.Permissions {
+		switch perm {
+		case Camera, Microphone, Location:
+			needsLaunchServices = true
+		}
+	}
+
+	if !needsLaunchServices {
+		// For simple CLI tools without TCC requirements, use direct execution
+		// This preserves stdin/stdout/stderr properly
+		return relaunchDirect(ctx, bundlePath, execPath, cfg)
+	}
+
+	// For apps needing TCC permissions, use 'open' with I/O redirection
+	return relaunchWithOpen(ctx, bundlePath, cfg)
+}
+
+// relaunchDirect directly executes the binary in the bundle.
+func relaunchDirect(ctx context.Context, bundlePath, execPath string, cfg *Config) error {
 	// Determine executable name
 	execName := ""
 	if cfg.AppName != "" {
@@ -169,7 +194,6 @@ func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Con
 	}
 	if execName == "" {
 		execName = filepath.Base(execPath)
-		// Don't strip extension - Go binaries typically don't have one anyway
 	}
 
 	bundleExec := filepath.Join(bundlePath, "Contents", "MacOS", execName)
@@ -201,7 +225,91 @@ func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Con
 	}
 
 	os.Exit(0)
-	return nil // unreachable
+	return nil
+}
+
+// relaunchWithOpen uses the 'open' command for proper LaunchServices integration.
+func relaunchWithOpen(ctx context.Context, bundlePath string, cfg *Config) error {
+	// Create named pipes for I/O redirection
+	pipeDir := filepath.Join(os.TempDir(), fmt.Sprintf("macgo-%d", os.Getpid()))
+	if err := os.MkdirAll(pipeDir, 0700); err != nil {
+		return fmt.Errorf("macgo: create pipe dir: %w", err)
+	}
+	defer os.RemoveAll(pipeDir)
+
+	stdinPipe := filepath.Join(pipeDir, "stdin")
+	stdoutPipe := filepath.Join(pipeDir, "stdout")
+	stderrPipe := filepath.Join(pipeDir, "stderr")
+
+	// Create named pipes
+	for _, pipe := range []string{stdinPipe, stdoutPipe, stderrPipe} {
+		if err := syscall.Mkfifo(pipe, 0600); err != nil {
+			return fmt.Errorf("macgo: create pipe %s: %w", pipe, err)
+		}
+	}
+
+	// Build arguments for open command
+	args := []string{
+		"-a", bundlePath,
+		"--wait-apps",           // Wait for the app to finish
+		"--stdin", stdinPipe,    // Connect stdin
+		"--stdout", stdoutPipe,  // Connect stdout
+		"--stderr", stderrPipe,  // Connect stderr
+	}
+
+	// Add command line arguments if any
+	if len(os.Args) > 1 {
+		args = append(args, "--args")
+		args = append(args, os.Args[1:]...)
+	}
+
+	// Use 'open' to launch through LaunchServices
+	cmd := exec.CommandContext(ctx, "open", args...)
+
+	// Start the app bundle
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("macgo: launch bundle with open: %w", err)
+	}
+
+	// Set up I/O forwarding
+	go forwardIO(stdinPipe, os.Stdin, nil)
+	go forwardIO(stdoutPipe, nil, os.Stdout)
+	go forwardIO(stderrPipe, nil, os.Stderr)
+
+	// Wait for the open command to finish
+	if err := cmd.Wait(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitErr.ExitCode())
+		}
+		return fmt.Errorf("macgo: open command failed: %w", err)
+	}
+
+	os.Exit(0)
+	return nil
+}
+
+// forwardIO copies data between a named pipe and stdin/stdout/stderr.
+func forwardIO(pipePath string, in *os.File, out *os.File) {
+	var err error
+	var pipe *os.File
+
+	if in != nil {
+		// Writing to the pipe (for stdin)
+		pipe, err = os.OpenFile(pipePath, os.O_WRONLY, 0)
+		if err != nil {
+			return
+		}
+		defer pipe.Close()
+		io.Copy(pipe, in)
+	} else if out != nil {
+		// Reading from the pipe (for stdout/stderr)
+		pipe, err = os.OpenFile(pipePath, os.O_RDONLY, 0)
+		if err != nil {
+			return
+		}
+		defer pipe.Close()
+		io.Copy(out, pipe)
+	}
 }
 
 // isInAppBundle checks if we're already running inside an app bundle.
