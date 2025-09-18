@@ -16,9 +16,9 @@ func main() {
 	fmt.Printf("Desktop Lister - macgo v2! PID: %d\n", os.Getpid())
 	fmt.Println()
 
-	// Simple setup - no sandbox, just proper app bundling
-	// This allows Desktop access without file picker dialogs
-	err := macgo.Request()  // No permissions = no sandbox
+	// Simple setup - creates proper app bundle
+	// Note: Desktop access still requires macOS permissions
+	err := macgo.Request()  // No special permissions requested
 	if err != nil {
 		log.Fatalf("Failed to initialize macgo: %v", err)
 	}
@@ -58,19 +58,14 @@ func main() {
 			fmt.Printf("   ✓ Accessible: %s\n", strings.Join(accessible, ", "))
 		}
 
-		// Use the macgo project directory for demonstration
-		targetDir = "/Volumes/tmc/go/src/github.com/tmc/misc/macgo/v2"
-		fmt.Printf("\n📂 Listing macgo v2 directory to demonstrate:\n")
+		// Fall back to current working directory
+		targetDir, _ = os.Getwd()
+		fmt.Printf("\n📂 Listing current directory instead:\n")
 		fmt.Printf("   %s\n", targetDir)
 
 		entries, err = os.ReadDir(targetDir)
 		if err != nil {
-			// Final fallback to current directory
-			targetDir, _ = os.Getwd()
-			entries, err = os.ReadDir(targetDir)
-			if err != nil {
-				log.Fatalf("Error reading directory: %v", err)
-			}
+			log.Fatalf("Error reading directory: %v", err)
 		}
 	} else {
 		fmt.Printf("📂 Listing files in ~/Desktop:\n")
@@ -166,11 +161,15 @@ func main() {
 	}
 
 	fmt.Println()
-	fmt.Println("✨ Benefits of macgo v2:")
+	fmt.Println("📋 Notes:")
+	fmt.Println("  • App bundle created in ~/go/bin/")
+	fmt.Println("  • Desktop access requires Full Disk Access for Terminal")
+	fmt.Println("  • To grant: System Settings → Privacy & Security → Full Disk Access")
+	fmt.Println()
+	fmt.Println("✨ macgo v2 benefits:")
 	fmt.Println("  • Simple one-line setup: macgo.Request()")
-	fmt.Println("  • No sandbox = direct file access")
-	fmt.Println("  • Still creates proper .app bundle")
-	fmt.Println("  • Add sandbox with: macgo.Request(macgo.Sandbox)")
+	fmt.Println("  • Creates proper .app bundle automatically")
+	fmt.Println("  • Add specific permissions as needed")
 }
 
 
