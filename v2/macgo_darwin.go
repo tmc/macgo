@@ -151,10 +151,14 @@ func cleanAppName(name string) string {
 
 // relaunchInBundle launches the app bundle and forwards signals/IO.
 func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Config) error {
-	execName := filepath.Base(cfg.AppName)
+	// Determine executable name
+	execName := ""
+	if cfg.AppName != "" {
+		execName = filepath.Base(cfg.AppName)
+	}
 	if execName == "" {
 		execName = filepath.Base(execPath)
-		execName = strings.TrimSuffix(execName, filepath.Ext(execName))
+		// Don't strip extension - Go binaries typically don't have one anyway
 	}
 
 	bundleExec := filepath.Join(bundlePath, "Contents", "MacOS", execName)
