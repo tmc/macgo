@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tmc/misc/macgo/helpers"
+	"github.com/tmc/misc/macgo/helpers/teamid"
 	"github.com/tmc/misc/macgo/internal/bundle"
 	"github.com/tmc/misc/macgo/internal/launch"
 	"github.com/tmc/misc/macgo/internal/tcc"
@@ -132,7 +132,7 @@ func substituteTeamID(cfg *Config) error {
 	}
 
 	// Use the helpers package for team ID detection and substitution
-	teamID, substitutions, err := helpers.AutoSubstituteTeamIDInGroups(cfg.AppGroups)
+	teamID, substitutions, err := teamid.AutoSubstituteTeamIDInGroups(cfg.AppGroups)
 	if err != nil {
 		return fmt.Errorf("team ID detection failed: %w", err)
 	}

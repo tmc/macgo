@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tmc/misc/macgo/helpers"
+	"github.com/tmc/misc/macgo/helpers/codesign"
 )
 
 // codeSignBundle signs the app bundle with the configured identity and options.
@@ -76,7 +76,7 @@ func codeSignBundle(bundlePath string, cfg *Config) error {
 // findDeveloperID attempts to find a Developer ID Application certificate
 // by querying the system keychain for available code signing identities.
 func findDeveloperID(debug bool) string {
-	identity := helpers.FindDeveloperID()
+	identity := codesign.FindDeveloperID()
 	if debug && identity != "" {
 		if strings.Contains(identity, "Developer ID Application") {
 			fmt.Fprintf(os.Stderr, "macgo: found Developer ID: %s\n", identity)
@@ -101,23 +101,23 @@ func readBundleIDFromPlist(plistPath string) (string, error) {
 // validateCodeSignIdentity checks if the provided code signing identity is valid
 // and available in the system keychain.
 func validateCodeSignIdentity(identity string) error {
-	return helpers.ValidateCodeSignIdentity(identity)
+	return codesign.ValidateCodeSignIdentity(identity)
 }
 
 // listAvailableIdentities returns a list of available code signing identities
 // from the system keychain. Useful for debugging and identity selection.
 func listAvailableIdentities() ([]string, error) {
-	return helpers.ListAvailableIdentities()
+	return codesign.ListAvailableIdentities()
 }
 
 // VerifySignature verifies that a bundle is properly code signed.
 // Returns nil if the signature is valid, error otherwise.
 func VerifySignature(bundlePath string) error {
-	return helpers.VerifySignature(bundlePath)
+	return codesign.VerifySignature(bundlePath)
 }
 
 // GetSignatureInfo retrieves detailed information about the bundle's code signature.
 // Returns the signing identity, team ID, and other signature details.
 func GetSignatureInfo(bundlePath string) (map[string]string, error) {
-	return helpers.GetSignatureInfo(bundlePath)
+	return codesign.GetSignatureInfo(bundlePath)
 }

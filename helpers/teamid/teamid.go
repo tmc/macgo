@@ -1,7 +1,5 @@
-// Package helpers provides utility functions for macgo that are useful for external users.
-// These helpers expose functionality for team ID detection, bundle validation,
-// code signing utilities, and permission management.
-package helpers
+// Package teamid provides Apple Developer Team ID detection and validation.
+package teamid
 
 import (
 	"fmt"

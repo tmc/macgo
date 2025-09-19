@@ -1,9 +1,11 @@
-package helpers
+package codesign
 
 import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/tmc/misc/macgo/helpers/teamid"
 )
 
 // FindDeveloperID attempts to find a Developer ID Application certificate
@@ -184,7 +186,7 @@ func ExtractTeamIDFromCertificate(identity string) string {
 	if start != -1 && end != -1 && end > start {
 		teamID := identity[start+1 : end]
 		// Validate team ID format (10 characters, alphanumeric)
-		if IsValidTeamID(teamID) {
+		if teamid.IsValidTeamID(teamID) {
 			return teamID
 		}
 	}

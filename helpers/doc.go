@@ -1,15 +1,43 @@
-// Package helpers provides utility functions for macgo that are useful for external users.
+// Package helpers provides utility functions for macgo organized into focused subpackages.
 //
-// The helpers package exposes key functionality from macgo's internal packages,
+// The helpers packages expose key functionality from macgo's internal packages,
 // making it easy for users to work with macOS app bundle creation, code signing,
 // team ID detection, permission management, and validation utilities.
 //
-// # Team ID Detection and Management
+// # Subpackage Organization
 //
-// The package provides functions for automatically detecting Apple Developer Team IDs
-// from installed code signing certificates and substituting them in app group identifiers:
+// The helpers functionality is organized into focused subpackages:
 //
-//	teamID, err := helpers.DetectTeamID()
+//   - bundle: App bundle creation, naming, and validation utilities
+//   - codesign: Code signing certificate management and validation
+//   - permissions: Permission validation and entitlement management
+//   - teamid: Apple Developer Team ID detection and substitution
+//
+// # Bundle Package (github.com/tmc/misc/macgo/helpers/bundle)
+//
+// Functions for working with app bundles and bundle identifiers:
+//
+//	import "github.com/tmc/misc/macgo/helpers/bundle"
+//
+//	// Infer bundle ID from Go module information
+//	bundleID := bundle.InferBundleID("MyApp")
+//
+//	// Validate bundle ID format
+//	if err := bundle.ValidateBundleID(bundleID); err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Clean problematic characters from app names
+//	cleanName := bundle.CleanAppName("My App/With:Bad*Characters")
+//
+// # TeamID Package (github.com/tmc/misc/macgo/helpers/teamid)
+//
+// Functions for detecting and managing Apple Developer Team IDs:
+//
+//	import "github.com/tmc/misc/macgo/helpers/teamid"
+//
+//	// Detect team ID from certificates
+//	teamID, err := teamid.DetectTeamID()
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -17,76 +45,89 @@
 //
 //	// Substitute TEAMID placeholders in app groups
 //	appGroups := []string{"group.TEAMID.shared", "group.TEAMID.cache"}
-//	substitutions := helpers.SubstituteTeamIDInGroups(appGroups, teamID)
+//	substitutions := teamid.SubstituteTeamIDInGroups(appGroups, teamID)
 //	fmt.Printf("Made %d substitutions\n", substitutions)
 //
-// # Bundle ID and App Name Utilities
-//
-// Functions for creating, validating, and cleaning bundle identifiers and app names:
-//
-//	// Infer bundle ID from Go module information
-//	bundleID := helpers.InferBundleID("MyApp")
-//
-//	// Validate bundle ID format
-//	if err := helpers.ValidateBundleID(bundleID); err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	// Clean problematic characters from app names
-//	cleanName := helpers.CleanAppName("My App/With:Bad*Characters")
-//
-// # Code Signing Utilities
+// # CodeSign Package (github.com/tmc/misc/macgo/helpers/codesign)
 //
 // Functions for working with code signing certificates and identities:
 //
+//	import "github.com/tmc/misc/macgo/helpers/codesign"
+//
 //	// Find Developer ID certificate
-//	identity := helpers.FindDeveloperID()
+//	identity := codesign.FindDeveloperID()
 //	if identity != "" {
 //		fmt.Printf("Found: %s\n", identity)
 //	}
 //
 //	// List all available identities
-//	identities, err := helpers.ListAvailableIdentities()
+//	identities, err := codesign.ListAvailableIdentities()
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //
 //	// Verify bundle signature
-//	if err := helpers.VerifySignature("/path/to/app.app"); err != nil {
+//	if err := codesign.VerifySignature("/path/to/app.app"); err != nil {
 //		log.Fatal(err)
 //	}
 //
-// # Permission Management
+// # Permissions Package (github.com/tmc/misc/macgo/helpers/permissions)
 //
 // Functions for working with macOS permissions and entitlements:
 //
+//	import "github.com/tmc/misc/macgo/helpers/permissions"
+//
 //	// Validate permissions
-//	perms := []helpers.Permission{helpers.Camera, helpers.Microphone}
-//	if err := helpers.ValidatePermissions(perms); err != nil {
+//	perms := []permissions.Permission{permissions.Camera, permissions.Microphone}
+//	if err := permissions.ValidatePermissions(perms); err != nil {
 //		log.Fatal(err)
 //	}
 //
 //	// Get entitlements for permissions
-//	entitlements := helpers.GetEntitlements(perms)
+//	entitlements := permissions.GetEntitlements(perms)
 //	fmt.Printf("Entitlements: %v\n", entitlements)
 //
 //	// Check if permissions require TCC dialogs
-//	if helpers.RequiresTCC(perms) {
+//	if permissions.RequiresTCC(perms) {
 //		fmt.Println("These permissions require user consent")
 //	}
 //
-// # App Groups Validation
+// # Complete Example
 //
-// Functions for validating app group configurations:
+//	import (
+//		"fmt"
+//		"log"
 //
-//	appGroups := []string{"group.com.example.shared"}
-//	sandboxPerms := []helpers.Permission{helpers.Sandbox}
+//		"github.com/tmc/misc/macgo/helpers/bundle"
+//		"github.com/tmc/misc/macgo/helpers/codesign"
+//		"github.com/tmc/misc/macgo/helpers/permissions"
+//		"github.com/tmc/misc/macgo/helpers/teamid"
+//	)
 //
-//	if err := helpers.ValidateAppGroups(appGroups, sandboxPerms); err != nil {
-//		log.Fatal(err)
+//	func main() {
+//		// Clean app name and generate bundle ID
+//		cleanName := bundle.CleanAppName("My App")
+//		bundleID := bundle.InferBundleID(cleanName)
+//
+//		// Detect team ID
+//		teamID, _ := teamid.DetectTeamID()
+//		if teamid.IsValidTeamID(teamID) {
+//			fmt.Printf("Team ID: %s\n", teamID)
+//		}
+//
+//		// Check for Developer ID certificate
+//		if codesign.HasDeveloperIDCertificate() {
+//			identity := codesign.FindDeveloperID()
+//			fmt.Printf("Signing identity: %s\n", identity)
+//		}
+//
+//		// Validate permissions
+//		perms := []permissions.Permission{permissions.Camera}
+//		if err := permissions.ValidatePermissions(perms); err != nil {
+//			log.Fatal(err)
+//		}
 //	}
 //
-// This package is designed to be used alongside the main macgo package
-// for applications that need more direct control over bundle creation
-// and permission management processes.
+// This package structure allows for more focused imports and clearer code organization
+// while maintaining backward compatibility through the internal package wrappers.
 package helpers

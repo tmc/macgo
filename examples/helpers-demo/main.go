@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/tmc/misc/macgo/helpers"
+	"github.com/tmc/misc/macgo/helpers/bundle"
+	"github.com/tmc/misc/macgo/helpers/codesign"
+	"github.com/tmc/misc/macgo/helpers/permissions"
+	"github.com/tmc/misc/macgo/helpers/teamid"
 )
 
 func main() {
@@ -16,16 +18,16 @@ func main() {
 
 	// Clean app name
 	dirtyName := "My App/Name:With*Bad?Characters"
-	cleanName := helpers.CleanAppName(dirtyName)
+	cleanName := bundle.CleanAppName(dirtyName)
 	fmt.Printf("   Clean app name: %q -> %q\n", dirtyName, cleanName)
 
 	// Infer bundle ID
-	bundleID := helpers.InferBundleID("MyApp")
+	bundleID := bundle.InferBundleID("MyApp")
 	fmt.Printf("   Inferred bundle ID: %s\n", bundleID)
 
 	// Validate bundle ID
 	testBundleID := "com.example.myapp"
-	if err := helpers.ValidateBundleID(testBundleID); err != nil {
+	if err := bundle.ValidateBundleID(testBundleID); err != nil {
 		fmt.Printf("   Bundle ID validation failed: %v\n", err)
 	} else {
 		fmt.Printf("   Bundle ID %q is valid\n", testBundleID)
@@ -33,13 +35,13 @@ func main() {
 
 	// Extract app name from path
 	execPath := "/path/to/my-executable"
-	appName := helpers.ExtractAppNameFromPath(execPath)
+	appName := bundle.ExtractAppNameFromPath(execPath)
 	fmt.Printf("   App name from path %q: %q\n", execPath, appName)
 
 	// 2. Team ID Detection and Substitution
 	fmt.Println("\n2. Team ID Detection and Substitution:")
 
-	teamID, err := helpers.DetectTeamID()
+	teamID, err := teamid.DetectTeamID()
 	if err != nil {
 		fmt.Printf("   Team ID detection failed: %v\n", err)
 		fmt.Printf("   (This is normal if you don't have Developer ID certificates)\n")
@@ -47,7 +49,7 @@ func main() {
 		fmt.Printf("   Detected Team ID: %s\n", teamID)
 
 		// Validate the team ID
-		if helpers.IsValidTeamID(teamID) {
+		if teamid.IsValidTeamID(teamID) {
 			fmt.Printf("   Team ID format is valid\n")
 		}
 	}
@@ -60,7 +62,7 @@ func main() {
 	}
 	fmt.Printf("   App groups before substitution: %v\n", appGroups)
 
-	detectedTeamID, substitutions, err := helpers.AutoSubstituteTeamIDInGroups(appGroups)
+	detectedTeamID, substitutions, err := teamid.AutoSubstituteTeamIDInGroups(appGroups)
 	if err != nil {
 		fmt.Printf("   Auto substitution failed: %v\n", err)
 	} else {
@@ -73,21 +75,21 @@ func main() {
 	fmt.Println("\n3. Code Signing Utilities:")
 
 	// Find Developer ID
-	identity := helpers.FindDeveloperID()
+	identity := codesign.FindDeveloperID()
 	if identity == "" {
 		fmt.Printf("   No Developer ID certificate found\n")
 	} else {
 		fmt.Printf("   Found Developer ID: %s\n", identity)
 
 		// Extract team ID from certificate
-		certTeamID := helpers.ExtractTeamIDFromCertificate(identity)
+		certTeamID := codesign.ExtractTeamIDFromCertificate(identity)
 		if certTeamID != "" {
 			fmt.Printf("   Team ID from certificate: %s\n", certTeamID)
 		}
 	}
 
 	// List all available identities
-	identities, err := helpers.ListAvailableIdentities()
+	identities, err := codesign.ListAvailableIdentities()
 	if err != nil {
 		fmt.Printf("   Failed to list identities: %v\n", err)
 	} else {
@@ -103,7 +105,7 @@ func main() {
 	}
 
 	// Check if Developer ID is available
-	if helpers.HasDeveloperIDCertificate() {
+	if codesign.HasDeveloperIDCertificate() {
 		fmt.Printf("   Developer ID certificate is available\n")
 	} else {
 		fmt.Printf("   No Developer ID certificate available\n")
@@ -113,31 +115,31 @@ func main() {
 	fmt.Println("\n4. Permission Utilities:")
 
 	// List all permissions
-	allPerms := helpers.AllPermissions()
+	allPerms := permissions.AllPermissions()
 	fmt.Printf("   Available permissions (%d):\n", len(allPerms))
 	for _, perm := range allPerms {
-		fmt.Printf("     - %s: %s\n", helpers.PermissionToString(perm), helpers.PermissionDescription(perm))
+		fmt.Printf("     - %s: %s\n", permissions.PermissionToString(perm), permissions.PermissionDescription(perm))
 	}
 
 	// Test permission validation
-	testPerms := []helpers.Permission{helpers.Camera, helpers.Microphone, helpers.Files}
-	if err := helpers.ValidatePermissions(testPerms); err != nil {
+	testPerms := []permissions.Permission{permissions.Camera, permissions.Microphone, permissions.Files}
+	if err := permissions.ValidatePermissions(testPerms); err != nil {
 		fmt.Printf("   Permission validation failed: %v\n", err)
 	} else {
 		fmt.Printf("   Permissions %v are valid\n", testPerms)
 	}
 
 	// Get entitlements for permissions
-	entitlements := helpers.GetEntitlements(testPerms)
+	entitlements := permissions.GetEntitlements(testPerms)
 	fmt.Printf("   Entitlements for permissions: %v\n", entitlements)
 
 	// Check if permissions require TCC
-	if helpers.RequiresTCC(testPerms) {
+	if permissions.RequiresTCC(testPerms) {
 		fmt.Printf("   These permissions require TCC dialogs\n")
 	}
 
 	// Get TCC services
-	tccServices := helpers.GetTCCServices(testPerms)
+	tccServices := permissions.GetTCCServices(testPerms)
 	if len(tccServices) > 0 {
 		fmt.Printf("   TCC services for reset: %v\n", tccServices)
 	}
@@ -149,17 +151,17 @@ func main() {
 		"group.com.example.shared",
 		"group.com.example.cache",
 	}
-	sandboxPerms := []helpers.Permission{helpers.Sandbox} // App groups require sandbox
+	sandboxPerms := []permissions.Permission{permissions.Sandbox} // App groups require sandbox
 
-	if err := helpers.ValidateAppGroups(testAppGroups, sandboxPerms); err != nil {
+	if err := permissions.ValidateAppGroups(testAppGroups, sandboxPerms); err != nil {
 		fmt.Printf("   App groups validation failed: %v\n", err)
 	} else {
 		fmt.Printf("   App groups %v are valid with sandbox permission\n", testAppGroups)
 	}
 
 	// Test without sandbox permission
-	noSandboxPerms := []helpers.Permission{helpers.Camera}
-	if err := helpers.ValidateAppGroups(testAppGroups, noSandboxPerms); err != nil {
+	noSandboxPerms := []permissions.Permission{permissions.Camera}
+	if err := permissions.ValidateAppGroups(testAppGroups, noSandboxPerms); err != nil {
 		fmt.Printf("   App groups validation (without sandbox): %v\n", err)
 	}
 
