@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/tmc/misc/macgo/internal/system"
 )
 
 func TestValidateCodeSignIdentity(t *testing.T) {
@@ -38,15 +40,22 @@ func TestValidateCodeSignIdentity(t *testing.T) {
 }
 
 func TestReadBundleIDFromPlist(t *testing.T) {
-	// Create a temporary plist file for testing
-	tempDir, err := os.MkdirTemp("", "plist-read-test")
+	// Create a temporary bundle structure for testing
+	tempDir, err := os.MkdirTemp("", "bundle-read-test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tempDir)
 
+	// Create a test bundle structure
+	bundlePath := filepath.Join(tempDir, "TestApp.app")
+	contentsDir := filepath.Join(bundlePath, "Contents")
+	if err := os.MkdirAll(contentsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
 	// Create a test Info.plist
-	plistPath := filepath.Join(tempDir, "Info.plist")
+	plistPath := filepath.Join(contentsDir, "Info.plist")
 	plistContent := `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -62,23 +71,17 @@ func TestReadBundleIDFromPlist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Test reading the bundle ID
-	bundleID, err := readBundleIDFromPlist(plistPath)
-	if err != nil {
-		// This test might fail if plutil is not available, which is expected
-		// on non-macOS systems or in some CI environments
-		t.Skipf("plutil not available or failed: %v", err)
-	}
-
+	// Test reading the bundle ID using system.GetBundleID
+	bundleID := system.GetBundleID(bundlePath)
 	expectedBundleID := "com.example.test"
 	if bundleID != expectedBundleID {
-		t.Errorf("readBundleIDFromPlist() = %q, want %q", bundleID, expectedBundleID)
+		t.Errorf("system.GetBundleID() = %q, want %q", bundleID, expectedBundleID)
 	}
 
-	// Test with non-existent file
-	_, err = readBundleIDFromPlist("/nonexistent/path")
-	if err == nil {
-		t.Error("readBundleIDFromPlist() should fail for non-existent file")
+	// Test with non-existent bundle
+	nonExistentBundleID := system.GetBundleID("/nonexistent/path.app")
+	if nonExistentBundleID != "" {
+		t.Error("system.GetBundleID() should return empty string for non-existent bundle")
 	}
 }
 

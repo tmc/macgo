@@ -1,185 +1,103 @@
 # macgo Examples
 
-These examples demonstrate the simplified macgo API following Go's design principles.
+This directory contains functional examples demonstrating various macgo features and use cases. All examples have been tested and verified to build successfully.
 
-## 🚀 Quick Start
+## Basic Examples
 
-All examples follow the same pattern:
+### getting-started
+**Purpose**: Simple introduction to macgo with basic permission requests
+**Features**: Camera and microphone permissions, basic setup
 
-1. **Simple approach** - One-liner for common cases
-2. **Configured approach** - Full Config struct for complex cases
-3. **Environment approach** - For deployment scenarios
+### hello
+**Purpose**: Minimal "Hello World" example
+**Features**: Basic macgo initialization
 
-## 📁 Available Examples
+### hello-files
+**Purpose**: File access permissions example
+**Features**: User-selected file access, basic file operations
 
-### 1. **[hello](./hello/)** - Simplest Example
-```go
-err := macgo.Request(macgo.Camera, macgo.Microphone)
-```
-- **Purpose:** Minimal working example
-- **Lines:** ~30 lines of code
-- **Shows:** Basic permission request
+### camera-mic
+**Purpose**: Camera and microphone access demonstration
+**Features**: TCC permission requests, hardware access testing
 
-### 2. **[getting-started](./getting-started/)** - Core Patterns
-```go
-cfg := &macgo.Config{
-    AppName: "MyApp",
-    Permissions: []macgo.Permission{macgo.Camera},
-}
-err := macgo.Start(cfg)
-```
-- **Purpose:** Main patterns and approaches
-- **Lines:** ~50 lines of code
-- **Shows:** Configuration, context, alternatives
+## Code Signing Examples
 
-### 3. **[sandboxed-file-exec](./sandboxed-file-exec/)** - Sandbox & Files
-```go
-err := macgo.Request(macgo.Files) // Sandbox + file access
-```
-- **Purpose:** File access and sandbox restrictions
-- **Lines:** ~60 lines of code
-- **Shows:** Sandbox behavior, file access testing
+### auto-signed
+**Purpose**: Automatic code signing with Developer ID
+**Features**: Auto-detection of signing certificates, production signing
 
-### 4. **[camera-mic](./camera-mic/)** - Media Permissions
-```go
-err := macgo.Request(macgo.Camera, macgo.Microphone)
-```
-- **Purpose:** Camera and microphone access
-- **Lines:** ~70 lines of code
-- **Shows:** Media device access, permission testing
+### code-signing
+**Purpose**: Manual code signing configuration
+**Features**: Custom signing identity, entitlements configuration
 
-## 🔨 Advanced Examples
+## Advanced Features
 
-### 5. **[file-processor](./file-processor/)** - File Processing CLI
-```go
-cfg := &macgo.Config{
-    AppName: "FileProcessor",
-    Permissions: []macgo.Permission{macgo.Files},
-    LSUIElement: true, // Hide from dock
-}
-```
-- **Purpose:** Batch file processing with sandbox permissions
-- **Shows:** CLI tool patterns, file transformations, error handling
+### app-groups
+Contains multiple sub-examples for App Groups functionality:
+- **app-groups-reader**: Reading shared data from app groups
+- **app-groups-verifier**: Verifying app group access
+- **app-groups-writer**: Writing data to shared app groups
 
-### 6. **[screen-recorder](./screen-recorder/)** - Screen Recording
-```go
-permissions := []macgo.Permission{macgo.Screen, macgo.Files}
-if withAudio { permissions = append(permissions, macgo.Microphone) }
-if withCamera { permissions = append(permissions, macgo.Camera) }
-```
-- **Purpose:** Screen recording with optional audio/camera
-- **Shows:** Conditional permissions, hardware acceleration, device enumeration
+### app-sandbox
+Contains multiple sub-examples for App Sandbox functionality:
+- **sandbox-container**: Working with sandbox containers
+- **security-scoped-bookmarks**: Using security-scoped bookmarks for persistent file access
+- **user-selected-files**: User-selected file access patterns
 
-### 7. **[network-service](./network-service/)** - HTTP/WebSocket Server
-```go
-cfg := &macgo.Config{
-    AppName: "NetworkService",
-    Permissions: []macgo.Permission{macgo.Network},
-    LSUIElement: background,
-}
-```
-- **Purpose:** Network service with sandbox networking
-- **Shows:** REST API, WebSocket, external connectivity testing
+### sandboxed-file-exec
+**Purpose**: File execution within app sandbox
+**Features**: Sandboxed execution, file permissions
 
-### 8. **[background-agent](./background-agent/)** - Background Service
-```go
-cfg := &macgo.Config{
-    AppName: "BackgroundAgent",
-    Permissions: []macgo.Permission{macgo.Files, macgo.Network},
-    LSUIElement: true,
-    LSBackgroundOnly: true,
-}
-```
-- **Purpose:** Long-running background daemon service
-- **Shows:** File monitoring, periodic tasks, launch agent configuration
+## System Integration
 
-### 9. **[dev-tools](./dev-tools/)** - Development Utilities
-```go
-cfg := &macgo.Config{
-    AppName: "DevTools",
-    Permissions: []macgo.Permission{macgo.Files, macgo.Network},
-    LSUIElement: true,
-}
-```
-- **Purpose:** Developer utilities for project analysis and building
-- **Shows:** Language detection, build/test execution, IDE integration
+### desktop-list
+**Purpose**: Desktop and window management
+**Features**: System information access, desktop interaction
 
-### 10. **[media-processor](./media-processor/)** - Media Processing
-```go
-permissions := []macgo.Permission{macgo.Files, macgo.Network}
-if liveCapture {
-    permissions = append(permissions, macgo.Camera, macgo.Microphone)
-}
-```
-- **Purpose:** Audio/video processing with hardware acceleration
-- **Shows:** Hardware encoding, format conversion, live capture, batch processing
+### osascript-wrapper
+**Purpose**: AppleScript integration and script management
+**Features**: Running AppleScript from Go, script storage and execution
 
-## 🔧 Running Examples
+## Building and Running Examples
 
-### Quick Test (No Relaunch)
+Each example can be built and run independently:
+
 ```bash
-cd examples/hello
-MACGO_NO_RELAUNCH=1 go run main.go
+# Navigate to any example directory
+cd examples/getting-started
+
+# Build the example
+go build .
+
+# Run the example
+./getting-started
 ```
 
-### Full Test (With Bundle Creation)
+For examples with subdirectories (app-groups, app-sandbox), navigate to the specific sub-example:
+
 ```bash
-cd examples/hello
-go run main.go
+cd examples/app-groups/app-groups-writer
+go build .
+./app-groups-writer
 ```
 
-### Build and Test
-```bash
-cd examples/hello
-go build -o hello-app
-./hello-app
-```
+## Example Categories
 
-## 🎯 Key Benefits Shown
+- **Beginner**: getting-started, hello, hello-files
+- **Hardware Access**: camera-mic
+- **Code Signing**: auto-signed, code-signing
+- **Advanced Permissions**: app-groups/*, app-sandbox/*, sandboxed-file-exec
+- **System Integration**: desktop-list, osascript-wrapper
 
-1. **No Global State** - All examples use explicit configuration
-2. **Simple API** - 1-3 lines for common permission requests
-3. **Clear Intent** - Configuration visible at call site
-4. **Easy Testing** - Pass different configs for different scenarios
-5. **No Magic** - No init() functions or import side effects
+## Requirements
 
-## 📝 Example Template
+- macOS 10.15 or later
+- Go 1.21 or later
+- Xcode Command Line Tools (for code signing)
 
-New examples should follow this structure:
+## Notes
 
-```go
-package main
-
-import "github.com/tmc/misc/macgo"
-
-func main() {
-    // Simple approach
-    err := macgo.Request(macgo.Camera)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Your app code here...
-}
-
-// Alternative: Configured approach
-func withConfig() {
-    cfg := &macgo.Config{
-        AppName: "MyApp",
-        Permissions: []macgo.Permission{macgo.Camera},
-        Debug: true,
-    }
-
-    err := macgo.Start(cfg)
-    // ...
-}
-
-// Alternative: Environment approach
-func withEnv() {
-    // MACGO_CAMERA=1 MACGO_DEBUG=1 ./myapp
-    err := macgo.Auto()
-    // ...
-}
-```
-
-All examples demonstrate these three patterns for maximum utility.
+- Some examples require specific macOS permissions that will be requested at runtime
+- Code signing examples may require valid Developer ID certificates
+- App Groups examples require proper app group configuration
+- AppleScript examples may require Automation permissions for target applications

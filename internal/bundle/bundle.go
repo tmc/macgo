@@ -161,7 +161,7 @@ func (b *Bundle) Create() error {
 	} else {
 		// Remove old bundle if not keeping it
 		if err := os.RemoveAll(bundleDir); err != nil && !os.IsNotExist(err) {
-			return err
+			return fmt.Errorf("failed to remove old bundle: %w", err)
 		}
 	}
 
@@ -169,17 +169,17 @@ func (b *Bundle) Create() error {
 	contentsDir := filepath.Join(bundleDir, "Contents")
 	macosDir := filepath.Join(contentsDir, "MacOS")
 	if err := os.MkdirAll(macosDir, 0755); err != nil {
-		return err
+		return fmt.Errorf("failed to create bundle directories: %w", err)
 	}
 
 	// Copy the executable directly
 	execName := filepath.Base(b.appName)
 	destExec := filepath.Join(macosDir, execName)
 	if err := system.CopyFile(b.execPath, destExec); err != nil {
-		return err
+		return fmt.Errorf("failed to copy executable: %w", err)
 	}
 	if err := os.Chmod(destExec, 0755); err != nil {
-		return err
+		return fmt.Errorf("failed to set executable permissions: %w", err)
 	}
 
 	// Create Info.plist
@@ -191,7 +191,7 @@ func (b *Bundle) Create() error {
 		Version:  b.version,
 	}
 	if err := plist.WriteInfoPlist(plistPath, infoCfg); err != nil {
-		return err
+		return fmt.Errorf("failed to write Info.plist: %w", err)
 	}
 
 	// Create entitlements if needed (not for ad-hoc signing)
@@ -211,7 +211,7 @@ func (b *Bundle) Create() error {
 			AppGroups:   b.Config.AppGroups,
 		}
 		if err := plist.WriteEntitlements(entPath, entCfg); err != nil {
-			return err
+			return fmt.Errorf("failed to write entitlements: %w", err)
 		}
 	}
 

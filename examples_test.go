@@ -229,6 +229,17 @@ func TestAutoPackages(t *testing.T) {
 
 // Test error handling
 func TestErrorHandling(t *testing.T) {
+	// Disable relaunch to prevent os.Exit() during test
+	original := os.Getenv("MACGO_NO_RELAUNCH")
+	os.Setenv("MACGO_NO_RELAUNCH", "1")
+	defer func() {
+		if original == "" {
+			os.Unsetenv("MACGO_NO_RELAUNCH")
+		} else {
+			os.Setenv("MACGO_NO_RELAUNCH", original)
+		}
+	}()
+
 	// Test with invalid configuration
 	cfg := &macgo.Config{
 		AppName: "", // Invalid empty name

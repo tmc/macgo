@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tmc/misc/macgo/helpers/codesign"
+	"github.com/tmc/misc/macgo/internal/system"
 )
 
 // codeSignBundle signs the app bundle with the configured identity and options.
@@ -25,13 +26,9 @@ func codeSignBundle(bundlePath string, cfg *Config) error {
 	}
 
 	// Always read bundle ID from Info.plist and use it as the identifier
-	plistPath := filepath.Join(bundlePath, "Contents", "Info.plist")
-	bundleID, err := readBundleIDFromPlist(plistPath)
-	if err != nil {
-		return fmt.Errorf("failed to read bundle ID from Info.plist for signing: %w", err)
-	}
+	bundleID := system.GetBundleID(bundlePath)
 	if bundleID == "" {
-		return fmt.Errorf("bundle ID is empty in Info.plist, cannot sign")
+		return fmt.Errorf("failed to read bundle ID from Info.plist for signing")
 	}
 
 	// Use custom identifier if specified, otherwise use bundle ID
@@ -90,17 +87,6 @@ func findDeveloperID(debug bool) string {
 		}
 	}
 	return identity
-}
-
-// readBundleIDFromPlist reads the CFBundleIdentifier from an Info.plist file
-// using the plutil command-line utility.
-func readBundleIDFromPlist(plistPath string) (string, error) {
-	cmd := exec.Command("plutil", "-extract", "CFBundleIdentifier", "raw", plistPath)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
 }
 
 // validateCodeSignIdentity checks if the provided code signing identity is valid

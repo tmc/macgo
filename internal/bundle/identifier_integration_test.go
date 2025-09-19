@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/tmc/misc/macgo/internal/system"
 )
 
 func TestIdentifierInSignedCode(t *testing.T) {
@@ -127,12 +129,10 @@ func TestBundleIDPlistBinding(t *testing.T) {
 			}
 
 			// Read the created Info.plist and verify it contains the correct bundle ID
-			plistPath := filepath.Join(bundle.Path, "Contents", "Info.plist")
-
-			// Use the readBundleIDFromPlist function to verify
-			readBundleID, err := readBundleIDFromPlist(plistPath)
-			if err != nil {
-				t.Fatalf("Failed to read bundle ID from plist: %v", err)
+			// Use the system function to verify
+			readBundleID := system.GetBundleID(bundle.Path)
+			if readBundleID == "" {
+				t.Fatal("Failed to read bundle ID from plist")
 			}
 
 			if readBundleID != bundleID {

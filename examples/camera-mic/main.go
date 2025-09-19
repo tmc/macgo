@@ -87,4 +87,3 @@ func testMicrophoneAccess() {
 		fmt.Printf("  Audio info: %s\n", lines)
 	}
 }
-

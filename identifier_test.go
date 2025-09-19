@@ -103,7 +103,7 @@ func TestBundleIDInferenceIntegration(t *testing.T) {
 }
 
 func TestEnvironmentBasedInference(t *testing.T) {
-	// Test that environment variables affect bundle ID inference
+	// Test that environment variables affect fallback bundle ID inference
 	originalUser := os.Getenv("LOGNAME")
 	defer func() {
 		if originalUser == "" {
@@ -116,7 +116,8 @@ func TestEnvironmentBasedInference(t *testing.T) {
 	// Set a test username
 	os.Setenv("LOGNAME", "testuser")
 
-	bundleID := bundle.InferBundleID("TestApp")
+	// Test the fallback function directly, which uses environment variables
+	bundleID := bundle.InferFallbackBundleID("TestApp")
 
 	// Should contain the username in some form
 	if !strings.Contains(bundleID, "testuser") {
