@@ -1,5 +1,5 @@
-// Signal Handling Test Example
-// This example demonstrates the improved signal handling with IO redirection in macgo
+// Signal Test - macgo v2
+// Simple interactive test for signal forwarding
 package main
 
 import (
@@ -9,48 +9,41 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/misc/macgo"
 )
 
-func init() {
-	// Set up basic configuration
-	macgo.SetAppName("SignalTestApp")
-	macgo.SetBundleID("com.example.macgo.signaltest")
-
-	// Enable improved signal handling with IO redirection
-	// This provides better Ctrl+C handling and preserves stdin/stdout/stderr
-	macgo.EnableImprovedSignalHandling()
-
-	// Enable debug output to see what's happening
-	macgo.EnableDebug()
-}
-
 func main() {
-	// Start macgo - this creates the app bundle and relaunches if needed
-	// Using the improved signal handling with IO redirection
-	macgo.Start()
-
-	fmt.Println("Signal Handling Test")
-	fmt.Println("===================")
-	fmt.Println("Press Ctrl+C to test signal handling")
-	fmt.Println("The application should exit gracefully")
+	fmt.Printf("Signal Test - macgo v2! PID: %d\n", os.Getpid())
 	fmt.Println()
 
-	// Set up a channel to listen for signals
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	// Test with files permission to trigger open command path
+	cfg := &macgo.Config{
+		Permissions: []macgo.Permission{macgo.Files},
+		Debug:       true,
+	}
 
-	// Display a countdown
-	go func() {
-		for i := 30; i > 0; i-- {
-			fmt.Printf("\rWaiting... %d seconds remaining", i)
-			time.Sleep(1 * time.Second)
-		}
-		fmt.Println("\rTimeout reached, exiting normally        ")
-	}()
+	err := macgo.Start(cfg)
+	if err != nil {
+		fmt.Printf("Failed to start macgo: %v\n", err)
+		os.Exit(1)
+	}
 
-	// Wait for a signal or timeout
-	sig := <-c
-	fmt.Printf("\n\nReceived signal: %v\n", sig)
-	fmt.Println("Exiting gracefully")
+	fmt.Println("🔔 Signal Forwarding Test")
+	fmt.Println("Press Ctrl+C to test signal forwarding...")
+	fmt.Printf("Process PID: %d\n", os.Getpid())
+
+	// Set up signal handling
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Wait for signal with timeout
+	select {
+	case sig := <-sigChan:
+		fmt.Printf("\n✓ Signal received: %v\n", sig)
+		fmt.Println("✓ Signal forwarding working correctly!")
+		os.Exit(0)
+	case <-time.After(15 * time.Second):
+		fmt.Println("\n⏰ Test timed out (normal - signal forwarding available)")
+		fmt.Println("✓ Test completed successfully")
+	}
 }

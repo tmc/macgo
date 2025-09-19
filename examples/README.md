@@ -1,201 +1,198 @@
-# MacGo Examples
+# macgo v2 Examples
 
-This directory contains examples demonstrating different ways to use the macgo package.
+These examples demonstrate the simplified v2 API following Russ Cox's design principles.
 
-## Core Examples
+## 🚀 Quick Start
 
-### Getting Started
-[getting-started/main.go](getting-started/main.go) - The recommended starting point showing proper API usage patterns.
+All examples follow the same pattern:
+
+1. **Simple approach** - One-liner for common cases
+2. **Configured approach** - Full Config struct for complex cases
+3. **Environment approach** - For deployment scenarios
+
+## 📁 Available Examples
+
+### 1. **[hello](./hello/)** - Simplest Example
+```go
+err := macgo.Request(macgo.Camera, macgo.Microphone)
+```
+- **Purpose:** Minimal working example
+- **Lines:** ~30 (vs 79 in v1)
+- **Shows:** Basic permission request
+
+### 2. **[getting-started](./getting-started/)** - Core Patterns
+```go
+cfg := &macgo.Config{
+    AppName: "MyApp",
+    Permissions: []macgo.Permission{macgo.Camera},
+}
+err := macgo.Start(cfg)
+```
+- **Purpose:** Main patterns and approaches
+- **Lines:** ~50 (vs 101 in v1)
+- **Shows:** Configuration, context, alternatives
+
+### 3. **[sandboxed-file-exec](./sandboxed-file-exec/)** - Sandbox & Files
+```go
+err := macgo.Request(macgo.Files) // Sandbox + file access
+```
+- **Purpose:** File access and sandbox restrictions
+- **Lines:** ~60 (vs 84 in v1)
+- **Shows:** Sandbox behavior, file access testing
+
+### 4. **[camera-mic](./camera-mic/)** - Media Permissions
+```go
+err := macgo.Request(macgo.Camera, macgo.Microphone)
+```
+- **Purpose:** Camera and microphone access
+- **Lines:** ~70 (new in v2)
+- **Shows:** Media device access, permission testing
+
+## 🔨 Advanced Examples
+
+### 5. **[file-processor](./file-processor/)** - File Processing CLI
+```go
+cfg := &macgo.Config{
+    AppName: "FileProcessor",
+    Permissions: []macgo.Permission{macgo.Files},
+    LSUIElement: true, // Hide from dock
+}
+```
+- **Purpose:** Batch file processing with sandbox permissions
+- **Shows:** CLI tool patterns, file transformations, error handling
+
+### 6. **[screen-recorder](./screen-recorder/)** - Screen Recording
+```go
+permissions := []macgo.Permission{macgo.Screen, macgo.Files}
+if withAudio { permissions = append(permissions, macgo.Microphone) }
+if withCamera { permissions = append(permissions, macgo.Camera) }
+```
+- **Purpose:** Screen recording with optional audio/camera
+- **Shows:** Conditional permissions, hardware acceleration, device enumeration
+
+### 7. **[network-service](./network-service/)** - HTTP/WebSocket Server
+```go
+cfg := &macgo.Config{
+    AppName: "NetworkService",
+    Permissions: []macgo.Permission{macgo.Network},
+    LSUIElement: background,
+}
+```
+- **Purpose:** Network service with sandbox networking
+- **Shows:** REST API, WebSocket, external connectivity testing
+
+### 8. **[background-agent](./background-agent/)** - Background Service
+```go
+cfg := &macgo.Config{
+    AppName: "BackgroundAgent",
+    Permissions: []macgo.Permission{macgo.Files, macgo.Network},
+    LSUIElement: true,
+    LSBackgroundOnly: true,
+}
+```
+- **Purpose:** Long-running background daemon service
+- **Shows:** File monitoring, periodic tasks, launch agent configuration
+
+### 9. **[dev-tools](./dev-tools/)** - Development Utilities
+```go
+cfg := &macgo.Config{
+    AppName: "DevTools",
+    Permissions: []macgo.Permission{macgo.Files, macgo.Network},
+    LSUIElement: true,
+}
+```
+- **Purpose:** Developer utilities for project analysis and building
+- **Shows:** Language detection, build/test execution, IDE integration
+
+### 10. **[media-processor](./media-processor/)** - Media Processing
+```go
+permissions := []macgo.Permission{macgo.Files, macgo.Network}
+if liveCapture {
+    permissions = append(permissions, macgo.Camera, macgo.Microphone)
+}
+```
+- **Purpose:** Audio/video processing with hardware acceleration
+- **Shows:** Hardware encoding, format conversion, live capture, batch processing
+
+## 🔧 Running Examples
+
+### Quick Test (No Relaunch)
+```bash
+cd v2/examples/hello
+MACGO_NO_RELAUNCH=1 go run main.go
+```
+
+### Full Test (With Bundle Creation)
+```bash
+cd v2/examples/hello
+go run main.go
+```
+
+### Build and Test
+```bash
+cd v2/examples/hello
+go build -o hello-app
+./hello-app
+```
+
+## 📊 Comparison with v1
+
+| Example | v1 Lines | v2 Lines | Improvement |
+|---------|----------|----------|-------------|
+| hello | 79 | 30 | 62% less |
+| getting-started | 101 | 50 | 50% less |
+| sandboxed-file-exec | 84 | 60 | 29% less |
+| camera-mic | N/A | 70 | New & simple |
+
+## 🎯 Key v2 Benefits Shown
+
+1. **No Global State** - All examples use explicit configuration
+2. **Simple API** - 1-3 lines vs 10+ lines for setup
+3. **Clear Intent** - Configuration visible at call site
+4. **Easy Testing** - Pass different configs for different scenarios
+5. **No Magic** - No init() functions or import side effects
+
+## 🔄 Migration Guide
+
+See [MIGRATION_GUIDE.md](../MIGRATION_GUIDE.md) for detailed migration instructions from v1 to v2.
+
+## 📝 Example Template
+
+New examples should follow this structure:
 
 ```go
-import (
-    "github.com/tmc/misc/macgo"
-    "github.com/tmc/misc/macgo/entitlements"
-)
+package main
 
-func init() {
-    entitlements.SetAppSandbox()
-    entitlements.SetCamera()
-    macgo.EnableImprovedSignalHandling()
-    macgo.Start()
+import macgo "github.com/tmc/misc/macgo/v2"
+
+func main() {
+    // Simple approach
+    err := macgo.Request(macgo.Camera)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Your app code here...
+}
+
+// Alternative: Configured approach
+func withConfig() {
+    cfg := &macgo.Config{
+        AppName: "MyApp",
+        Permissions: []macgo.Permission{macgo.Camera},
+        Debug: true,
+    }
+
+    err := macgo.Start(cfg)
+    // ...
+}
+
+// Alternative: Environment approach
+func withEnv() {
+    // MACGO_CAMERA=1 MACGO_DEBUG=1 ./myapp
+    err := macgo.Auto()
+    // ...
 }
 ```
 
-### Minimal Usage
-[minimal/main.go](minimal/main.go) - The simplest way to use macgo with a blank import of the auto package.
-
-```go
-import (
-    _ "github.com/tmc/misc/macgo/auto" // --
-)
-```
-
-### Simple Usage
-[simple/main.go](simple/main.go) - A basic example showing file access with the auto package.
-
-### Hello World
-[hello/main.go](hello/main.go) - A simple hello world example with debug package usage.
-
-### Customization With Environment Variables
-[customization/main.go](customization/main.go) - Configure macgo through environment variables.
-
-```
-MACGO_APP_NAME="CustomApp" MACGO_BUNDLE_ID="com.example.custom" MACGO_CAMERA=1 MACGO_MIC=1 MACGO_DEBUG=1 go run main.go
-```
-
-### Auto-Initialization
-[auto-initialization/main.go](auto-initialization/main.go) - Demonstrates auto-initialization packages for simplified setup.
-
-### Entitlements Package Demo
-[entitlements-package-demo/main.go](entitlements-package-demo/main.go) - Shows how to use the entitlements package for semantic permission setting.
-
-### Signal Handling
-[signal-handling/main.go](signal-handling/main.go) - Legacy signal handling example (now redundant as robust signal handling is enabled by default).
-
-```go
-import (
-    _ "github.com/tmc/misc/macgo/auto/sandbox/signalhandler" // --
-)
-```
-
-### Default Signal Handling Test
-[signal-test/main.go](signal-test/main.go) - Tests the default robust signal handling (no special imports needed).
-
-### Legacy Signal Handling
-[legacy-signals/main.go](legacy-signals/main.go) - Demonstrates how to opt out of robust signal handling.
-
-```go
-func init() {
-    // Opt out of robust signal handling
-    macgo.DisableRobustSignals()
-}
-```
-
-## Advanced Examples
-
-### Advanced Configuration
-[advanced/main.go](advanced/main.go) - Full control using the Config API.
-
-```go
-cfg := macgo.NewConfig()
-cfg.ApplicationName = "AdvancedExampleApp"
-cfg.AddEntitlement(macgo.EntCamera)
-// ...and more
-```
-
-### Custom Template
-[custom-template/main.go](custom-template/main.go) - Using a custom app template with embedded files.
-
-### Entitlements From JSON
-[entitlements/main.go](entitlements/main.go) - Loading entitlements from embedded JSON and using entitlements package.
-
-### Comprehensive Features
-[comprehensive-features/main.go](comprehensive-features/main.go) - Shows all new features including SetIconFile, EnableImprovedSignalHandling, and entitlements package.
-
-### New Features Demo
-[new-features/main.go](new-features/main.go) - Demonstrates newly documented features like SetIconFile and StartWithContext.
-
-## Sandbox Examples
-
-### Sandbox File and Execution Testing
-[sandboxed-file-exec/main.go](sandboxed-file-exec/main.go) - Tests file access and process execution in sandbox.
-
-```go
-import (
-    _ "github.com/tmc/misc/macgo/auto/sandbox" // --
-)
-```
-
-### Sandbox Best Practices
-[sandbox-best-practices/main.go](sandbox-best-practices/main.go) - Demonstrates recommended patterns for working with App Sandbox.
-
-### Specific Folder Access
-[specific-folder-access/main.go](specific-folder-access/main.go) - Shows how to access standard folders with specific entitlements.
-
-```go
-cfg.RequestEntitlements(
-    macgo.EntDownloadsReadOnly,
-    macgo.EntPicturesReadOnly,
-    // ...and more
-)
-```
-
-### Security-Scoped Bookmarks
-[security-bookmarks/main.go](security-bookmarks/main.go) - How to use security-scoped bookmarks for persistent file access.
-
-## Auto-Initialization Packages
-
-Macgo provides several auto-initialization packages for different use cases:
-
-- `github.com/tmc/misc/macgo/auto` - Basic auto-initialization (default settings, includes robust signal handling)
-- `github.com/tmc/misc/macgo/auto/sandbox` - Auto-initialization with app sandbox
-- `github.com/tmc/misc/macgo/auto/sandbox/readonly` - App sandbox with user read access
-- `github.com/tmc/misc/macgo/auto/sandbox/signalhandler` - (Legacy) Kept for backward compatibility, but redundant as robust signal handling is now enabled by default
-
-## New Examples
-
-### File Processor
-[file-processor/main.go](file-processor/main.go) - CLI tool for batch file processing with proper sandbox permissions.
-- Read/write file access with user selection
-- Batch processing with glob patterns
-- Text transformations (uppercase, lowercase, reverse)
-- Proper sandbox configuration for file operations
-
-### Screen Recorder
-[screen-recorder/main.go](screen-recorder/main.go) - Screen recording application with TCC permissions.
-- Screen capture permission handling
-- Optional microphone and camera overlay
-- Hardware-accelerated encoding
-- Configurable output format and quality
-
-### Network Service
-[network-service/main.go](network-service/main.go) - HTTP/WebSocket server with sandbox networking.
-- Both client and server network entitlements
-- REST API endpoints
-- WebSocket support
-- External connectivity testing
-- Optional background mode
-
-### Background Agent
-[background-agent/main.go](background-agent/main.go) - Long-running background service without dock icon.
-- Runs as background daemon
-- File system monitoring
-- Periodic health checks
-- JSON status file output
-- Launch agent configuration
-
-### Development Tools
-[dev-tools/main.go](dev-tools/main.go) - Developer utility for project analysis and building.
-- Language detection (Go, JavaScript, Python, Rust, etc.)
-- Build and test execution
-- File watching with auto-format
-- IDE integration (VSCode, Xcode, IntelliJ)
-- Development server support
-
-### Media Processor
-[media-processor/main.go](media-processor/main.go) - Audio/video processing with hardware acceleration.
-- Hardware video encoding/decoding (VideoToolbox)
-- Format conversion (MP4, WebM, MOV, MP3, etc.)
-- Live capture from camera/microphone
-- Batch processing
-- Thumbnail generation
-- Resolution and quality adjustment
-
-## Running the Examples
-
-To run any example with debug output enabled:
-
-```
-MACGO_DEBUG=1 go run ./examples/minimal/main.go
-```
-
-### Testing Sandbox Permissions
-
-When testing sandbox permissions, keep these points in mind:
-
-1. The App Sandbox restricts access to most filesystem locations
-2. User-selected files can be accessed with EntUserSelectedReadOnly
-3. Standard folders need specific entitlements (Downloads, Pictures, etc.)
-4. Temporary directories are always accessible
-5. Network access works by default in Go (bypasses sandbox restrictions)
-6. Process execution may be restricted based on the process
+All examples demonstrate these three patterns for maximum utility.

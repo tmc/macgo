@@ -1,87 +1,66 @@
-// Getting Started with macgo
-// This example shows the basic patterns for using macgo with proper API usage
+// Getting Started with macgo v2
+// This example shows the simplified API following Russ Cox's principles
 package main
 
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/misc/macgo"
 )
 
-func init() {
-	// Step 1: Configure app details
-	macgo.SetAppName("GettingStarted")
-	macgo.SetBundleID("com.example.macgo.getting-started")
-
-	// Step 2: Set custom icon (optional)
-	// Using a system icon for demonstration
-	macgo.SetIconFile("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ToolbarCustomizeIcon.icns")
-
-	// Step 3: Enable improved signal handling (recommended)
-	// This provides better Ctrl+C handling and preserves stdin/stdout/stderr
-	macgo.EnableImprovedSignalHandling()
-
-	// Step 4: Request permissions using entitlements package (recommended approach)
-	// This is more readable than using macgo.RequestEntitlements() directly
-	macgo.RequestEntitlement(macgo.EntAppSandbox) // Enable app sandbox
-	macgo.RequestEntitlement(macgo.EntCamera)     // Request camera access
-	macgo.RequestEntitlement(macgo.EntMicrophone) // Request microphone access
-	macgo.RequestEntitlement(macgo.EntLocation)   // Request location access
-
-	// Alternative: You can also use the direct API
-	// macgo.RequestEntitlements(
-	//     macgo.EntAppSandbox,
-	//     macgo.EntCamera,
-	//     macgo.EntMicrophone,
-	//     macgo.EntLocation,
-	// )
-
-	// Step 5: Enable debug logging (optional, useful for development)
-	macgo.EnableDebug()
-
-	// Step 6: Start macgo - this creates the app bundle and relaunches if needed
-	// Must be called after all configuration is done
-	macgo.Start()
-}
-
 func main() {
-	fmt.Println("Getting Started with macgo")
-	fmt.Println("==========================")
+	fmt.Println("Getting Started with macgo v2")
+	fmt.Println("=============================")
+	fmt.Println()
+	fmt.Println("Key improvements over v1:")
+	fmt.Println("  ✓ No global state or init() magic")
+	fmt.Println("  ✓ Explicit configuration")
+	fmt.Println("  ✓ Simpler API with fewer concepts")
+	fmt.Println("  ✓ Better error handling")
 	fmt.Println()
 
-	// Check if we're running in an app bundle
-	if macgo.IsInAppBundle() {
-		fmt.Println("✓ Running inside app bundle")
-		fmt.Println("✓ TCC permissions should now be available")
-		fmt.Println("✓ Custom icon is visible")
-		fmt.Println("✓ Improved signal handling is active")
-	} else {
-		fmt.Println("ℹ Running outside app bundle - will relaunch")
+	// All configuration in one place - no init() function!
+	cfg := &macgo.Config{
+		AppName:  "GettingStarted",
+		BundleID: "com.example.macgo.getting-started",
+
+		// Simple permission model - just 5 core types
+		Permissions: []macgo.Permission{
+			macgo.Camera,
+			macgo.Microphone,
+			macgo.Location,
+		},
+
+		Debug: true, // Enable debug logging
 	}
 
-	fmt.Println()
-	fmt.Println("This example demonstrates:")
-	fmt.Println("  - Basic macgo configuration")
-	fmt.Println("  - Using the entitlements package for permissions")
-	fmt.Println("  - Setting a custom app icon")
-	fmt.Println("  - Enabling improved signal handling")
-	fmt.Println("  - Using StartWithContext for better control")
-	fmt.Println()
-
-	// Using context for better control (optional but recommended)
+	// Create context for lifecycle management
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// You can also use macgo.StartWithContext() instead of macgo.Start()
-	// This allows for better lifecycle management and cancellation support
-	// macgo.StartWithContext(ctx)
+	// Single explicit call to start - no magic!
+	fmt.Println("Starting macgo with configuration...")
+	err := macgo.StartContext(ctx, cfg)
+	if err != nil {
+		log.Fatalf("Failed to start macgo: %v", err)
+	}
 
-	// Set up signal handling to demonstrate improved signal handling
+	fmt.Println("✓ App bundle created and permissions configured")
+	fmt.Println()
+	fmt.Println("This example demonstrates:")
+	fmt.Println("  - Explicit configuration (no init magic)")
+	fmt.Println("  - Simple permission model (5 core types)")
+	fmt.Println("  - Context-based lifecycle management")
+	fmt.Println("  - Clean error handling")
+	fmt.Println()
+
+	// Set up signal handling
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
@@ -91,10 +70,42 @@ func main() {
 	select {
 	case sig := <-c:
 		fmt.Printf("\nReceived signal: %v\n", sig)
-		fmt.Println("✓ Signal handling is working correctly!")
+		fmt.Println("✓ Signal handling works correctly!")
 	case <-ctx.Done():
 		fmt.Println("\nTimeout reached")
 	}
 
 	fmt.Println("Shutting down...")
+}
+
+// Alternative approaches for different use cases:
+
+func simpleApproach() {
+	// For quick scripts - one line!
+	if err := macgo.Request(macgo.Camera, macgo.Microphone); err != nil {
+		log.Fatal(err)
+	}
+	// Your app code here...
+}
+
+func builderApproach() {
+	// Using the builder pattern
+	err := macgo.Start(
+		new(macgo.Config).
+			WithPermissions(macgo.Camera, macgo.Microphone).
+			WithDebug(),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Your app code here...
+}
+
+func environmentApproach() {
+	// For deployment scenarios
+	// Set: MACGO_CAMERA=1 MACGO_MICROPHONE=1 MACGO_DEBUG=1
+	if err := macgo.Auto(); err != nil {
+		log.Fatal(err)
+	}
+	// Your app code here...
 }

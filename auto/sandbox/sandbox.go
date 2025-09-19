@@ -1,23 +1,23 @@
-// Package sandbox provides automatic initialization for macgo with app sandboxing.
+// Package sandbox provides automatic initialization for macgo v2 with app sandboxing.
 //
-// Import this package to automatically set up app sandboxing on startup:
+// Import this package to automatically set up app sandboxing:
 //
 //	import (
 //	    _ "github.com/tmc/misc/macgo/auto/sandbox"
 //	)
 //
-// This will automatically enable app sandboxing and create the app bundle.
-// No user-selected file access is enabled by default. To include read-only
-// file access, use github.com/tmc/misc/macgo/auto/sandbox/readonly.
+// This enables app sandboxing which provides security isolation but limits
+// file system access to user-selected files only. Perfect for apps that
+// process user documents safely.
 package sandbox
 
 import (
-	"github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/misc/macgo"
 )
 
 func init() {
-	// Only enable app sandbox for basic security
-	macgo.RequestEntitlements(macgo.EntAppSandbox)
-	// Start macgo
-	macgo.Start()
+	// Enable app sandbox - much simpler in v2!
+	if err := macgo.Request(macgo.Sandbox); err != nil {
+		return
+	}
 }
