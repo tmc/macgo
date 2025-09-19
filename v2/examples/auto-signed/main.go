@@ -8,8 +8,8 @@ import (
 	"os"
 
 	// Import the signed package for automatic code signing
-	signed "github.com/tmc/misc/macgo/v2/auto/signed"
 	macgo "github.com/tmc/misc/macgo/v2"
+	signed "github.com/tmc/misc/macgo/v2/auto/signed"
 )
 
 func main() {

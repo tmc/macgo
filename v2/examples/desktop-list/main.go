@@ -1,8 +1,9 @@
 // Desktop List - macgo v2
-// Simple example that lists Desktop files without sandbox
+// Simple example that lists Desktop files with proper file permissions
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -12,64 +13,82 @@ import (
 	macgo "github.com/tmc/misc/macgo/v2"
 )
 
+func init() {
+	// Customize flag usage
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Desktop List - macgo v2\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Lists Desktop files with proper macOS permissions\n\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags]\n\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Flags:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(), "\nExamples:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s                           # Basic usage\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s -debug                    # With debug output\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s -ad-hoc                   # With ad-hoc signing\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s -auto-sign                # With auto-detected signing\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s -sign \"Developer ID\"       # With specific identity\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "\nCode Signing:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  Ad-hoc signing provides basic code signing for development.\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  Auto-sign detects Developer ID certificates automatically.\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  List available identities: security find-identity -v -p codesigning\n")
+	}
+}
+
 func main() {
+	// Parse command line flags
+	var (
+		signIdentity = flag.String("sign", "", "code signing identity (e.g., 'Developer ID Application')")
+		autoSign     = flag.Bool("auto-sign", false, "automatically detect and use Developer ID certificate")
+		adHocSign    = flag.Bool("ad-hoc", false, "use ad-hoc code signing (no certificate required)")
+		debug        = flag.Bool("debug", false, "enable debug output")
+	)
+	flag.Parse()
+
 	fmt.Printf("Desktop Lister - macgo v2! PID: %d\n", os.Getpid())
 	fmt.Println()
 
-	// Simple setup - creates proper app bundle
-	// Note: Desktop access still requires macOS permissions
-	err := macgo.Request()  // No special permissions requested
+	// Configure macgo with optional code signing
+	keepBundle := false
+	cfg := &macgo.Config{
+		Permissions: []macgo.Permission{macgo.Sandbox, macgo.Files},
+		Debug:       *debug,
+		AutoSign:    *autoSign,
+		AdHocSign:   *adHocSign,
+		KeepBundle:  &keepBundle,
+	}
+
+	if *signIdentity != "" {
+		cfg.CodeSignIdentity = *signIdentity
+		fmt.Printf("🔐 Code signing enabled with identity: %s\n", *signIdentity)
+	} else if *autoSign {
+		fmt.Println("🔍 Auto-detection enabled for Developer ID certificate")
+	} else if *adHocSign {
+		fmt.Println("🔒 Ad-hoc code signing enabled (no certificate required)")
+	} else {
+		fmt.Println("🔓 Running without code signing (use -sign, -auto-sign, or -ad-hoc flag to enable)")
+	}
+	fmt.Println()
+
+	// Request file access permissions for Desktop access
+	err := macgo.Start(cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize macgo: %v", err)
 	}
 
-	// Try Desktop first (requires permissions)
+	// Get Desktop path
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatalf("Error getting home directory: %v", err)
 	}
 
 	desktopPath := filepath.Join(homeDir, "Desktop")
-	targetDir := desktopPath
+	fmt.Printf("📂 Listing files in ~/Desktop:\n")
+	fmt.Printf("   %s\n", desktopPath)
 
-	// Try to read Desktop
+	// Read Desktop contents
 	entries, err := os.ReadDir(desktopPath)
 	if err != nil {
-		fmt.Printf("⚠️  Cannot access Desktop: %v\n", err)
-		fmt.Println("   Note: Terminal/iTerm may need Full Disk Access in System Settings")
-		fmt.Println()
-
-		// Fall back to home directory (showing accessible folders)
-		fmt.Println("📂 Listing accessible directories in home instead:")
-
-		// List what we CAN access in home directory
-		homeEntries, _ := os.ReadDir(homeDir)
-		accessible := []string{}
-		for _, e := range homeEntries {
-			if e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
-				testPath := filepath.Join(homeDir, e.Name())
-				if _, err := os.ReadDir(testPath); err == nil {
-					accessible = append(accessible, e.Name())
-				}
-			}
-		}
-
-		if len(accessible) > 0 {
-			fmt.Printf("   ✓ Accessible: %s\n", strings.Join(accessible, ", "))
-		}
-
-		// Fall back to current working directory
-		targetDir, _ = os.Getwd()
-		fmt.Printf("\n📂 Listing current directory instead:\n")
-		fmt.Printf("   %s\n", targetDir)
-
-		entries, err = os.ReadDir(targetDir)
-		if err != nil {
-			log.Fatalf("Error reading directory: %v", err)
-		}
-	} else {
-		fmt.Printf("📂 Listing files in ~/Desktop:\n")
-		fmt.Printf("   %s\n", targetDir)
+		log.Fatalf("Error reading Desktop: %v", err)
 	}
 
 	fmt.Println(strings.Repeat("─", 70))
@@ -105,34 +124,34 @@ func main() {
 				name := strings.ToLower(entry.Name())
 				switch {
 				case strings.HasSuffix(name, ".png"),
-				     strings.HasSuffix(name, ".jpg"),
-				     strings.HasSuffix(name, ".jpeg"),
-				     strings.HasSuffix(name, ".gif"):
+					strings.HasSuffix(name, ".jpg"),
+					strings.HasSuffix(name, ".jpeg"),
+					strings.HasSuffix(name, ".gif"):
 					icon = "🖼️"
 				case strings.HasSuffix(name, ".pdf"):
 					icon = "📑"
 				case strings.HasSuffix(name, ".txt"),
-				     strings.HasSuffix(name, ".md"):
+					strings.HasSuffix(name, ".md"):
 					icon = "📝"
 				case strings.HasSuffix(name, ".zip"),
-				     strings.HasSuffix(name, ".tar"),
-				     strings.HasSuffix(name, ".gz"):
+					strings.HasSuffix(name, ".tar"),
+					strings.HasSuffix(name, ".gz"):
 					icon = "📦"
 				case strings.HasSuffix(name, ".mp3"),
-				     strings.HasSuffix(name, ".wav"),
-				     strings.HasSuffix(name, ".m4a"):
+					strings.HasSuffix(name, ".wav"),
+					strings.HasSuffix(name, ".m4a"):
 					icon = "🎵"
 				case strings.HasSuffix(name, ".mp4"),
-				     strings.HasSuffix(name, ".mov"),
-				     strings.HasSuffix(name, ".avi"):
+					strings.HasSuffix(name, ".mov"),
+					strings.HasSuffix(name, ".avi"):
 					icon = "🎬"
 				case strings.HasSuffix(name, ".go"):
 					icon = "🐹"
 				case strings.HasSuffix(name, ".js"),
-				     strings.HasSuffix(name, ".ts"):
+					strings.HasSuffix(name, ".ts"):
 					icon = "📜"
 				case strings.HasSuffix(name, ".html"),
-				     strings.HasSuffix(name, ".css"):
+					strings.HasSuffix(name, ".css"):
 					icon = "🌐"
 				}
 			}
@@ -161,17 +180,18 @@ func main() {
 	}
 
 	fmt.Println()
-	fmt.Println("📋 Notes:")
-	fmt.Println("  • App bundle created in ~/go/bin/")
-	fmt.Println("  • Desktop access requires Full Disk Access for Terminal")
-	fmt.Println("  • To grant: System Settings → Privacy & Security → Full Disk Access")
-	fmt.Println()
 	fmt.Println("✨ macgo v2 benefits:")
-	fmt.Println("  • Simple one-line setup: macgo.Request()")
+	fmt.Println("  • Simple configuration with optional code signing")
 	fmt.Println("  • Creates proper .app bundle automatically")
-	fmt.Println("  • Add specific permissions as needed")
+	fmt.Println("  • Handles file permissions with sandbox integration")
+	fmt.Println("  • Uses LaunchServices for proper macOS behavior")
+	fmt.Println()
+	fmt.Println("🔐 Code signing usage:")
+	fmt.Println("  desktop-list -ad-hoc                            # Ad-hoc signing (dev/test)")
+	fmt.Println("  desktop-list -auto-sign                         # Auto-detect certificate")
+	fmt.Println("  desktop-list -sign \"Developer ID Application\"   # Use specific identity")
+	fmt.Println("  desktop-list -debug                             # See bundle creation details")
 }
-
 
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {

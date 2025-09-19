@@ -22,10 +22,11 @@ func main() {
 		AppName:  "SandboxedFileExec",
 		BundleID: "com.example.sandboxed-file-exec",
 
-		// The Files permission enables sandboxing with user-selected file access
+		// Enable app sandbox and user-selected file access
 		// This replaces v1's EntAppSandbox + EntUserSelectedReadOnly
 		Permissions: []macgo.Permission{
-			macgo.Files, // Sandbox + file access
+			macgo.Sandbox, // App sandbox isolation
+			macgo.Files,   // User-selected file access
 		},
 
 		Debug: true,

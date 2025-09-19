@@ -122,7 +122,7 @@ func TestStartOnNonDarwin(t *testing.T) {
 
 func TestPermissionConstants(t *testing.T) {
 	// Test that permission constants are reasonable
-	permissions := []Permission{Camera, Microphone, Location, Files, Network}
+	permissions := []Permission{Camera, Microphone, Location, Files, Network, Sandbox}
 
 	for _, perm := range permissions {
 		if string(perm) == "" {
@@ -185,7 +185,7 @@ func TestInferBundleID(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		 containsInMiddle(s, substr))))
+			containsInMiddle(s, substr))))
 }
 
 func containsInMiddle(s, substr string) bool {

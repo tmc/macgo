@@ -14,12 +14,12 @@ import (
 )
 
 var (
-	flagAdHoc    = flag.Bool("ad-hoc", false, "Use ad-hoc code signing")
-	flagAutoSign = flag.Bool("auto-sign", false, "Auto-detect signing certificate")
-	flagSign     = flag.String("sign", "", "Code signing identity")
-	flagDebug    = flag.Bool("debug", false, "Enable debug logging")
-	flagDirect   = flag.Bool("direct", false, "Force direct execution (no LaunchServices)")
-	flagLaunch   = flag.Bool("launch", false, "Force LaunchServices")
+	flagAdHoc       = flag.Bool("ad-hoc", false, "Use ad-hoc code signing")
+	flagAutoSign    = flag.Bool("auto-sign", false, "Auto-detect signing certificate")
+	flagSign        = flag.String("sign", "", "Code signing identity")
+	flagDebug       = flag.Bool("debug", false, "Enable debug logging")
+	flagDirect      = flag.Bool("direct", false, "Force direct execution (no LaunchServices)")
+	flagLaunch      = flag.Bool("launch", false, "Force LaunchServices")
 	flagInteractive = flag.Bool("interactive", false, "Run interactive tests")
 )
 

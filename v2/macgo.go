@@ -26,6 +26,7 @@ const (
 	Location   Permission = "location"
 	Files      Permission = "files"
 	Network    Permission = "network"
+	Sandbox    Permission = "sandbox"
 )
 
 // Config holds macgo configuration.
@@ -49,8 +50,9 @@ type Config struct {
 	// Debug enables debug logging.
 	Debug bool
 
-	// KeepBundle prevents cleanup of temporary bundles.
-	KeepBundle bool
+	// KeepBundle prevents cleanup of temporary bundles. Use a pointer to distinguish
+	// between explicitly set false and default (which is true).
+	KeepBundle *bool
 
 	// CodeSignIdentity is the signing identity to use for code signing.
 	// If empty and AutoSign is false, the app bundle will not be signed.
@@ -102,7 +104,8 @@ func (c *Config) FromEnv() *Config {
 	}
 
 	if os.Getenv("MACGO_KEEP_BUNDLE") == "1" {
-		c.KeepBundle = true
+		keepBundle := true
+		c.KeepBundle = &keepBundle
 	}
 
 	if identity := os.Getenv("MACGO_CODE_SIGN_IDENTITY"); identity != "" {
@@ -132,6 +135,9 @@ func (c *Config) FromEnv() *Config {
 	}
 	if os.Getenv("MACGO_NETWORK") == "1" {
 		c.Permissions = append(c.Permissions, Network)
+	}
+	if os.Getenv("MACGO_SANDBOX") == "1" {
+		c.Permissions = append(c.Permissions, Sandbox)
 	}
 
 	return c
@@ -189,6 +195,14 @@ func (c *Config) WithAdHocSign() *Config {
 	}
 	c.AdHocSign = true
 	return c
+}
+
+// shouldKeepBundle returns the effective KeepBundle value (defaults to true).
+func (c *Config) shouldKeepBundle() bool {
+	if c.KeepBundle == nil {
+		return true // Default to keeping bundles
+	}
+	return *c.KeepBundle
 }
 
 // Start initializes macgo with the given configuration.

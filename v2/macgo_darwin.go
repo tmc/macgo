@@ -92,19 +92,19 @@ func createSimpleBundle(execPath string, cfg *Config) (string, error) {
 	// Create bundle directory
 	bundleDir := filepath.Join(bundleBaseDir, appName+".app")
 
-	// Check if bundle already exists and KeepBundle is true
-	if cfg.KeepBundle {
+	// Check if bundle already exists and should be kept
+	if cfg.shouldKeepBundle() {
 		if _, err := os.Stat(bundleDir); err == nil {
 			if cfg.Debug {
 				fmt.Fprintf(os.Stderr, "macgo: reusing existing bundle at %s\n", bundleDir)
 			}
 			return bundleDir, nil
 		}
-	}
-
-	// Remove old bundle if we're recreating
-	if err := os.RemoveAll(bundleDir); err != nil && !os.IsNotExist(err) {
-		return "", err
+	} else {
+		// Remove old bundle if not keeping it
+		if err := os.RemoveAll(bundleDir); err != nil && !os.IsNotExist(err) {
+			return "", err
+		}
 	}
 
 	// Create directory structure

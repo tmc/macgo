@@ -16,8 +16,8 @@ func main() {
 	fmt.Printf("Hello from macgo v2 with Files! PID: %d\n", os.Getpid())
 	fmt.Println()
 
-	// Request file permissions - single line!
-	err := macgo.Request(macgo.Files)
+	// Request sandbox and file permissions - single line!
+	err := macgo.Request(macgo.Sandbox, macgo.Files)
 	if err != nil {
 		log.Fatalf("Failed to request file permissions: %v", err)
 	}
@@ -94,13 +94,13 @@ func main() {
 			if entry.IsDir() {
 				icon = "📁"
 			} else if strings.HasSuffix(strings.ToLower(entry.Name()), ".png") ||
-			         strings.HasSuffix(strings.ToLower(entry.Name()), ".jpg") ||
-			         strings.HasSuffix(strings.ToLower(entry.Name()), ".jpeg") {
+				strings.HasSuffix(strings.ToLower(entry.Name()), ".jpg") ||
+				strings.HasSuffix(strings.ToLower(entry.Name()), ".jpeg") {
 				icon = "🖼️"
 			} else if strings.HasSuffix(strings.ToLower(entry.Name()), ".pdf") {
 				icon = "📑"
 			} else if strings.HasSuffix(strings.ToLower(entry.Name()), ".txt") ||
-			         strings.HasSuffix(strings.ToLower(entry.Name()), ".md") {
+				strings.HasSuffix(strings.ToLower(entry.Name()), ".md") {
 				icon = "📝"
 			}
 

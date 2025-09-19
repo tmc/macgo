@@ -52,15 +52,14 @@ func writeEntitlements(path string, cfg *Config) error {
 		case Location:
 			entries = append(entries, `	<key>com.apple.security.personal-information.location</key>
 	<true/>`)
-		case Files:
+		case Sandbox:
 			entries = append(entries, `	<key>com.apple.security.app-sandbox</key>
-	<true/>
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>`)
+		case Files:
+			entries = append(entries, `	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>`)
 		case Network:
-			entries = append(entries, `	<key>com.apple.security.app-sandbox</key>
-	<true/>
-	<key>com.apple.security.network.client</key>
+			entries = append(entries, `	<key>com.apple.security.network.client</key>
 	<true/>`)
 		}
 	}
