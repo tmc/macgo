@@ -13,11 +13,20 @@ import (
 // It replaces filesystem-problematic characters with hyphens and
 // removes non-printable ASCII characters.
 //
+// Environment variable MACGO_APP_NAME_PREFIX can be used to force
+// a prefix on all app names. This is useful for development or
+// organizational requirements.
+//
 // This function is useful for sanitizing user-provided app names
 // before creating app bundles.
 func CleanAppName(name string) string {
 	if name == "" {
 		return ""
+	}
+
+	// Apply prefix from environment variable if set
+	if prefix := os.Getenv("MACGO_APP_NAME_PREFIX"); prefix != "" {
+		name = prefix + name
 	}
 
 	// Replace problematic filesystem characters with hyphens
@@ -55,10 +64,14 @@ func CleanAppName(name string) string {
 // It uses the module path from build info to create meaningful, unique bundle IDs
 // that reflect the actual Go module and program name.
 //
+// Environment variable MACGO_BUNDLE_ID_PREFIX can be used to force a prefix
+// on all bundle IDs. This is useful for development or organizational requirements.
+//
 // Examples:
 //   - github.com/user/repo + "myapp" -> com.github.user.repo.myapp
 //   - example.com/project + "tool" -> com.example.project.tool
 //   - local/project + "app" -> local.project.app
+//   - With MACGO_BUNDLE_ID_PREFIX="dev": dev.com.github.user.repo.myapp
 //
 // If no module information is available, it creates a fallback bundle ID
 // based on the user's environment.
@@ -67,18 +80,30 @@ func InferBundleID(appName string) string {
 		appName = "app"
 	}
 
+	var bundleID string
+
 	// Try to get module path from build info
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Path != "" {
 		modulePath := info.Main.Path
 
 		// Convert module path to reverse DNS format
-		bundleID := modulePathToBundleID(modulePath, appName)
-		return SanitizeBundleID(bundleID)
+		bundleID = modulePathToBundleID(modulePath, appName)
+	} else {
+		// If no module info, use a more generic but still meaningful format
+		// based on the current working directory or executable location
+		bundleID = inferFallbackBundleID(appName)
 	}
 
-	// If no module info, use a more generic but still meaningful format
-	// based on the current working directory or executable location
-	return inferFallbackBundleID(appName)
+	// Apply prefix from environment variable if set
+	if prefix := os.Getenv("MACGO_BUNDLE_ID_PREFIX"); prefix != "" {
+		// If the prefix doesn't end with a dot, add one
+		if !strings.HasSuffix(prefix, ".") {
+			prefix = prefix + "."
+		}
+		bundleID = prefix + bundleID
+	}
+
+	return SanitizeBundleID(bundleID)
 }
 
 // modulePathToBundleID converts a Go module path to a bundle ID format.

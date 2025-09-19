@@ -247,7 +247,9 @@ func Example_environmentVariables() {
 	// MACGO_DEBUG=1                 - Enable debug logging
 	// MACGO_RESET_PERMISSIONS=1     - Reset TCC permissions using tccutil
 	// MACGO_APP_NAME=MyApp          - Set application name
+	// MACGO_APP_NAME_PREFIX=Dev-    - Add prefix to all app names
 	// MACGO_BUNDLE_ID=com.example   - Set bundle identifier
+	// MACGO_BUNDLE_ID_PREFIX=dev    - Add prefix to all bundle IDs
 	// MACGO_KEEP_BUNDLE=1           - Preserve bundle after execution
 	// MACGO_CODE_SIGN_IDENTITY=xyz  - Set code signing identity
 	// MACGO_AUTO_SIGN=1             - Enable automatic code signing

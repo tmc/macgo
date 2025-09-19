@@ -123,7 +123,9 @@ type Config struct {
 //
 // Supported environment variables:
 //   MACGO_APP_NAME          - Application name
+//   MACGO_APP_NAME_PREFIX   - Prefix to add to all app names
 //   MACGO_BUNDLE_ID         - Bundle identifier
+//   MACGO_BUNDLE_ID_PREFIX  - Prefix to add to all bundle IDs
 //   MACGO_DEBUG=1           - Enable debug logging
 //   MACGO_KEEP_BUNDLE=1     - Preserve bundle after execution
 //   MACGO_CODE_SIGN_IDENTITY - Code signing identity
