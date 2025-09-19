@@ -14,6 +14,15 @@ import (
 
 // startDarwin implements the macOS-specific logic.
 func startDarwin(ctx context.Context, cfg *Config) error {
+	// Check for permission reset flag
+	if os.Getenv("MACGO_RESET_PERMISSIONS") == "1" {
+		if err := resetTCCPermissions(cfg); err != nil {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: failed to reset permissions: %v\n", err)
+			}
+		}
+	}
+
 	// Skip if already in app bundle
 	if isInAppBundle() {
 		if cfg.Debug {
@@ -537,4 +546,45 @@ func readBundleIDFromPlist(plistPath string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// resetTCCPermissions resets all TCC permissions for the app bundle.
+func resetTCCPermissions(cfg *Config) error {
+	// Determine bundle ID
+	bundleID := cfg.BundleID
+	if bundleID == "" {
+		appName := cfg.AppName
+		if appName == "" {
+			execPath, err := os.Executable()
+			if err != nil {
+				return fmt.Errorf("failed to get executable path: %w", err)
+			}
+			appName = strings.TrimSuffix(filepath.Base(execPath), filepath.Ext(execPath))
+		}
+		bundleID = fmt.Sprintf("com.macgo.%s", strings.ToLower(appName))
+	}
+
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: resetting TCC permissions for bundle ID: %s\n", bundleID)
+	}
+
+	// Execute tccutil reset All command
+	cmd := exec.Command("tccutil", "reset", "All", bundleID)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: tccutil output: %s\n", string(output))
+		}
+		return fmt.Errorf("tccutil reset failed: %w", err)
+	}
+
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: successfully reset TCC permissions for %s\n", bundleID)
+		if len(output) > 0 {
+			fmt.Fprintf(os.Stderr, "macgo: tccutil output: %s\n", string(output))
+		}
+	}
+
+	return nil
 }

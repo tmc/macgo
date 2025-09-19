@@ -226,6 +226,34 @@ func TestErrorHandling(t *testing.T) {
 	}
 }
 
+// Example showing environment variables
+func Example_environmentVariables() {
+	// Environment variables that control macgo behavior:
+	// MACGO_NO_RELAUNCH=1         - Skip bundle creation and relaunch
+	// MACGO_DEBUG=1               - Enable debug logging
+	// MACGO_RESET_PERMISSIONS=1   - Reset TCC permissions using tccutil
+	// MACGO_CAMERA=1              - Request camera permissions
+	// MACGO_MICROPHONE=1          - Request microphone permissions
+	// MACGO_FILES=1               - Request file access permissions
+	// MACGO_AUTO_SIGN=1           - Enable automatic code signing
+	// MACGO_AD_HOC_SIGN=1         - Use ad-hoc code signing
+
+	// Example: Reset permissions before requesting new ones
+	os.Setenv("MACGO_RESET_PERMISSIONS", "1")
+	os.Setenv("MACGO_DEBUG", "1")
+	defer func() {
+		os.Unsetenv("MACGO_RESET_PERMISSIONS")
+		os.Unsetenv("MACGO_DEBUG")
+	}()
+
+	err := macgo.Request(macgo.Camera)
+	if err != nil {
+		// Handle error
+		return
+	}
+	// Permissions reset and then requested
+}
+
 // Example showing migration from v1 to v2 patterns
 func Example_migration() {
 	// v1 pattern (removed):
