@@ -7,7 +7,7 @@ import (
 )
 
 // writeInfoPlist creates a minimal Info.plist file.
-func writeInfoPlist(path, appName, bundleID, execName string) error {
+func writeInfoPlist(path, appName, bundleID, execName, version string) error {
 	plist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -23,15 +23,15 @@ func writeInfoPlist(path, appName, bundleID, execName string) error {
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleVersion</key>
-	<string>1.0</string>
+	<string>%s</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>%s</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>
-</plist>`, escapeXML(appName), escapeXML(execName), escapeXML(bundleID), escapeXML(appName))
+</plist>`, escapeXML(appName), escapeXML(execName), escapeXML(bundleID), escapeXML(appName), escapeXML(version), escapeXML(version))
 
 	return os.WriteFile(path, []byte(plist), 0644)
 }

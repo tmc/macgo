@@ -36,14 +36,15 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		return fmt.Errorf("macgo: get executable: %w", err)
 	}
 
-	// Create bundle
+	// Create or reuse bundle
 	bundlePath, err := createSimpleBundle(execPath, cfg)
 	if err != nil {
-		return fmt.Errorf("macgo: create bundle: %w", err)
+		return fmt.Errorf("macgo: bundle operation: %w", err)
 	}
 
 	if cfg.Debug {
-		fmt.Fprintf(os.Stderr, "macgo: created bundle at %s\n", bundlePath)
+		fmt.Fprintf(os.Stderr, "macgo: using bundle at %s\n", bundlePath)
+		fmt.Fprintf(os.Stderr, "macgo: permissions requested: %v\n", cfg.Permissions)
 	}
 
 	// Relaunch in bundle
@@ -71,6 +72,12 @@ func createSimpleBundle(execPath string, cfg *Config) (string, error) {
 		bundleID = inferBundleID(appName)
 	}
 
+	// Determine version
+	version := cfg.Version
+	if version == "" {
+		version = "1.0.0"
+	}
+
 	// Determine bundle location - prefer ~/go/bin/ if it exists
 	bundleBaseDir := os.TempDir()
 	if goPath := os.Getenv("GOPATH"); goPath != "" {
@@ -84,6 +91,18 @@ func createSimpleBundle(execPath string, cfg *Config) (string, error) {
 
 	// Create bundle directory
 	bundleDir := filepath.Join(bundleBaseDir, appName+".app")
+
+	// Check if bundle already exists and KeepBundle is true
+	if cfg.KeepBundle {
+		if _, err := os.Stat(bundleDir); err == nil {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: reusing existing bundle at %s\n", bundleDir)
+			}
+			return bundleDir, nil
+		}
+	}
+
+	// Remove old bundle if we're recreating
 	if err := os.RemoveAll(bundleDir); err != nil && !os.IsNotExist(err) {
 		return "", err
 	}
@@ -95,29 +114,60 @@ func createSimpleBundle(execPath string, cfg *Config) (string, error) {
 		return "", err
 	}
 
-	// Copy executable
+	// Copy the executable directly
 	execName := filepath.Base(appName)
 	destExec := filepath.Join(macosDir, execName)
 	if err := copyFile(execPath, destExec); err != nil {
 		return "", err
 	}
-
-	// Make executable
 	if err := os.Chmod(destExec, 0755); err != nil {
 		return "", err
 	}
 
 	// Create Info.plist
 	plistPath := filepath.Join(contentsDir, "Info.plist")
-	if err := writeInfoPlist(plistPath, appName, bundleID, execName); err != nil {
+	if err := writeInfoPlist(plistPath, appName, bundleID, execName, version); err != nil {
 		return "", err
 	}
 
-	// Create entitlements if needed
-	if len(cfg.Permissions) > 0 || len(cfg.Custom) > 0 {
+	// Create entitlements if needed (not for ad-hoc signing)
+	if (len(cfg.Permissions) > 0 || len(cfg.Custom) > 0) && cfg.CodeSignIdentity != "-" && !cfg.AdHocSign {
 		entPath := filepath.Join(contentsDir, "entitlements.plist")
 		if err := writeEntitlements(entPath, cfg); err != nil {
 			return "", err
+		}
+	}
+
+	// Code sign the bundle if identity is provided, auto-detect, or ad-hoc
+	if cfg.CodeSignIdentity != "" {
+		if err := codeSignBundle(bundleDir, cfg); err != nil {
+			return "", fmt.Errorf("code signing failed: %w", err)
+		}
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: code signed with identity: %s\n", cfg.CodeSignIdentity)
+		}
+	} else if cfg.AdHocSign {
+		cfg.CodeSignIdentity = "-"
+		if err := codeSignBundle(bundleDir, cfg); err != nil {
+			return "", fmt.Errorf("ad-hoc signing failed: %w", err)
+		}
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: ad-hoc signed\n")
+		}
+	} else if cfg.AutoSign {
+		if identity := findDeveloperID(cfg.Debug); identity != "" {
+			cfg.CodeSignIdentity = identity
+			if err := codeSignBundle(bundleDir, cfg); err != nil {
+				if cfg.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: auto-signing failed, continuing unsigned: %v\n", err)
+				}
+			} else {
+				if cfg.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: auto-signed with identity: %s\n", identity)
+				}
+			}
+		} else if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: no Developer ID found, creating unsigned bundle\n")
 		}
 	}
 
@@ -126,20 +176,17 @@ func createSimpleBundle(execPath string, cfg *Config) (string, error) {
 
 // inferBundleID creates a reasonable bundle ID from the app name.
 func inferBundleID(appName string) string {
-	// Try to get module path from build info
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Path != "" {
-		// Convert module path to bundle ID
 		bundleID := strings.ReplaceAll(info.Main.Path, "/", ".")
+		// Append the app name to make bundle IDs unique per binary
+		bundleID = fmt.Sprintf("%s.%s", bundleID, appName)
 		return bundleID
 	}
-
-	// Fallback to simple format
 	return fmt.Sprintf("com.macgo.%s", appName)
 }
 
 // cleanAppName removes problematic characters from app names.
 func cleanAppName(name string) string {
-	// Remove path separators and other problematic characters
 	name = strings.ReplaceAll(name, "/", "-")
 	name = strings.ReplaceAll(name, "\\", "-")
 	name = strings.ReplaceAll(name, ":", "-")
@@ -150,44 +197,65 @@ func cleanAppName(name string) string {
 	name = strings.ReplaceAll(name, ">", "-")
 	name = strings.ReplaceAll(name, "|", "-")
 
-	// Remove control characters
 	var result strings.Builder
 	for _, r := range name {
 		if r >= 32 && r < 127 {
 			result.WriteRune(r)
 		}
 	}
-
 	return result.String()
 }
 
-// relaunchInBundle launches the app bundle using macOS 'open' command.
+// relaunchInBundle launches the app bundle.
 func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Config) error {
-	// For simple CLI tools, we can use direct execution for better I/O handling
-	// But for apps that need proper TCC dialogs, we should use 'open'
-
-	// Check if we need LaunchServices (for TCC permissions)
+	// Determine if we should use LaunchServices or direct execution
 	needsLaunchServices := false
+
+	// Check if any permissions require TCC (and thus LaunchServices)
 	for _, perm := range cfg.Permissions {
 		switch perm {
-		case Camera, Microphone, Location:
+		case Files, Camera, Microphone, Location:
 			needsLaunchServices = true
 		}
 	}
 
+	if cfg.ForceLaunchServices {
+		needsLaunchServices = true
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: forced LaunchServices via config\n")
+		}
+	} else if cfg.ForceDirectExecution {
+		needsLaunchServices = false
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: forced direct execution via config\n")
+		}
+	} else {
+		if os.Getenv("MACGO_FORCE_LAUNCH_SERVICES") == "1" {
+			needsLaunchServices = true
+		} else if os.Getenv("MACGO_FORCE_DIRECT") == "1" {
+			needsLaunchServices = false
+		}
+	}
+
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: needsLaunchServices: %v\n", needsLaunchServices)
+	}
+
 	if !needsLaunchServices {
-		// For simple CLI tools without TCC requirements, use direct execution
-		// This preserves stdin/stdout/stderr properly
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: using direct execution\n")
+		}
 		return relaunchDirect(ctx, bundlePath, execPath, cfg)
 	}
 
-	// For apps needing TCC permissions, use 'open' with I/O redirection
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: using LaunchServices\n")
+	}
 	return relaunchWithOpen(ctx, bundlePath, cfg)
 }
 
 // relaunchDirect directly executes the binary in the bundle.
 func relaunchDirect(ctx context.Context, bundlePath, execPath string, cfg *Config) error {
-	// Determine executable name
 	execName := ""
 	if cfg.AppName != "" {
 		execName = filepath.Base(cfg.AppName)
@@ -198,24 +266,20 @@ func relaunchDirect(ctx context.Context, bundlePath, execPath string, cfg *Confi
 
 	bundleExec := filepath.Join(bundlePath, "Contents", "MacOS", execName)
 
-	// Create command
 	cmd := exec.CommandContext(ctx, bundleExec, os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	// Set process group for signal handling
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 		Pgid:    0,
 	}
 
-	// Start the process
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("macgo: start bundle: %w", err)
 	}
 
-	// Wait for completion
 	err := cmd.Wait()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -228,9 +292,13 @@ func relaunchDirect(ctx context.Context, bundlePath, execPath string, cfg *Confi
 	return nil
 }
 
-// relaunchWithOpen uses the 'open' command for proper LaunchServices integration.
+// relaunchWithOpen uses the 'open' command with I/O forwarding.
 func relaunchWithOpen(ctx context.Context, bundlePath string, cfg *Config) error {
-	// Create named pipes for I/O redirection
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: launching with open command\n")
+	}
+
+	// Create named pipes for I/O forwarding
 	pipeDir := filepath.Join(os.TempDir(), fmt.Sprintf("macgo-%d", os.Getpid()))
 	if err := os.MkdirAll(pipeDir, 0700); err != nil {
 		return fmt.Errorf("macgo: create pipe dir: %w", err)
@@ -241,75 +309,89 @@ func relaunchWithOpen(ctx context.Context, bundlePath string, cfg *Config) error
 	stdoutPipe := filepath.Join(pipeDir, "stdout")
 	stderrPipe := filepath.Join(pipeDir, "stderr")
 
-	// Create named pipes
+	// Create FIFOs
 	for _, pipe := range []string{stdinPipe, stdoutPipe, stderrPipe} {
 		if err := syscall.Mkfifo(pipe, 0600); err != nil {
 			return fmt.Errorf("macgo: create pipe %s: %w", pipe, err)
 		}
 	}
 
-	// Build arguments for open command
+	// Build open command with I/O redirection
 	args := []string{
 		"-a", bundlePath,
-		"--wait-apps",           // Wait for the app to finish
-		"--stdin", stdinPipe,    // Connect stdin
-		"--stdout", stdoutPipe,  // Connect stdout
-		"--stderr", stderrPipe,  // Connect stderr
+		"--wait-apps",
+		"--stdin", stdinPipe,
+		"--stdout", stdoutPipe,
+		"--stderr", stderrPipe,
 	}
 
-	// Add command line arguments if any
+	// Add command line arguments
 	if len(os.Args) > 1 {
 		args = append(args, "--args")
 		args = append(args, os.Args[1:]...)
 	}
 
-	// Use 'open' to launch through LaunchServices
 	cmd := exec.CommandContext(ctx, "open", args...)
 
-	// Start the app bundle
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("macgo: launch bundle with open: %w", err)
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: launching: open %v\n", args)
 	}
 
-	// Set up I/O forwarding
-	go forwardIO(stdinPipe, os.Stdin, nil)
-	go forwardIO(stdoutPipe, nil, os.Stdout)
-	go forwardIO(stderrPipe, nil, os.Stderr)
+	// Start the open command
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("macgo: start open: %w", err)
+	}
 
-	// Wait for the open command to finish
+	// Set up I/O forwarding goroutines
+	errChan := make(chan error, 3)
+
+	// Forward stdin
+	go func() {
+		w, err := os.OpenFile(stdinPipe, os.O_WRONLY, 0)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		defer w.Close()
+		_, err = io.Copy(w, os.Stdin)
+		errChan <- err
+	}()
+
+	// Forward stdout
+	go func() {
+		r, err := os.OpenFile(stdoutPipe, os.O_RDONLY, 0)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		defer r.Close()
+		_, err = io.Copy(os.Stdout, r)
+		errChan <- err
+	}()
+
+	// Forward stderr
+	go func() {
+		r, err := os.OpenFile(stderrPipe, os.O_RDONLY, 0)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		defer r.Close()
+		_, err = io.Copy(os.Stderr, r)
+		errChan <- err
+	}()
+
+	// Wait for open command
 	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			os.Exit(exitErr.ExitCode())
 		}
-		return fmt.Errorf("macgo: open command failed: %w", err)
+		return fmt.Errorf("macgo: open failed: %w", err)
 	}
 
+	// The app should handle its own exit
 	os.Exit(0)
 	return nil
-}
-
-// forwardIO copies data between a named pipe and stdin/stdout/stderr.
-func forwardIO(pipePath string, in *os.File, out *os.File) {
-	var err error
-	var pipe *os.File
-
-	if in != nil {
-		// Writing to the pipe (for stdin)
-		pipe, err = os.OpenFile(pipePath, os.O_WRONLY, 0)
-		if err != nil {
-			return
-		}
-		defer pipe.Close()
-		io.Copy(pipe, in)
-	} else if out != nil {
-		// Reading from the pipe (for stdout/stderr)
-		pipe, err = os.OpenFile(pipePath, os.O_RDONLY, 0)
-		if err != nil {
-			return
-		}
-		defer pipe.Close()
-		io.Copy(out, pipe)
-	}
 }
 
 // isInAppBundle checks if we're already running inside an app bundle.
@@ -337,4 +419,122 @@ func copyFile(src, dst string) error {
 
 	_, err = dstFile.ReadFrom(srcFile)
 	return err
+}
+
+// codeSignBundle signs the app bundle.
+func codeSignBundle(bundlePath string, cfg *Config) error {
+	args := []string{
+		"--sign", cfg.CodeSignIdentity,
+		"--force",
+	}
+
+	if cfg.CodeSignIdentity != "-" {
+		args = append(args, "--timestamp")
+		args = append(args, "--options", "runtime")
+	}
+
+	// Add identifier - use custom identifier if specified, otherwise use bundle ID
+	identifier := cfg.CodeSigningIdentifier
+	if cfg.Debug {
+		fmt.Printf("macgo: codesign identifier from config: %q\n", identifier)
+	}
+	if identifier == "" {
+		// Read bundle ID from Info.plist
+		plistPath := filepath.Join(bundlePath, "Contents", "Info.plist")
+		if bundleID, err := readBundleIDFromPlist(plistPath); err == nil && bundleID != "" {
+			identifier = bundleID
+			if cfg.Debug {
+				fmt.Printf("macgo: using bundle ID as identifier: %q\n", identifier)
+			}
+		} else if cfg.Debug {
+			fmt.Printf("macgo: failed to read bundle ID: %v\n", err)
+		}
+	}
+	if identifier != "" {
+		args = append(args, "--identifier", identifier)
+		if cfg.Debug {
+			fmt.Printf("macgo: codesign will use identifier: %q\n", identifier)
+		}
+	}
+
+	if cfg.CodeSignIdentity != "-" {
+		entitlementsPath := filepath.Join(bundlePath, "Contents", "entitlements.plist")
+		if _, err := os.Stat(entitlementsPath); err == nil {
+			args = append(args, "--entitlements", entitlementsPath)
+		}
+	}
+
+	args = append(args, bundlePath)
+
+	cmd := exec.Command("codesign", args...)
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: running: codesign %s\n", strings.Join(args, " "))
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("codesign failed: %w\nOutput: %s", err, string(output))
+	}
+
+	if cfg.Debug && len(output) > 0 {
+		fmt.Fprintf(os.Stderr, "macgo: codesign output: %s\n", string(output))
+	}
+
+	return nil
+}
+
+// findDeveloperID attempts to find a Developer ID Application certificate.
+func findDeveloperID(debug bool) string {
+	cmd := exec.Command("security", "find-identity", "-v", "-p", "codesigning")
+	output, err := cmd.Output()
+	if err != nil {
+		if debug {
+			fmt.Fprintf(os.Stderr, "macgo: failed to query code signing identities: %v\n", err)
+		}
+		return ""
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Developer ID Application") {
+			if start := strings.Index(line, `"`); start != -1 {
+				if end := strings.LastIndex(line, `"`); end != -1 && end > start {
+					identity := line[start+1 : end]
+					if debug {
+						fmt.Fprintf(os.Stderr, "macgo: found Developer ID: %s\n", identity)
+					}
+					return identity
+				}
+			}
+		}
+	}
+
+	for _, line := range lines {
+		if strings.Contains(line, "valid identities found") {
+			continue
+		}
+		if strings.Contains(line, `"`) && !strings.Contains(line, "invalid") {
+			if start := strings.Index(line, `"`); start != -1 {
+				if end := strings.LastIndex(line, `"`); end != -1 && end > start {
+					identity := line[start+1 : end]
+					if debug {
+						fmt.Fprintf(os.Stderr, "macgo: found fallback identity: %s\n", identity)
+					}
+					return identity
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// readBundleIDFromPlist reads the CFBundleIdentifier from an Info.plist file.
+func readBundleIDFromPlist(plistPath string) (string, error) {
+	cmd := exec.Command("plutil", "-extract", "CFBundleIdentifier", "raw", plistPath)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }

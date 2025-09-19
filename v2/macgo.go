@@ -11,7 +11,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
+	"strings"
 )
 
 // Permission represents a macOS permission type.
@@ -35,6 +37,9 @@ type Config struct {
 	// BundleID is the bundle identifier. Defaults to com.macgo.{appname}.
 	BundleID string
 
+	// Version is the application version. Defaults to "1.0.0".
+	Version string
+
 	// Permissions are the requested macOS permissions.
 	Permissions []Permission
 
@@ -46,6 +51,35 @@ type Config struct {
 
 	// KeepBundle prevents cleanup of temporary bundles.
 	KeepBundle bool
+
+	// CodeSignIdentity is the signing identity to use for code signing.
+	// If empty and AutoSign is false, the app bundle will not be signed.
+	// Use "Developer ID Application" for automatic identity selection.
+	CodeSignIdentity string
+
+	// AutoSign enables automatic detection of Developer ID certificates.
+	// If true and CodeSignIdentity is empty, macgo will try to find and use
+	// a Developer ID Application certificate automatically.
+	AutoSign bool
+
+	// AdHocSign enables ad-hoc code signing using the "-" identity.
+	// Ad-hoc signing provides basic code signing without requiring certificates.
+	// This is useful for development and testing.
+	AdHocSign bool
+
+	// CodeSigningIdentifier is the identifier to use for code signing.
+	// If empty, defaults to the bundle identifier.
+	CodeSigningIdentifier string
+
+	// ForceDirectExecution forces direct execution instead of LaunchServices.
+	// This preserves terminal I/O (stdin/stdout/stderr) but may not trigger
+	// proper TCC dialogs. Use this for CLI commands that need terminal output.
+	ForceDirectExecution bool
+
+	// ForceLaunchServices forces use of LaunchServices (open command).
+	// This ensures proper TCC dialogs but breaks terminal I/O.
+	// Use this for commands that need GUI interaction or browser automation.
+	ForceLaunchServices bool
 }
 
 // FromEnv loads configuration from environment variables.
@@ -69,6 +103,18 @@ func (c *Config) FromEnv() *Config {
 
 	if os.Getenv("MACGO_KEEP_BUNDLE") == "1" {
 		c.KeepBundle = true
+	}
+
+	if identity := os.Getenv("MACGO_CODE_SIGN_IDENTITY"); identity != "" {
+		c.CodeSignIdentity = identity
+	}
+
+	if os.Getenv("MACGO_AUTO_SIGN") == "1" {
+		c.AutoSign = true
+	}
+
+	if os.Getenv("MACGO_AD_HOC_SIGN") == "1" {
+		c.AdHocSign = true
 	}
 
 	// Parse permissions from environment
@@ -118,6 +164,33 @@ func (c *Config) WithDebug() *Config {
 	return c
 }
 
+// WithCodeSigning enables code signing with the specified identity.
+func (c *Config) WithCodeSigning(identity string) *Config {
+	if c == nil {
+		c = &Config{}
+	}
+	c.CodeSignIdentity = identity
+	return c
+}
+
+// WithAutoSign enables automatic detection and use of Developer ID certificates.
+func (c *Config) WithAutoSign() *Config {
+	if c == nil {
+		c = &Config{}
+	}
+	c.AutoSign = true
+	return c
+}
+
+// WithAdHocSign enables ad-hoc code signing.
+func (c *Config) WithAdHocSign() *Config {
+	if c == nil {
+		c = &Config{}
+	}
+	c.AdHocSign = true
+	return c
+}
+
 // Start initializes macgo with the given configuration.
 // On non-macOS platforms, this is a no-op.
 func Start(cfg *Config) error {
@@ -161,4 +234,46 @@ func Request(perms ...Permission) error {
 // Equivalent to Start(new(Config).FromEnv()).
 func Auto() error {
 	return Start(new(Config).FromEnv())
+}
+
+// OpenSystemPreferences attempts to open the Privacy & Security settings.
+// This is useful when your app needs Full Disk Access or other system permissions.
+func OpenSystemPreferences() error {
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("system preferences only available on macOS")
+	}
+
+	// Try opening the Full Disk Access pane directly
+	cmd := exec.Command("open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+	if err := cmd.Run(); err != nil {
+		// Fallback to general Privacy & Security
+		cmd = exec.Command("open", "x-apple.systempreferences:com.apple.preference.security")
+		return cmd.Run()
+	}
+	return nil
+}
+
+// copyToClipboard attempts to copy text to the system clipboard
+func copyToClipboard(text string) error {
+	cmd := exec.Command("pbcopy")
+	cmd.Stdin = strings.NewReader(text)
+	return cmd.Run()
+}
+
+// LaunchAppBundle uses the open command to launch an app bundle, which properly registers it with TCC
+func LaunchAppBundle(bundlePath string) error {
+	if !strings.HasSuffix(bundlePath, ".app") {
+		return fmt.Errorf("not an app bundle: %s", bundlePath)
+	}
+
+	cmd := exec.Command("open", bundlePath, "--args")
+	return cmd.Run()
+}
+
+// ShowFullDiskAccessInstructions provides simple instructions for granting Full Disk Access.
+func ShowFullDiskAccessInstructions(programPath string, openSettings bool) {
+	if openSettings {
+		// Open System Settings
+		OpenSystemPreferences()
+	}
 }
