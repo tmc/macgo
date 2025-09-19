@@ -1,4 +1,4 @@
-// Comprehensive I/O Test - macgo v2
+// Comprehensive I/O Test - macgo
 // Tests both direct execution and open command I/O forwarding
 package main
 
@@ -21,7 +21,7 @@ func main() {
 		return
 	}
 
-	fmt.Println("🧪 Comprehensive I/O Test - macgo v2")
+	fmt.Println("🧪 Comprehensive I/O Test - macgo")
 	fmt.Println("═══════════════════════════════════")
 	fmt.Println()
 

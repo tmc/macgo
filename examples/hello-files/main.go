@@ -1,4 +1,4 @@
-// Hello Files - macgo v2
+// Hello Files - macgo
 // Demonstrates file access permissions with Desktop listing
 package main
 
@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	fmt.Printf("Hello from macgo v2 with Files! PID: %d\n", os.Getpid())
+	fmt.Printf("Hello from macgo with Files! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	// Request sandbox and file permissions - single line!
@@ -57,7 +57,7 @@ func main() {
 		testFile := filepath.Join(tempDir, "macgo-test.txt")
 
 		// Create a test file
-		if err := os.WriteFile(testFile, []byte("Hello from macgo v2!"), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte("Hello from macgo!"), 0644); err != nil {
 			fmt.Printf("    ❌ Cannot write to temp: %v\n", err)
 		} else {
 			fmt.Printf("    ✓ Created test file: %s\n", testFile)

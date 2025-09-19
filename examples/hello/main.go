@@ -1,5 +1,5 @@
-// Hello World - macgo v2
-// The simplest possible example with the new API
+// Hello World - macgo
+// The simplest possible example
 package main
 
 import (
@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	fmt.Printf("Hello from macgo v2! PID: %d\n", os.Getpid())
+	fmt.Printf("Hello from macgo! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	// Simple one-line setup for camera and microphone
@@ -25,11 +25,11 @@ func main() {
 	fmt.Println("✓ Running with camera and microphone access")
 	fmt.Println()
 
-	fmt.Println("Key improvements over v1:")
+	fmt.Println("Key features:")
 	fmt.Println("  • No init() function magic")
-	fmt.Println("  • No debug package needed")
+	fmt.Println("  • Clean, simple API")
 	fmt.Println("  • One line to request permissions")
-	fmt.Println("  • 97% less code overall")
+	fmt.Println("  • Explicit configuration")
 	fmt.Println()
 
 	// Simple countdown
@@ -39,25 +39,6 @@ func main() {
 		time.Sleep(1 * time.Second)
 	}
 
-	fmt.Println("\nGoodbye from macgo v2!")
+	fmt.Println("\nGoodbye from macgo!")
 }
 
-// Alternative with more configuration:
-func withConfiguration() {
-	cfg := &macgo.Config{
-		AppName:  "HelloMacgoApp",
-		BundleID: "com.example.hellomacgo",
-		Permissions: []macgo.Permission{
-			macgo.Camera,
-			macgo.Microphone,
-		},
-		Debug: true, // Enable debug output
-	}
-
-	if err := macgo.Start(cfg); err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Hello with explicit configuration!")
-	// Your app code here...
-}

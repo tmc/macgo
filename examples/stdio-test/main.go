@@ -1,4 +1,4 @@
-// stdio-test demonstrates stdin/stdout/stderr handling with macgo v2
+// stdio-test demonstrates stdin/stdout/stderr handling with macgo
 package main
 
 import (
@@ -25,7 +25,7 @@ var (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "STDIO Test - macgo v2\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "STDIO Test - macgo\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "\nTests stdin/stdout/stderr forwarding in macgo\n\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options]\n\n", os.Args[0])
 		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
@@ -43,7 +43,7 @@ func main() {
 	}
 	flag.Parse()
 
-	fmt.Printf("🧪 STDIO Test - macgo v2! PID: %d\n", os.Getpid())
+	fmt.Printf("🧪 STDIO Test - macgo! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	// Configure macgo

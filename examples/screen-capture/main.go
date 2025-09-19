@@ -47,7 +47,7 @@ func main() {
 		log.Fatalf("Failed to start macgo: %v", err)
 	}
 
-	fmt.Println("Screen Capture - macgo v2")
+	fmt.Println("Screen Capture - macgo")
 	fmt.Println("=========================")
 	fmt.Println()
 
@@ -115,7 +115,7 @@ func main() {
 }
 
 func showHelp() {
-	fmt.Println("Screen Capture - macgo v2")
+	fmt.Println("Screen Capture - macgo")
 	fmt.Println("Wraps macOS screencapture tool with proper permissions")
 	fmt.Println()
 	fmt.Println("Usage:")

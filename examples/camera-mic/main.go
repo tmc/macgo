@@ -1,4 +1,4 @@
-// Camera & Microphone Access - macgo v2
+// Camera & Microphone Access - macgo
 // Shows how to request and use camera/microphone permissions
 package main
 
@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	fmt.Println("macgo v2 - Camera & Microphone Example")
+	fmt.Println("macgo - Camera & Microphone Example")
 	fmt.Println("======================================")
 	fmt.Println()
 

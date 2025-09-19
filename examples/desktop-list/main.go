@@ -1,4 +1,4 @@
-// Desktop List - macgo v2
+// Desktop List - macgo
 // Simple example that lists Desktop files with proper file permissions
 package main
 
@@ -16,7 +16,7 @@ import (
 func init() {
 	// Customize flag usage
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Desktop List - macgo v2\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Desktop List - macgo\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Lists Desktop files with proper macOS permissions\n\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags]\n\n", os.Args[0])
 		fmt.Fprintf(flag.CommandLine.Output(), "Flags:\n")
@@ -44,7 +44,7 @@ func main() {
 	)
 	flag.Parse()
 
-	fmt.Printf("Desktop Lister - macgo v2! PID: %d\n", os.Getpid())
+	fmt.Printf("Desktop Lister - macgo! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	// Configure macgo with optional code signing
@@ -180,7 +180,7 @@ func main() {
 	}
 
 	fmt.Println()
-	fmt.Println("✨ macgo v2 benefits:")
+	fmt.Println("✨ macgo benefits:")
 	fmt.Println("  • Simple configuration with optional code signing")
 	fmt.Println("  • Creates proper .app bundle automatically")
 	fmt.Println("  • Handles file permissions with sandbox integration")

@@ -1,4 +1,4 @@
-// Auto-Signed Example - macgo v2
+// Auto-Signed Example - macgo
 // Demonstrates automatic code signing using the signed subpackage
 package main
 
@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	fmt.Printf("Auto-Signed Demo - macgo v2! PID: %d\n", os.Getpid())
+	fmt.Printf("Auto-Signed Demo - macgo! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	fmt.Println("🔍 Using auto-signed package - will detect Developer ID automatically")

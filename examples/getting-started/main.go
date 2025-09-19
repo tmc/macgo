@@ -1,4 +1,4 @@
-// Getting Started with macgo v2
+// Getting Started with macgo
 // This example shows the simplified API following Russ Cox's principles
 package main
 
@@ -15,10 +15,10 @@ import (
 )
 
 func main() {
-	fmt.Println("Getting Started with macgo v2")
-	fmt.Println("=============================")
+	fmt.Println("Getting Started with macgo")
+	fmt.Println("==========================")
 	fmt.Println()
-	fmt.Println("Key improvements over v1:")
+	fmt.Println("Key features:")
 	fmt.Println("  ✓ No global state or init() magic")
 	fmt.Println("  ✓ Explicit configuration")
 	fmt.Println("  ✓ Simpler API with fewer concepts")
@@ -78,34 +78,3 @@ func main() {
 	fmt.Println("Shutting down...")
 }
 
-// Alternative approaches for different use cases:
-
-func simpleApproach() {
-	// For quick scripts - one line!
-	if err := macgo.Request(macgo.Camera, macgo.Microphone); err != nil {
-		log.Fatal(err)
-	}
-	// Your app code here...
-}
-
-func builderApproach() {
-	// Using the builder pattern
-	err := macgo.Start(
-		new(macgo.Config).
-			WithPermissions(macgo.Camera, macgo.Microphone).
-			WithDebug(),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Your app code here...
-}
-
-func environmentApproach() {
-	// For deployment scenarios
-	// Set: MACGO_CAMERA=1 MACGO_MICROPHONE=1 MACGO_DEBUG=1
-	if err := macgo.Auto(); err != nil {
-		log.Fatal(err)
-	}
-	// Your app code here...
-}

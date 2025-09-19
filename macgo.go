@@ -29,6 +29,11 @@ const (
 	Sandbox    Permission = "sandbox"
 )
 
+// NewConfig creates a new Config with sensible defaults.
+func NewConfig() *Config {
+	return &Config{}
+}
+
 // Config holds macgo configuration.
 // Zero value is valid and uses sensible defaults.
 type Config struct {
@@ -140,6 +145,15 @@ func (c *Config) FromEnv() *Config {
 		c.Permissions = append(c.Permissions, Sandbox)
 	}
 
+	return c
+}
+
+// WithAppName sets the application name.
+func (c *Config) WithAppName(name string) *Config {
+	if c == nil {
+		c = &Config{}
+	}
+	c.AppName = name
 	return c
 }
 

@@ -1,4 +1,4 @@
-// Environment Variable Test - macgo v2
+// Environment Variable Test - macgo
 // Tests loading configuration from environment variables
 package main
 
@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	fmt.Printf("Environment Variable Test - macgo v2! PID: %d\n", os.Getpid())
+	fmt.Printf("Environment Variable Test - macgo! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	// Use Auto() to load configuration from environment

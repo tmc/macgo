@@ -1,4 +1,4 @@
-// Test Code Signing - macgo v2
+// Test Code Signing - macgo
 // Verifies that code signing functionality works correctly
 package main
 
@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	fmt.Printf("Code Signing Verification - macgo v2! PID: %d\n", os.Getpid())
+	fmt.Printf("Code Signing Verification - macgo! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	// List existing identities

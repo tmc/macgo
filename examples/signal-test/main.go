@@ -1,4 +1,4 @@
-// Signal Test - macgo v2
+// Signal Test - macgo
 // Simple interactive test for signal forwarding
 package main
 
@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	fmt.Printf("Signal Test - macgo v2! PID: %d\n", os.Getpid())
+	fmt.Printf("Signal Test - macgo! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	// Test with files permission to trigger open command path

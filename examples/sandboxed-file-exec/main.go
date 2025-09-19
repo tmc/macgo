@@ -1,4 +1,4 @@
-// Sandboxed File Access Example - macgo v2
+// Sandboxed File Access Example - macgo
 // Demonstrates sandbox restrictions and file access permissions
 package main
 
@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	fmt.Println("macgo v2 - Sandboxed File Access Example")
+	fmt.Println("macgo - Sandboxed File Access Example")
 	fmt.Println("========================================")
 	fmt.Println()
 

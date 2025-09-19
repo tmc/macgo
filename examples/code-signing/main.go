@@ -1,4 +1,4 @@
-// Code Signing Example - macgo v2
+// Code Signing Example - macgo
 // Demonstrates optional code signing for enhanced security and distribution
 package main
 
@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	fmt.Printf("Code Signing Demo - macgo v2! PID: %d\n", os.Getpid())
+	fmt.Printf("Code Signing Demo - macgo! PID: %d\n", os.Getpid())
 	fmt.Println()
 
 	// Example 1: No code signing (default behavior)
