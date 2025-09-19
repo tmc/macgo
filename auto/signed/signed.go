@@ -3,6 +3,7 @@
 package signed
 
 import (
+	"fmt"
 	"os"
 
 	macgo "github.com/tmc/misc/macgo"
@@ -19,7 +20,11 @@ func Request(perms ...macgo.Permission) error {
 		Permissions: perms,
 		AutoSign:    true,
 	}
-	return macgo.Start(cfg)
+	if err := macgo.Start(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "macgo/auto/signed: failed to start with auto-signing: %v\n", err)
+		return err
+	}
+	return nil
 }
 
 // Start is a convenience function that creates a config with auto-signing.
@@ -28,12 +33,20 @@ func Start(cfg *macgo.Config) error {
 		cfg = &macgo.Config{}
 	}
 	cfg.AutoSign = true
-	return macgo.Start(cfg)
+	if err := macgo.Start(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "macgo/auto/signed: failed to start with auto-signing: %v\n", err)
+		return err
+	}
+	return nil
 }
 
 // Auto loads configuration from environment, enables auto-signing, and starts macgo.
 func Auto() error {
 	cfg := new(macgo.Config).FromEnv()
 	cfg.AutoSign = true
-	return macgo.Start(cfg)
+	if err := macgo.Start(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "macgo/auto/signed: failed to auto-start with signing: %v\n", err)
+		return err
+	}
+	return nil
 }

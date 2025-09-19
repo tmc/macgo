@@ -1,6 +1,6 @@
-# macgo v2 Auto Packages
+# macgo Auto Packages
 
-The `auto` packages provide the simplest way to use macgo v2 - just import and go! These packages use Go's `init()` function to automatically configure macgo with common permission sets.
+The `auto` packages provide the simplest way to use macgo - just import and go! These packages use Go's `init()` function to automatically configure macgo with common permission sets.
 
 ## 🚀 Quick Start
 
@@ -8,25 +8,25 @@ Pick the auto package that matches your app's needs:
 
 ```go
 // No permissions needed - just proper macOS app bundling
-import _ "github.com/tmc/misc/macgo/v2/auto"
+import _ "github.com/tmc/misc/macgo/auto"
 
 // File access for document processors, editors
-import _ "github.com/tmc/misc/macgo/v2/auto/files"
+import _ "github.com/tmc/misc/macgo/auto/files"
 
 // Camera access for video apps
-import _ "github.com/tmc/misc/macgo/v2/auto/camera"
+import _ "github.com/tmc/misc/macgo/auto/camera"
 
 // Network access for web servers, API clients
-import _ "github.com/tmc/misc/macgo/v2/auto/network"
+import _ "github.com/tmc/misc/macgo/auto/network"
 
 // Media capture for screen recorders, conferencing
-import _ "github.com/tmc/misc/macgo/v2/auto/media"
+import _ "github.com/tmc/misc/macgo/auto/media"
 
 // Development tools permissions
-import _ "github.com/tmc/misc/macgo/v2/auto/dev"
+import _ "github.com/tmc/misc/macgo/auto/dev"
 
 // Everything enabled (files + network + camera + mic)
-import _ "github.com/tmc/misc/macgo/v2/auto/all"
+import _ "github.com/tmc/misc/macgo/auto/all"
 ```
 
 That's it! No configuration needed.
@@ -53,23 +53,25 @@ That's it! No configuration needed.
 
 ## 🎯 Why Auto Packages?
 
-**v1 Style (verbose)**:
+**Manual Style (verbose)**:
 ```go
 func init() {
-    macgo.RequestEntitlements(
-        macgo.EntAppSandbox,
-        macgo.EntUserSelectedReadWrite,
-        macgo.EntNetworkClient,
-        macgo.EntCamera,
-        macgo.EntMicrophone,
-    )
-    macgo.Start()
+    cfg := &macgo.Config{
+        Permissions: []macgo.Permission{
+            macgo.Sandbox,
+            macgo.Files,
+            macgo.Network,
+            macgo.Camera,
+            macgo.Microphone,
+        },
+    }
+    macgo.Start(cfg)
 }
 ```
 
-**v2 Style (clean)**:
+**Auto Style (clean)**:
 ```go
-import _ "github.com/tmc/misc/macgo/v2/auto/all"
+import _ "github.com/tmc/misc/macgo/auto/all"
 ```
 
 ## 🔧 Manual Configuration
@@ -77,7 +79,7 @@ import _ "github.com/tmc/misc/macgo/v2/auto/all"
 If you need custom configuration, use the explicit v2 API instead:
 
 ```go
-import macgo "github.com/tmc/misc/macgo/v2"
+import "github.com/tmc/misc/macgo"
 
 func main() {
     cfg := &macgo.Config{
@@ -103,7 +105,7 @@ func main() {
 | `macgo.Screen` | Screen recording | "Allow screen recording" |
 | `macgo.Sandbox` | App sandbox isolation | No prompt (enhanced security) |
 
-## ✨ Benefits of v2 Auto Packages
+## ✨ Benefits of Auto Packages
 
 1. **One Line**: Single import vs multiple init() calls
 2. **No Global State**: Each import is isolated and predictable
@@ -115,25 +117,13 @@ func main() {
 
 ```bash
 # Test basic auto package
-cd v2/examples/hello
+cd examples/hello
 go run main.go
 
 # Test with auto import
-echo 'import _ "github.com/tmc/misc/macgo/v2/auto/files"' > test.go
+echo 'import _ "github.com/tmc/misc/macgo/auto/files"' > test.go
 echo 'func main() { println("Hello from auto!") }' >> test.go
 go run test.go
 ```
 
-## 🚀 Migration from v1
-
-Replace your v1 auto imports:
-
-```go
-// v1 - multiple imports, complex setup
-import _ "github.com/tmc/misc/macgo/auto/sandbox/readonly"
-
-// v2 - single import, clear intent
-import _ "github.com/tmc/misc/macgo/v2/auto/files"
-```
-
-The v2 auto packages are designed for maximum simplicity while maintaining the power and flexibility of the explicit v2 API when you need it.
+The auto packages are designed for maximum simplicity while maintaining the power and flexibility of the explicit API when you need it.

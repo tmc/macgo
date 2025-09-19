@@ -12,12 +12,17 @@
 package network
 
 import (
+	"fmt"
+	"os"
+
 	macgo "github.com/tmc/misc/macgo"
 )
 
 func init() {
 	// Enable network access - unified permission in v2
 	if err := macgo.Request(macgo.Network); err != nil {
+		// Log the error for debugging, but allow the app to continue
+		fmt.Fprintf(os.Stderr, "macgo/auto/network: failed to request network permissions: %v\n", err)
 		return
 	}
 }

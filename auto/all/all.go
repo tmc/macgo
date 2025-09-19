@@ -17,6 +17,9 @@
 package all
 
 import (
+	"fmt"
+	"os"
+
 	macgo "github.com/tmc/misc/macgo"
 )
 
@@ -28,6 +31,8 @@ func init() {
 		macgo.Camera,
 		macgo.Microphone,
 	); err != nil {
+		// Log the error for debugging, but allow the app to continue
+		fmt.Fprintf(os.Stderr, "macgo/auto/all: failed to request permissions: %v\n", err)
 		return
 	}
 }

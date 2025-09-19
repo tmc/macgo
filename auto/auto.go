@@ -14,6 +14,9 @@
 package auto
 
 import (
+	"fmt"
+	"os"
+
 	macgo "github.com/tmc/misc/macgo"
 )
 
@@ -21,8 +24,8 @@ func init() {
 	// Use the simplest possible v2 configuration - no permissions needed
 	// This creates a proper macOS app bundle but requests no special permissions
 	if err := macgo.Request(); err != nil {
-		// In v2, we can handle errors gracefully instead of panicking
-		// The app will still run, just without proper bundling
+		// Log the error for debugging, but allow the app to continue
+		fmt.Fprintf(os.Stderr, "macgo/auto: failed to initialize: %v\n", err)
 		return
 	}
 }

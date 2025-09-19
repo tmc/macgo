@@ -16,13 +16,14 @@ import (
 )
 
 var (
-	script    = flag.String("script", "", "name of the script to run")
-	list      = flag.Bool("list", false, "list all available scripts")
-	create    = flag.String("create", "", "create a new script with the given name")
-	edit      = flag.String("edit", "", "edit an existing script")
-	remove    = flag.String("remove", "", "remove a script")
+	script     = flag.String("script", "", "name of the script to run")
+	list       = flag.Bool("list", false, "list all available scripts")
+	create     = flag.String("create", "", "create a new script with the given name")
+	edit       = flag.String("edit", "", "edit an existing script")
+	remove     = flag.String("remove", "", "remove a script")
 	scriptsDir = flag.String("dir", "", "scripts directory (default: ~/.osascripts)")
-	help      = flag.Bool("help", false, "show help")
+	help       = flag.Bool("help", false, "show help")
+	prefs      = flag.Bool("prefs", false, "open Privacy & Security preferences")
 )
 
 func main() {
@@ -63,6 +64,8 @@ func main() {
 
 	// Handle commands
 	switch {
+	case *prefs:
+		openPrivacyPrefs()
 	case *list:
 		listScripts(dir)
 	case *create != "":
@@ -208,8 +211,14 @@ func runScript(dir, name string) {
 
 	fmt.Printf("Running script '%s'...\n", name)
 
-	// Execute the script
-	cmd := exec.Command("osascript", scriptPath)
+	// Get any additional arguments to pass to the script
+	scriptArgs := flag.Args()
+
+	// Execute the script with arguments
+	cmdArgs := []string{scriptPath}
+	cmdArgs = append(cmdArgs, scriptArgs...)
+
+	cmd := exec.Command("osascript", cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -329,6 +338,40 @@ tell application "Finder"
 end tell
 `
 
+func openPrivacyPrefs() {
+	fmt.Println("Opening Privacy & Security preferences...")
+
+	// Try System Settings first (macOS 13+), then fall back to System Preferences
+	scripts := []string{
+		`tell application "System Settings"
+	activate
+	reveal anchor "Privacy_Automation" of pane id "com.apple.preference.security"
+end tell`,
+		`tell application "System Preferences"
+	activate
+	set the current pane to pane id "com.apple.preference.security"
+	reveal anchor "Privacy_Automation"
+end tell`,
+	}
+
+	var lastErr error
+	for _, script := range scripts {
+		cmd := exec.Command("osascript", "-e", script)
+		err := cmd.Run()
+		if err == nil {
+			fmt.Println("Navigate to Automation in the left sidebar and grant your terminal permission to control Brave Browser.")
+			return
+		}
+		lastErr = err
+	}
+
+	fmt.Printf("Failed to open Privacy preferences: %v\n", lastErr)
+	fmt.Println("Please manually open:")
+	fmt.Println("- macOS 13+: System Settings > Privacy & Security > Automation")
+	fmt.Println("- macOS 12-: System Preferences > Security & Privacy > Automation")
+	fmt.Println("Then grant your terminal permission to control Brave Browser.")
+}
+
 func showHelp() {
 	fmt.Println("OSAScript Wrapper - Manage and run named AppleScripts")
 	fmt.Println("==================================================")
@@ -343,6 +386,7 @@ func showHelp() {
 	fmt.Printf("  %s -list                        # List all available scripts\n", appName)
 	fmt.Printf("  %s -edit brave-automation       # Edit the script in $EDITOR\n", appName)
 	fmt.Printf("  %s -remove old-script           # Remove a script\n", appName)
+	fmt.Printf("  %s -prefs                       # Open Privacy & Security preferences\n", appName)
 	fmt.Println()
 	fmt.Println("Script Templates:")
 	fmt.Println("  brave-*    : Creates Brave browser automation template")

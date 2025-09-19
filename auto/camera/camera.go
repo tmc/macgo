@@ -12,12 +12,17 @@
 package camera
 
 import (
+	"fmt"
+	"os"
+
 	macgo "github.com/tmc/misc/macgo"
 )
 
 func init() {
 	// Enable camera access - much simpler than v1
 	if err := macgo.Request(macgo.Camera); err != nil {
+		// Log the error for debugging, but allow the app to continue
+		fmt.Fprintf(os.Stderr, "macgo/auto/camera: failed to request camera permission: %v\n", err)
 		return
 	}
 }

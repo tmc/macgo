@@ -157,6 +157,14 @@ func TestExampleFunctions(t *testing.T) {
 	t.Run("permission_constants", func(t *testing.T) {
 		ExamplePermission_constants()
 	})
+
+	t.Run("app_groups", func(t *testing.T) {
+		ExampleConfig_appGroups()
+	})
+
+	t.Run("app_groups_builder", func(t *testing.T) {
+		ExampleConfig_appGroupsBuilder()
+	})
 }
 
 // Test the helper functions from examples
@@ -185,6 +193,12 @@ func TestHelperFunctions(t *testing.T) {
 
 	if len(cfg.Permissions) != 1 || cfg.Permissions[0] != macgo.Camera {
 		t.Error("Expected Camera permission")
+	}
+
+	// Test WithAppGroups
+	cfg = cfg.WithAppGroups("group.test.shared")
+	if len(cfg.AppGroups) != 1 || cfg.AppGroups[0] != "group.test.shared" {
+		t.Error("Expected app group 'group.test.shared'")
 	}
 }
 
@@ -229,14 +243,21 @@ func TestErrorHandling(t *testing.T) {
 // Example showing environment variables
 func Example_environmentVariables() {
 	// Environment variables that control macgo behavior:
-	// MACGO_NO_RELAUNCH=1         - Skip bundle creation and relaunch
-	// MACGO_DEBUG=1               - Enable debug logging
-	// MACGO_RESET_PERMISSIONS=1   - Reset TCC permissions using tccutil
-	// MACGO_CAMERA=1              - Request camera permissions
-	// MACGO_MICROPHONE=1          - Request microphone permissions
-	// MACGO_FILES=1               - Request file access permissions
-	// MACGO_AUTO_SIGN=1           - Enable automatic code signing
-	// MACGO_AD_HOC_SIGN=1         - Use ad-hoc code signing
+	// MACGO_NO_RELAUNCH=1           - Skip bundle creation and relaunch
+	// MACGO_DEBUG=1                 - Enable debug logging
+	// MACGO_RESET_PERMISSIONS=1     - Reset TCC permissions using tccutil
+	// MACGO_APP_NAME=MyApp          - Set application name
+	// MACGO_BUNDLE_ID=com.example   - Set bundle identifier
+	// MACGO_KEEP_BUNDLE=1           - Preserve bundle after execution
+	// MACGO_CODE_SIGN_IDENTITY=xyz  - Set code signing identity
+	// MACGO_AUTO_SIGN=1             - Enable automatic code signing
+	// MACGO_AD_HOC_SIGN=1           - Use ad-hoc code signing
+	// MACGO_CAMERA=1                - Request camera permissions
+	// MACGO_MICROPHONE=1            - Request microphone permissions
+	// MACGO_LOCATION=1              - Request location permissions
+	// MACGO_FILES=1                 - Request file access permissions
+	// MACGO_NETWORK=1               - Request network permissions
+	// MACGO_SANDBOX=1               - Enable app sandbox
 
 	// Example: Reset permissions before requesting new ones
 	os.Setenv("MACGO_RESET_PERMISSIONS", "1")
@@ -254,17 +275,70 @@ func Example_environmentVariables() {
 	// Permissions reset and then requested
 }
 
-// Example showing migration from v1 to v2 patterns
-func Example_migration() {
-	// v1 pattern (removed):
-	// macgo.RequestEntitlements(macgo.EntCamera, macgo.EntMicrophone)
-	// macgo.Start()
+// Example showing automatic bundle ID generation
+func Example_bundleIDGeneration() {
+	// macgo automatically generates meaningful bundle IDs based on your Go module
+	// Examples of automatic bundle ID generation:
+	//
+	// Module: github.com/user/myproject -> Bundle ID: com.github.user.myproject.appname
+	// Module: gitlab.com/company/tool   -> Bundle ID: com.gitlab.company.tool.appname
+	// Module: example.com/service       -> Bundle ID: com.example.service.appname
+	// No module info available          -> Bundle ID: dev.username.appname (or local.app.appname)
+	//
+	// This replaces the old generic "com.macgo.*" format with meaningful,
+	// unique identifiers that reflect your actual project.
 
-	// v2 pattern (current):
-	err := macgo.Request(macgo.Camera, macgo.Microphone)
+	cfg := &macgo.Config{
+		AppName: "MyTool",
+		// BundleID is automatically inferred from Go module if not specified
+		Permissions: []macgo.Permission{macgo.Files},
+	}
+
+	err := macgo.Start(cfg)
 	if err != nil {
 		// Handle error
 		return
 	}
-	// Much simpler!
+	// Bundle ID automatically generated based on module path
+}
+
+// Example showing app groups for sharing data between sandboxed apps
+func ExampleConfig_appGroups() {
+	// App groups allow sandboxed apps to share data
+	cfg := &macgo.Config{
+		AppName:  "AppGroupsExample",
+		BundleID: "com.example.appgroups.demo",
+		Permissions: []macgo.Permission{
+			macgo.Sandbox, // Required for app groups
+		},
+		AppGroups: []string{
+			"TEAMID.shared-data", // TEAMID placeholder gets automatically substituted
+		},
+		Debug:    true,
+		AutoSign: true,
+	}
+
+	err := macgo.Start(cfg)
+	if err != nil {
+		// Handle error
+		return
+	}
+	// App now has access to shared app group container
+}
+
+// Example using builder pattern for app groups
+func ExampleConfig_appGroupsBuilder() {
+	// Using builder pattern with app groups
+	cfg := macgo.NewConfig().
+		WithAppName("AppGroupBuilder").
+		WithPermissions(macgo.Sandbox).
+		WithAppGroups("TEAMID.shared-data"). // TEAMID placeholder gets automatically substituted
+		WithDebug()
+
+	err := macgo.Start(cfg)
+	if err != nil {
+		// Handle error
+		return
+	}
+	// App configured with app groups using builder pattern
 }

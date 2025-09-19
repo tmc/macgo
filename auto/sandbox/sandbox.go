@@ -12,12 +12,17 @@
 package sandbox
 
 import (
+	"fmt"
+	"os"
+
 	macgo "github.com/tmc/misc/macgo"
 )
 
 func init() {
 	// Enable app sandbox - much simpler in v2!
 	if err := macgo.Request(macgo.Sandbox); err != nil {
+		// Log the error for debugging, but allow the app to continue
+		fmt.Fprintf(os.Stderr, "macgo/auto/sandbox: failed to request sandbox permissions: %v\n", err)
 		return
 	}
 }

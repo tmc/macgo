@@ -15,6 +15,9 @@
 package media
 
 import (
+	"fmt"
+	"os"
+
 	macgo "github.com/tmc/misc/macgo"
 )
 
@@ -24,6 +27,8 @@ func init() {
 		macgo.Camera,
 		macgo.Microphone,
 	); err != nil {
+		// Log the error for debugging, but allow the app to continue
+		fmt.Fprintf(os.Stderr, "macgo/auto/media: failed to request media permissions: %v\n", err)
 		return
 	}
 }

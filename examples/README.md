@@ -1,6 +1,6 @@
-# macgo v2 Examples
+# macgo Examples
 
-These examples demonstrate the simplified v2 API following Russ Cox's design principles.
+These examples demonstrate the simplified macgo API following Go's design principles.
 
 ## 🚀 Quick Start
 
@@ -17,7 +17,7 @@ All examples follow the same pattern:
 err := macgo.Request(macgo.Camera, macgo.Microphone)
 ```
 - **Purpose:** Minimal working example
-- **Lines:** ~30 (vs 79 in v1)
+- **Lines:** ~30 lines of code
 - **Shows:** Basic permission request
 
 ### 2. **[getting-started](./getting-started/)** - Core Patterns
@@ -29,7 +29,7 @@ cfg := &macgo.Config{
 err := macgo.Start(cfg)
 ```
 - **Purpose:** Main patterns and approaches
-- **Lines:** ~50 (vs 101 in v1)
+- **Lines:** ~50 lines of code
 - **Shows:** Configuration, context, alternatives
 
 ### 3. **[sandboxed-file-exec](./sandboxed-file-exec/)** - Sandbox & Files
@@ -37,7 +37,7 @@ err := macgo.Start(cfg)
 err := macgo.Request(macgo.Files) // Sandbox + file access
 ```
 - **Purpose:** File access and sandbox restrictions
-- **Lines:** ~60 (vs 84 in v1)
+- **Lines:** ~60 lines of code
 - **Shows:** Sandbox behavior, file access testing
 
 ### 4. **[camera-mic](./camera-mic/)** - Media Permissions
@@ -45,7 +45,7 @@ err := macgo.Request(macgo.Files) // Sandbox + file access
 err := macgo.Request(macgo.Camera, macgo.Microphone)
 ```
 - **Purpose:** Camera and microphone access
-- **Lines:** ~70 (new in v2)
+- **Lines:** ~70 lines of code
 - **Shows:** Media device access, permission testing
 
 ## 🔨 Advanced Examples
@@ -118,43 +118,30 @@ if liveCapture {
 
 ### Quick Test (No Relaunch)
 ```bash
-cd v2/examples/hello
+cd examples/hello
 MACGO_NO_RELAUNCH=1 go run main.go
 ```
 
 ### Full Test (With Bundle Creation)
 ```bash
-cd v2/examples/hello
+cd examples/hello
 go run main.go
 ```
 
 ### Build and Test
 ```bash
-cd v2/examples/hello
+cd examples/hello
 go build -o hello-app
 ./hello-app
 ```
 
-## 📊 Comparison with v1
-
-| Example | v1 Lines | v2 Lines | Improvement |
-|---------|----------|----------|-------------|
-| hello | 79 | 30 | 62% less |
-| getting-started | 101 | 50 | 50% less |
-| sandboxed-file-exec | 84 | 60 | 29% less |
-| camera-mic | N/A | 70 | New & simple |
-
-## 🎯 Key v2 Benefits Shown
+## 🎯 Key Benefits Shown
 
 1. **No Global State** - All examples use explicit configuration
-2. **Simple API** - 1-3 lines vs 10+ lines for setup
+2. **Simple API** - 1-3 lines for common permission requests
 3. **Clear Intent** - Configuration visible at call site
 4. **Easy Testing** - Pass different configs for different scenarios
 5. **No Magic** - No init() functions or import side effects
-
-## 🔄 Migration Guide
-
-See [MIGRATION_GUIDE.md](../MIGRATION_GUIDE.md) for detailed migration instructions from v1 to v2.
 
 ## 📝 Example Template
 
@@ -163,7 +150,7 @@ New examples should follow this structure:
 ```go
 package main
 
-import macgo "github.com/tmc/misc/macgo/v2"
+import "github.com/tmc/misc/macgo"
 
 func main() {
     // Simple approach

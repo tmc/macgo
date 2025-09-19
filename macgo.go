@@ -1,10 +1,29 @@
-// Package macgo provides simple macOS app bundle creation for TCC permissions.
+// Package macgo provides simple macOS app bundle creation and TCC permission management.
 //
-// This is a simplified API designed following Russ Cox's principles:
-// - Simple API surface
-// - Explicit configuration
-// - No global state
-// - Focus on the common case
+// macgo enables Go applications to request macOS system permissions (camera, microphone,
+// files, etc.) by automatically creating app bundles with proper entitlements and handling
+// the relaunch process when necessary.
+//
+// This is a simplified API designed following Go's design principles:
+// - Simple API surface with sensible defaults
+// - Explicit configuration over magic behavior
+// - No global state or init() side effects
+// - Focus on the common case (95% of users)
+//
+// Basic usage:
+//
+//	err := macgo.Request(macgo.Camera, macgo.Microphone)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+// Advanced configuration:
+//
+//	cfg := macgo.NewConfig().
+//		WithAppName("MyApp").
+//		WithPermissions(macgo.Camera, macgo.Files).
+//		WithDebug()
+//	err := macgo.Start(cfg)
 package macgo
 
 import (
@@ -14,33 +33,39 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/tmc/misc/macgo/internal/tcc"
+	"github.com/tmc/misc/macgo/internal/system"
 )
 
-// Permission represents a macOS permission type.
+// Permission represents a macOS system permission that can be requested.
+// These correspond to TCC (Transparency, Consent, Control) permission types.
 type Permission string
 
-// Core permissions that 95% of users need.
+// Core permissions covering 95% of use cases.
 const (
-	Camera     Permission = "camera"
-	Microphone Permission = "microphone"
-	Location   Permission = "location"
-	Files      Permission = "files"
-	Network    Permission = "network"
-	Sandbox    Permission = "sandbox"
+	Camera     Permission = "camera"     // Camera access (com.apple.security.device.camera)
+	Microphone Permission = "microphone" // Microphone access (com.apple.security.device.audio-input)
+	Location   Permission = "location"   // Location services (com.apple.security.personal-information.location)
+	Files      Permission = "files"      // File system access with user selection
+	Network    Permission = "network"    // Network client/server access
+	Sandbox    Permission = "sandbox"    // App sandbox with restricted file access
 )
 
 // NewConfig creates a new Config with sensible defaults.
+// The zero value is valid, so this is equivalent to &Config{}.
 func NewConfig() *Config {
 	return &Config{}
 }
 
-// Config holds macgo configuration.
-// Zero value is valid and uses sensible defaults.
+// Config holds macgo configuration options.
+// The zero value is valid and uses sensible defaults.
+// Use NewConfig() and builder methods for fluent configuration.
 type Config struct {
 	// AppName is the application name. Defaults to executable name.
 	AppName string
 
-	// BundleID is the bundle identifier. Defaults to com.macgo.{appname}.
+	// BundleID is the bundle identifier. Defaults to module-based ID (e.g., com.github.user.repo.appname).
 	BundleID string
 
 	// Version is the application version. Defaults to "1.0.0".
@@ -51,6 +76,10 @@ type Config struct {
 
 	// Custom allows specifying custom entitlements not covered by Permission constants.
 	Custom []string
+
+	// AppGroups specifies app group identifiers for sharing data between apps.
+	// Requires sandbox permission and com.apple.security.application-groups entitlement.
+	AppGroups []string
 
 	// Debug enables debug logging.
 	Debug bool
@@ -90,12 +119,25 @@ type Config struct {
 }
 
 // FromEnv loads configuration from environment variables.
-// This is explicit - no magic init() functions.
+// This provides explicit configuration without magic init() functions.
+//
+// Supported environment variables:
+//   MACGO_APP_NAME          - Application name
+//   MACGO_BUNDLE_ID         - Bundle identifier
+//   MACGO_DEBUG=1           - Enable debug logging
+//   MACGO_KEEP_BUNDLE=1     - Preserve bundle after execution
+//   MACGO_CODE_SIGN_IDENTITY - Code signing identity
+//   MACGO_AUTO_SIGN=1       - Enable automatic code signing
+//   MACGO_AD_HOC_SIGN=1     - Enable ad-hoc code signing
+//   MACGO_CAMERA=1          - Request camera permission
+//   MACGO_MICROPHONE=1      - Request microphone permission
+//   MACGO_LOCATION=1        - Request location permission
+//   MACGO_FILES=1           - Request file access permission
+//   MACGO_NETWORK=1         - Request network permission
+//   MACGO_SANDBOX=1         - Enable app sandbox
+//   MACGO_FORCE_LAUNCH_SERVICES=1 - Force use of LaunchServices
+//   MACGO_FORCE_DIRECT=1    - Force direct execution
 func (c *Config) FromEnv() *Config {
-	if c == nil {
-		c = &Config{}
-	}
-
 	if name := os.Getenv("MACGO_APP_NAME"); name != "" {
 		c.AppName = name
 	}
@@ -145,73 +187,75 @@ func (c *Config) FromEnv() *Config {
 		c.Permissions = append(c.Permissions, Sandbox)
 	}
 
+	// Parse launch preferences from environment
+	if os.Getenv("MACGO_FORCE_LAUNCH_SERVICES") == "1" {
+		c.ForceLaunchServices = true
+	}
+	if os.Getenv("MACGO_FORCE_DIRECT") == "1" {
+		c.ForceDirectExecution = true
+	}
+
 	return c
 }
 
-// WithAppName sets the application name.
+// WithAppName sets the application name for the bundle.
+// If empty, defaults to the executable name.
 func (c *Config) WithAppName(name string) *Config {
-	if c == nil {
-		c = &Config{}
-	}
 	c.AppName = name
 	return c
 }
 
-// WithPermissions adds permissions to the config.
+// WithPermissions adds macOS system permissions to request.
+// Permissions are additive - multiple calls append to the list.
 func (c *Config) WithPermissions(perms ...Permission) *Config {
-	if c == nil {
-		c = &Config{}
-	}
 	c.Permissions = append(c.Permissions, perms...)
 	return c
 }
 
-// WithCustom adds custom entitlements to the config.
+// WithCustom adds custom entitlements not covered by Permission constants.
+// Use full entitlement identifiers (e.g. "com.apple.security.device.capture").
 func (c *Config) WithCustom(entitlements ...string) *Config {
-	if c == nil {
-		c = &Config{}
-	}
 	c.Custom = append(c.Custom, entitlements...)
+	return c
+}
+
+// WithAppGroups adds app group identifiers for sharing data between sandboxed apps.
+// Requires Sandbox permission. Use reverse-DNS format (e.g. "group.com.example.shared").
+func (c *Config) WithAppGroups(groups ...string) *Config {
+	c.AppGroups = append(c.AppGroups, groups...)
 	return c
 }
 
 // WithDebug enables debug logging.
 func (c *Config) WithDebug() *Config {
-	if c == nil {
-		c = &Config{}
-	}
 	c.Debug = true
 	return c
 }
 
 // WithCodeSigning enables code signing with the specified identity.
+// Use "Developer ID Application" for automatic identity selection.
 func (c *Config) WithCodeSigning(identity string) *Config {
-	if c == nil {
-		c = &Config{}
-	}
 	c.CodeSignIdentity = identity
 	return c
 }
 
 // WithAutoSign enables automatic detection and use of Developer ID certificates.
+// macgo will search for and use an available Developer ID Application certificate.
 func (c *Config) WithAutoSign() *Config {
-	if c == nil {
-		c = &Config{}
-	}
 	c.AutoSign = true
 	return c
 }
 
-// WithAdHocSign enables ad-hoc code signing.
+// WithAdHocSign enables ad-hoc code signing using the "-" identity.
+// Ad-hoc signing provides basic code integrity without requiring certificates.
+// Useful for development and testing.
 func (c *Config) WithAdHocSign() *Config {
-	if c == nil {
-		c = &Config{}
-	}
 	c.AdHocSign = true
 	return c
 }
 
-// shouldKeepBundle returns the effective KeepBundle value (defaults to true).
+// shouldKeepBundle returns the effective KeepBundle value.
+// Defaults to true to preserve bundles for inspection and reuse.
 func (c *Config) shouldKeepBundle() bool {
 	if c.KeepBundle == nil {
 		return true // Default to keeping bundles
@@ -219,8 +263,48 @@ func (c *Config) shouldKeepBundle() bool {
 	return *c.KeepBundle
 }
 
+// Validate checks the configuration for common issues and dependency requirements.
+// Returns an error if the configuration is invalid.
+func (c *Config) Validate() error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
+
+	// Validate permissions and their dependencies
+	var tccPerms []tcc.Permission
+	for _, perm := range c.Permissions {
+		tccPerms = append(tccPerms, tcc.Permission(perm))
+	}
+	if err := tcc.ValidatePermissions(tccPerms); err != nil {
+		return fmt.Errorf("invalid permissions: %w", err)
+	}
+
+	// Validate app groups dependencies
+	if err := tcc.ValidateAppGroups(c.AppGroups, tccPerms); err != nil {
+		return fmt.Errorf("invalid app groups: %w", err)
+	}
+
+	// Validate bundle ID format if specified
+	if c.BundleID != "" {
+		if err := system.ValidateBundleID(c.BundleID); err != nil {
+			return fmt.Errorf("invalid bundle ID: %w", err)
+		}
+	}
+
+	// Validate app name constraints
+	if c.AppName != "" {
+		if err := system.ValidateAppName(c.AppName); err != nil {
+			return fmt.Errorf("invalid app name: %w", err)
+		}
+	}
+
+	return nil
+}
+
+
 // Start initializes macgo with the given configuration.
-// On non-macOS platforms, this is a no-op.
+// Creates an app bundle if needed and handles permission requests.
+// On non-macOS platforms, this is a no-op that returns nil.
 func Start(cfg *Config) error {
 	if runtime.GOOS != "darwin" {
 		if cfg != nil && cfg.Debug {
@@ -237,6 +321,7 @@ func Start(cfg *Config) error {
 }
 
 // StartContext is like Start but accepts a context for cancellation.
+// The context can be used to cancel the bundle creation and launch process.
 func StartContext(ctx context.Context, cfg *Config) error {
 	if runtime.GOOS != "darwin" {
 		if cfg != nil && cfg.Debug {
@@ -252,20 +337,23 @@ func StartContext(ctx context.Context, cfg *Config) error {
 	return startDarwin(ctx, cfg)
 }
 
-// Request is a convenience function that creates a config with the given permissions and starts macgo.
+// Request is a convenience function for requesting specific permissions.
+// Creates a minimal config and starts macgo immediately.
 // Equivalent to Start(&Config{Permissions: perms}).
 func Request(perms ...Permission) error {
 	return Start(&Config{Permissions: perms})
 }
 
-// Auto loads configuration from environment and starts macgo.
-// Equivalent to Start(new(Config).FromEnv()).
+// Auto loads configuration from environment variables and starts macgo.
+// Useful for external configuration without code changes.
+// Equivalent to Start(NewConfig().FromEnv()).
 func Auto() error {
 	return Start(new(Config).FromEnv())
 }
 
-// OpenSystemPreferences attempts to open the Privacy & Security settings.
-// This is useful when your app needs Full Disk Access or other system permissions.
+// OpenSystemPreferences attempts to open macOS Privacy & Security settings.
+// Tries to open Full Disk Access directly, falls back to general Privacy pane.
+// Useful when your app needs Full Disk Access or other manual permission grants.
 func OpenSystemPreferences() error {
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("system preferences only available on macOS")
@@ -281,14 +369,15 @@ func OpenSystemPreferences() error {
 	return nil
 }
 
-// copyToClipboard attempts to copy text to the system clipboard
+// copyToClipboard copies text to the system clipboard using pbcopy.
 func copyToClipboard(text string) error {
 	cmd := exec.Command("pbcopy")
 	cmd.Stdin = strings.NewReader(text)
 	return cmd.Run()
 }
 
-// LaunchAppBundle uses the open command to launch an app bundle, which properly registers it with TCC
+// LaunchAppBundle launches an app bundle using the open command.
+// This ensures proper registration with TCC for permission dialogs.
 func LaunchAppBundle(bundlePath string) error {
 	if !strings.HasSuffix(bundlePath, ".app") {
 		return fmt.Errorf("not an app bundle: %s", bundlePath)
@@ -298,10 +387,16 @@ func LaunchAppBundle(bundlePath string) error {
 	return cmd.Run()
 }
 
-// ShowFullDiskAccessInstructions provides simple instructions for granting Full Disk Access.
+// ShowFullDiskAccessInstructions provides instructions for granting Full Disk Access.
+// Optionally opens System Preferences if openSettings is true.
+// The programPath parameter is provided for future use in displaying specific instructions.
 func ShowFullDiskAccessInstructions(programPath string, openSettings bool) {
 	if openSettings {
 		// Open System Settings
 		OpenSystemPreferences()
 	}
+
+	// The programPath parameter is available for future enhancements
+	// to provide program-specific instructions
+	_ = programPath // Acknowledge the parameter is intentionally unused for now
 }

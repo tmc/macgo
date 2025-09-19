@@ -4,6 +4,8 @@ import (
 	"os"
 	"runtime"
 	"testing"
+
+	"github.com/tmc/misc/macgo/internal/system"
 )
 
 func TestConfig(t *testing.T) {
@@ -153,9 +155,9 @@ func TestCleanAppName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := cleanAppName(tt.input)
+			result := system.CleanAppName(tt.input)
 			if result != tt.expected {
-				t.Errorf("cleanAppName(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("CleanAppName(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -163,20 +165,37 @@ func TestCleanAppName(t *testing.T) {
 
 func TestInferBundleID(t *testing.T) {
 	tests := []struct {
+		name     string
 		appName  string
-		expected string
+		expected string // We'll check that it contains this substring
 	}{
-		{"myapp", "com.macgo.myapp"},
-		{"test-app", "com.macgo.test-app"},
-		{"", "com.macgo."},
+		{"valid_app_name", "myapp", "myapp"},
+		{"hyphenated_name", "test-app", "test-app"},
+		{"empty_name", "", "app"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.appName, func(t *testing.T) {
-			result := inferBundleID(tt.appName)
-			// Should either be the expected format or include build info module path
-			if result != tt.expected && !contains(result, ".") {
-				t.Errorf("inferBundleID(%q) = %q, should contain dots for bundle ID format", tt.appName, result)
+		t.Run(tt.name, func(t *testing.T) {
+			result := system.InferBundleID(tt.appName)
+
+			// Should always contain dots (reverse DNS format)
+			if !contains(result, ".") {
+				t.Errorf("InferBundleID(%q) = %q, should contain dots for bundle ID format", tt.appName, result)
+			}
+
+			// Should contain the expected app name component
+			if !contains(result, tt.expected) {
+				t.Errorf("InferBundleID(%q) = %q, should contain %q", tt.appName, result, tt.expected)
+			}
+
+			// Should not contain the old "com.macgo" prefix
+			if contains(result, "com.macgo") {
+				t.Errorf("InferBundleID(%q) = %q, should not contain old 'com.macgo' prefix", tt.appName, result)
+			}
+
+			// Should be a valid bundle ID format
+			if err := system.ValidateBundleID(result); err != nil {
+				t.Errorf("InferBundleID(%q) = %q, invalid bundle ID: %v", tt.appName, result, err)
 			}
 		})
 	}
