@@ -377,28 +377,28 @@ func TestGetLaunchMode(t *testing.T) {
 		want            string
 	}{
 		{
-			name:           "default mode",
-			launchServices: "",
+			name:            "default mode",
+			launchServices:  "",
 			directExecution: "",
-			want:           "auto",
+			want:            "auto",
 		},
 		{
-			name:           "force launch services",
-			launchServices: "1",
+			name:            "force launch services",
+			launchServices:  "1",
 			directExecution: "",
-			want:           "launch_services",
+			want:            "launch_services",
 		},
 		{
-			name:           "force direct execution",
-			launchServices: "",
+			name:            "force direct execution",
+			launchServices:  "",
 			directExecution: "1",
-			want:           "direct",
+			want:            "direct",
 		},
 		{
-			name:           "both set - launch services wins",
-			launchServices: "1",
+			name:            "both set - launch services wins",
+			launchServices:  "1",
 			directExecution: "1",
-			want:           "launch_services",
+			want:            "launch_services",
 		},
 	}
 

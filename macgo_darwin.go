@@ -8,8 +8,8 @@ import (
 	"github.com/tmc/misc/macgo/helpers/teamid"
 	"github.com/tmc/misc/macgo/internal/bundle"
 	"github.com/tmc/misc/macgo/internal/launch"
-	"github.com/tmc/misc/macgo/internal/tcc"
 	"github.com/tmc/misc/macgo/internal/system"
+	"github.com/tmc/misc/macgo/internal/tcc"
 )
 
 // startDarwin implements the macOS-specific logic.
@@ -96,8 +96,6 @@ func createSimpleBundle(execPath string, cfg *Config) (*bundle.Bundle, error) {
 	)
 }
 
-
-
 // convertPermissions converts Permission values to strings for the launch package.
 func convertPermissions(permissions []Permission) []string {
 	var result []string
@@ -124,7 +122,6 @@ func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Con
 	return manager.Launch(ctx, bundlePath, execPath, launchCfg)
 }
 
-
 // substituteTeamID automatically detects team ID and substitutes "TEAMID" placeholders in app groups
 func substituteTeamID(cfg *Config) error {
 	if len(cfg.AppGroups) == 0 {
@@ -143,7 +140,3 @@ func substituteTeamID(cfg *Config) error {
 
 	return nil
 }
-
-
-
-

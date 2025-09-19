@@ -4,8 +4,11 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -60,6 +63,14 @@ func main() {
 	dir := getScriptsDir()
 	if err := ensureScriptsDir(dir); err != nil {
 		log.Fatalf("Failed to create scripts directory: %v", err)
+	}
+
+	// Get bundle resources directory for embedded scripts
+	bundleDir := getBundleResourcesDir()
+	if bundleDir != "" {
+		if err := ensureBundleScriptsDir(bundleDir); err != nil {
+			log.Printf("Warning: Failed to create bundle scripts directory: %v", err)
+		}
 	}
 
 	// Handle commands
@@ -169,7 +180,7 @@ func editScript(dir, name string) {
 	// Open in default editor
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
-		editor = "nano"  // fallback to nano
+		editor = "nano" // fallback to nano
 	}
 
 	cmd := exec.Command(editor, scriptPath)
@@ -200,16 +211,23 @@ func removeScript(dir, name string) {
 }
 
 func runScript(dir, name string) {
-	scriptPath := filepath.Join(dir, name+".applescript")
+	// Sync the specific script to bundle if we're in a bundle
+	bundleDir := getBundleResourcesDir()
+	if bundleDir != "" {
+		if err := syncScriptToBundle(dir, bundleDir, name); err != nil {
+			log.Printf("Warning: Failed to sync script to bundle: %v", err)
+		}
+	}
 
-	// Check if script exists
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+	// Try to find script in bundle first, then fall back to external directory
+	scriptPath := findScript(dir, name)
+	if scriptPath == "" {
 		fmt.Printf("Script '%s' not found. Available scripts:\n", name)
 		listScripts(dir)
 		return
 	}
 
-	fmt.Printf("Running script '%s'...\n", name)
+	fmt.Printf("Running script '%s' from %s...\n", name, scriptPath)
 
 	// Get any additional arguments to pass to the script
 	scriptArgs := flag.Args()
@@ -399,4 +417,203 @@ func showHelp() {
 	fmt.Println("  EDITOR     : Text editor to use for editing scripts (default: nano)")
 	fmt.Println()
 	fmt.Println("Scripts are stored in ~/.osascripts/ by default")
+	fmt.Println("When running in an app bundle, scripts are embedded in the bundle and auto-updated")
+}
+
+// getBundleResourcesDir returns the Resources directory of the current app bundle, if we're running in one
+func getBundleResourcesDir() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+
+	// Check if we're in an app bundle (path should contain .app/Contents/MacOS/)
+	if strings.Contains(executable, ".app/Contents/MacOS/") {
+		bundlePath := executable
+		// Find the .app directory
+		for !strings.HasSuffix(bundlePath, ".app") && bundlePath != "/" {
+			bundlePath = filepath.Dir(bundlePath)
+		}
+		if strings.HasSuffix(bundlePath, ".app") {
+			return filepath.Join(bundlePath, "Contents", "Resources")
+		}
+	}
+	return ""
+}
+
+// ensureBundleScriptsDir creates the scripts directory in the bundle if it doesn't exist
+func ensureBundleScriptsDir(bundleDir string) error {
+	scriptsDir := filepath.Join(bundleDir, "scripts")
+	return os.MkdirAll(scriptsDir, 0755)
+}
+
+// syncScriptToBundle copies a specific script from external directory to bundle if it's newer
+func syncScriptToBundle(externalDir, bundleDir, scriptName string) error {
+	scriptsDir := filepath.Join(bundleDir, "scripts")
+	scriptFileName := scriptName + ".applescript"
+
+	srcPath := filepath.Join(externalDir, scriptFileName)
+	dstPath := filepath.Join(scriptsDir, scriptFileName)
+
+	// Check if source script exists
+	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+		return nil // Nothing to sync
+	}
+
+	needsUpdate, err := scriptNeedsUpdate(srcPath, dstPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if script %s needs update: %v", scriptFileName, err)
+	}
+
+	if needsUpdate {
+		if err := copyScript(srcPath, dstPath); err != nil {
+			return fmt.Errorf("failed to copy script %s to bundle: %v", scriptFileName, err)
+		}
+		fmt.Printf("Updated embedded script: %s\n", scriptFileName)
+	}
+
+	return nil
+}
+
+// syncScriptsToBundle copies scripts from external directory to bundle when they're newer
+func syncScriptsToBundle(externalDir, bundleDir string) error {
+	scriptsDir := filepath.Join(bundleDir, "scripts")
+
+	// Read scripts from external directory
+	entries, err := os.ReadDir(externalDir)
+	if err != nil {
+		// External directory doesn't exist, nothing to sync
+		return nil
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".applescript") {
+			continue
+		}
+
+		srcPath := filepath.Join(externalDir, entry.Name())
+		dstPath := filepath.Join(scriptsDir, entry.Name())
+
+		needsUpdate, err := scriptNeedsUpdate(srcPath, dstPath)
+		if err != nil {
+			log.Printf("Warning: Failed to check if script %s needs update: %v", entry.Name(), err)
+			continue
+		}
+
+		if needsUpdate {
+			if err := copyScript(srcPath, dstPath); err != nil {
+				log.Printf("Warning: Failed to copy script %s to bundle: %v", entry.Name(), err)
+				continue
+			}
+			fmt.Printf("Updated embedded script: %s\n", entry.Name())
+		}
+	}
+
+	return nil
+}
+
+// scriptNeedsUpdate checks if a script needs to be updated in the bundle
+func scriptNeedsUpdate(srcPath, dstPath string) (bool, error) {
+	// If destination doesn't exist, needs update
+	dstInfo, err := os.Stat(dstPath)
+	if os.IsNotExist(err) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		return false, err
+	}
+
+	// Check modification time
+	if srcInfo.ModTime().After(dstInfo.ModTime()) {
+		return true, nil
+	}
+
+	// Check content hash to be sure
+	srcHash, err := getFileHash(srcPath)
+	if err != nil {
+		return false, err
+	}
+
+	dstHash, err := getFileHash(dstPath)
+	if err != nil {
+		return false, err
+	}
+
+	return srcHash != dstHash, nil
+}
+
+// copyScript copies a script file from source to destination
+func copyScript(srcPath, dstPath string) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	// Ensure destination directory exists
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+		return err
+	}
+
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		return err
+	}
+
+	// Copy file permissions
+	srcInfo, err := src.Stat()
+	if err != nil {
+		return err
+	}
+
+	return dst.Chmod(srcInfo.Mode())
+}
+
+// getFileHash calculates SHA256 hash of a file
+func getFileHash(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// findScript looks for a script in bundle first, then external directory
+func findScript(externalDir, name string) string {
+	scriptName := name + ".applescript"
+
+	// First, try bundle directory if we're in a bundle
+	bundleDir := getBundleResourcesDir()
+	if bundleDir != "" {
+		bundlePath := filepath.Join(bundleDir, "scripts", scriptName)
+		if _, err := os.Stat(bundlePath); err == nil {
+			return bundlePath
+		}
+	}
+
+	// Fall back to external directory
+	externalPath := filepath.Join(externalDir, scriptName)
+	if _, err := os.Stat(externalPath); err == nil {
+		return externalPath
+	}
+
+	return ""
 }

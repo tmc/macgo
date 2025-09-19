@@ -9,11 +9,11 @@ import (
 // Environment variable constants for macgo
 const (
 	// Core configuration
-	EnvAppName        = "MACGO_APP_NAME"
-	EnvBundleID       = "MACGO_BUNDLE_ID"
-	EnvDebug          = "MACGO_DEBUG"
-	EnvKeepBundle     = "MACGO_KEEP_BUNDLE"
-	EnvVersion        = "MACGO_VERSION"
+	EnvAppName    = "MACGO_APP_NAME"
+	EnvBundleID   = "MACGO_BUNDLE_ID"
+	EnvDebug      = "MACGO_DEBUG"
+	EnvKeepBundle = "MACGO_KEEP_BUNDLE"
+	EnvVersion    = "MACGO_VERSION"
 
 	// Code signing
 	EnvCodeSignIdentity = "MACGO_CODE_SIGN_IDENTITY"

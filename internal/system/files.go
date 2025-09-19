@@ -2,6 +2,7 @@
 package system
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -233,4 +234,35 @@ func GetBundleID(bundlePath string) string {
 	}
 
 	return ""
+}
+
+// CalculateFileSHA256 calculates the SHA256 hash of a file.
+// Returns the hexadecimal string representation of the hash.
+func CalculateFileSHA256(filePath string) (string, error) {
+	if filePath == "" {
+		return "", fmt.Errorf("file path cannot be empty")
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", fmt.Errorf("failed to read file %s for hashing: %w", filePath, err)
+	}
+
+	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
+}
+
+// CompareFileSHA256 compares the SHA256 hash of a file with an expected hash.
+// Returns true if they match, false otherwise.
+func CompareFileSHA256(filePath, expectedHash string) (bool, error) {
+	actualHash, err := CalculateFileSHA256(filePath)
+	if err != nil {
+		return false, err
+	}
+	return actualHash == expectedHash, nil
 }

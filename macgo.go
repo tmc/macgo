@@ -34,8 +34,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/tmc/misc/macgo/internal/tcc"
 	"github.com/tmc/misc/macgo/internal/system"
+	"github.com/tmc/misc/macgo/internal/tcc"
 )
 
 // Permission represents a macOS system permission that can be requested.
@@ -122,23 +122,24 @@ type Config struct {
 // This provides explicit configuration without magic init() functions.
 //
 // Supported environment variables:
-//   MACGO_APP_NAME          - Application name
-//   MACGO_APP_NAME_PREFIX   - Prefix to add to all app names
-//   MACGO_BUNDLE_ID         - Bundle identifier
-//   MACGO_BUNDLE_ID_PREFIX  - Prefix to add to all bundle IDs
-//   MACGO_DEBUG=1           - Enable debug logging
-//   MACGO_KEEP_BUNDLE=1     - Preserve bundle after execution
-//   MACGO_CODE_SIGN_IDENTITY - Code signing identity
-//   MACGO_AUTO_SIGN=1       - Enable automatic code signing
-//   MACGO_AD_HOC_SIGN=1     - Enable ad-hoc code signing
-//   MACGO_CAMERA=1          - Request camera permission
-//   MACGO_MICROPHONE=1      - Request microphone permission
-//   MACGO_LOCATION=1        - Request location permission
-//   MACGO_FILES=1           - Request file access permission
-//   MACGO_NETWORK=1         - Request network permission
-//   MACGO_SANDBOX=1         - Enable app sandbox
-//   MACGO_FORCE_LAUNCH_SERVICES=1 - Force use of LaunchServices
-//   MACGO_FORCE_DIRECT=1    - Force direct execution
+//
+//	MACGO_APP_NAME          - Application name
+//	MACGO_APP_NAME_PREFIX   - Prefix to add to all app names
+//	MACGO_BUNDLE_ID         - Bundle identifier
+//	MACGO_BUNDLE_ID_PREFIX  - Prefix to add to all bundle IDs
+//	MACGO_DEBUG=1           - Enable debug logging
+//	MACGO_KEEP_BUNDLE=1     - Preserve bundle after execution
+//	MACGO_CODE_SIGN_IDENTITY - Code signing identity
+//	MACGO_AUTO_SIGN=1       - Enable automatic code signing
+//	MACGO_AD_HOC_SIGN=1     - Enable ad-hoc code signing
+//	MACGO_CAMERA=1          - Request camera permission
+//	MACGO_MICROPHONE=1      - Request microphone permission
+//	MACGO_LOCATION=1        - Request location permission
+//	MACGO_FILES=1           - Request file access permission
+//	MACGO_NETWORK=1         - Request network permission
+//	MACGO_SANDBOX=1         - Enable app sandbox
+//	MACGO_FORCE_LAUNCH_SERVICES=1 - Force use of LaunchServices
+//	MACGO_FORCE_DIRECT=1    - Force direct execution
 func (c *Config) FromEnv() *Config {
 	if name := os.Getenv("MACGO_APP_NAME"); name != "" {
 		c.AppName = name
@@ -302,7 +303,6 @@ func (c *Config) Validate() error {
 
 	return nil
 }
-
 
 // Start initializes macgo with the given configuration.
 // Creates an app bundle if needed and handles permission requests.

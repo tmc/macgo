@@ -2,6 +2,8 @@ package system
 
 import (
 	"testing"
+
+	"github.com/tmc/misc/macgo/helpers/bundle"
 )
 
 func TestModulePathToBundleID(t *testing.T) {
@@ -45,7 +47,7 @@ func TestModulePathToBundleID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := modulePathToBundleID(tt.modulePath, tt.appName)
+			result := bundle.ModulePathToBundleID(tt.modulePath, tt.appName)
 			if result != tt.expected {
 				t.Errorf("modulePathToBundleID(%q, %q) = %q, want %q",
 					tt.modulePath, tt.appName, result, tt.expected)
@@ -66,7 +68,7 @@ func TestInferFallbackBundleID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := inferFallbackBundleID(tt.appName)
+			result := bundle.InferFallbackBundleID(tt.appName)
 
 			// Should contain the app name (or "app" for empty)
 			expectedName := tt.appName
@@ -111,7 +113,7 @@ func TestSanitizeComponent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeComponent(tt.component)
+			result := bundle.SanitizeComponent(tt.component)
 			if result != tt.expected {
 				t.Errorf("sanitizeComponent(%q) = %q, want %q",
 					tt.component, result, tt.expected)
@@ -137,9 +139,9 @@ func findSubstring(s, substr string) bool {
 
 func TestCleanAppName(t *testing.T) {
 	tests := []struct {
-		name string
+		name  string
 		input string
-		want string
+		want  string
 	}{
 		{
 			name:  "clean name unchanged",
@@ -255,9 +257,9 @@ func TestInferBundleID(t *testing.T) {
 
 func TestSanitizeBundleID(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		want   string
+		name  string
+		input string
+		want  string
 	}{
 		{
 			name:  "valid bundle ID unchanged",
@@ -303,7 +305,7 @@ func TestSanitizeBundleID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sanitizeBundleID(tt.input)
+			got := bundle.SanitizeBundleID(tt.input)
 			if got != tt.want {
 				t.Errorf("sanitizeBundleID() = %q, want %q", got, tt.want)
 			}

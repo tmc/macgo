@@ -3,14 +3,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
-	"time"
 
 	macgo "github.com/tmc/misc/macgo"
 )
@@ -90,47 +88,3 @@ func testMicrophoneAccess() {
 	}
 }
 
-// Example with context and timeout
-func withContext() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	cfg := &macgo.Config{
-		AppName:     "CameraMicApp",
-		BundleID:    "com.example.camera-mic",
-		Permissions: []macgo.Permission{macgo.Camera, macgo.Microphone},
-		Debug:       true,
-	}
-
-	if err := macgo.StartContext(ctx, cfg); err != nil {
-		log.Fatal(err)
-	}
-
-	// Your app code here...
-	select {
-	case <-ctx.Done():
-		fmt.Println("Context cancelled")
-	}
-}
-
-// Example for recording scenario
-func recordingExample() {
-	// Request all media permissions
-	cfg := &macgo.Config{
-		AppName:  "RecordingApp",
-		BundleID: "com.example.recording",
-		Permissions: []macgo.Permission{
-			macgo.Camera,
-			macgo.Microphone,
-			macgo.Files, // For saving recordings
-		},
-		Debug: true,
-	}
-
-	if err := macgo.Start(cfg); err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Ready to record with camera, microphone, and file access!")
-	// Recording logic here...
-}

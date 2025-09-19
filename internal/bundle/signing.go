@@ -16,6 +16,7 @@ func codeSignBundle(bundlePath string, cfg *Config) error {
 	args := []string{
 		"--sign", cfg.CodeSignIdentity,
 		"--force",
+		"--deep",
 	}
 
 	if cfg.CodeSignIdentity != "-" {
@@ -23,29 +24,33 @@ func codeSignBundle(bundlePath string, cfg *Config) error {
 		args = append(args, "--options", "runtime")
 	}
 
-	// Add identifier - use custom identifier if specified, otherwise use bundle ID
+	// Always read bundle ID from Info.plist and use it as the identifier
+	plistPath := filepath.Join(bundlePath, "Contents", "Info.plist")
+	bundleID, err := readBundleIDFromPlist(plistPath)
+	if err != nil {
+		return fmt.Errorf("failed to read bundle ID from Info.plist for signing: %w", err)
+	}
+	if bundleID == "" {
+		return fmt.Errorf("bundle ID is empty in Info.plist, cannot sign")
+	}
+
+	// Use custom identifier if specified, otherwise use bundle ID
 	identifier := cfg.CodeSigningIdentifier
-	if cfg.Debug {
-		fmt.Printf("macgo: codesign identifier from config: %q\n", identifier)
-	}
 	if identifier == "" {
-		// Read bundle ID from Info.plist
-		plistPath := filepath.Join(bundlePath, "Contents", "Info.plist")
-		if bundleID, err := readBundleIDFromPlist(plistPath); err == nil && bundleID != "" {
-			identifier = bundleID
-			if cfg.Debug {
-				fmt.Printf("macgo: using bundle ID as identifier: %q\n", identifier)
-			}
-		} else if cfg.Debug {
-			fmt.Printf("macgo: failed to read bundle ID: %v\n", err)
-		}
+		identifier = bundleID
 	}
-	if identifier != "" {
-		args = append(args, "--identifier", identifier)
-		if cfg.Debug {
-			fmt.Printf("macgo: codesign will use identifier: %q\n", identifier)
+
+	if cfg.Debug {
+		if cfg.CodeSigningIdentifier != "" {
+			fmt.Printf("macgo: using custom codesign identifier: %q\n", identifier)
+		} else {
+			fmt.Printf("macgo: using bundle ID as identifier: %q\n", identifier)
 		}
+		fmt.Printf("macgo: codesign will use identifier: %q\n", identifier)
 	}
+
+	// Always add the identifier flag
+	args = append(args, "--identifier", identifier)
 
 	if cfg.CodeSignIdentity != "-" {
 		entitlementsPath := filepath.Join(bundlePath, "Contents", "entitlements.plist")

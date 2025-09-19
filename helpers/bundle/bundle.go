@@ -87,11 +87,11 @@ func InferBundleID(appName string) string {
 		modulePath := info.Main.Path
 
 		// Convert module path to reverse DNS format
-		bundleID = modulePathToBundleID(modulePath, appName)
+		bundleID = ModulePathToBundleID(modulePath, appName)
 	} else {
 		// If no module info, use a more generic but still meaningful format
 		// based on the current working directory or executable location
-		bundleID = inferFallbackBundleID(appName)
+		bundleID = InferFallbackBundleID(appName)
 	}
 
 	// Apply prefix from environment variable if set
@@ -108,10 +108,11 @@ func InferBundleID(appName string) string {
 
 // modulePathToBundleID converts a Go module path to a bundle ID format.
 // Examples:
-//   github.com/user/repo -> com.github.user.repo.appname
-//   example.com/project -> com.example.project.appname
-//   local/project -> local.project.appname
-func modulePathToBundleID(modulePath, appName string) string {
+//
+//	github.com/user/repo -> com.github.user.repo.appname
+//	example.com/project -> com.example.project.appname
+//	local/project -> local.project.appname
+func ModulePathToBundleID(modulePath, appName string) string {
 	// Handle common patterns
 	parts := strings.Split(modulePath, "/")
 
@@ -144,7 +145,7 @@ func modulePathToBundleID(modulePath, appName string) string {
 
 // inferFallbackBundleID creates a bundle ID when no module info is available.
 // It creates a reasonable default based on the user's system.
-func inferFallbackBundleID(appName string) string {
+func InferFallbackBundleID(appName string) string {
 	// Ensure we have a valid app name
 	if appName == "" {
 		appName = "app"
@@ -155,7 +156,7 @@ func inferFallbackBundleID(appName string) string {
 
 	// Check for common environment variables that might indicate the user/organization
 	if user := getEnvironmentIdentifier(); user != "" {
-		return fmt.Sprintf("dev.%s.%s", sanitizeComponent(user), appName)
+		return fmt.Sprintf("dev.%s.%s", SanitizeComponent(user), appName)
 	}
 
 	// Final fallback - use a generic but descriptive format
@@ -188,7 +189,7 @@ func getEnvironmentIdentifier() string {
 }
 
 // sanitizeComponent cleans a single bundle ID component.
-func sanitizeComponent(component string) string {
+func SanitizeComponent(component string) string {
 	// Convert to lowercase and replace invalid characters
 	component = strings.ToLower(component)
 

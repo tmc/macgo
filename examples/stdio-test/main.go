@@ -48,9 +48,9 @@ func main() {
 
 	// Configure macgo
 	cfg := &macgo.Config{
-		AppName:  "stdio-test",
-		BundleID: "com.macgo.examples.stdio-test",
-		Debug:    *flagDebug,
+		AppName: "stdio-test",
+		Debug:   *flagDebug,
+		// BundleID will be inferred automatically
 	}
 
 	// Request Files permission to test LaunchServices path

@@ -40,7 +40,7 @@ type Config struct {
 	// AppName is the application name. Defaults to executable name.
 	AppName string
 
-	// BundleID is the bundle identifier. Defaults to com.macgo.{appname}.
+	// BundleID is the bundle identifier. Defaults to inferred from module path or environment.
 	BundleID string
 
 	// Version is the application version. Defaults to "1.0.0".
@@ -142,10 +142,21 @@ func (b *Bundle) Create() error {
 	// Check if bundle already exists and should be kept
 	if b.Config.shouldKeepBundle() {
 		if _, err := os.Stat(bundleDir); err == nil {
-			if b.Config.Debug {
-				fmt.Fprintf(os.Stderr, "macgo: reusing existing bundle at %s\n", bundleDir)
+			// Check if the original executable has changed by comparing SHA256
+			if b.isBundleUpToDate() {
+				if b.Config.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: reusing existing bundle at %s (binary unchanged)\n", bundleDir)
+				}
+				return nil
+			} else {
+				if b.Config.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: binary changed, recreating bundle at %s\n", bundleDir)
+				}
+				// Remove the outdated bundle
+				if err := os.RemoveAll(bundleDir); err != nil && !os.IsNotExist(err) {
+					return fmt.Errorf("failed to remove outdated bundle: %w", err)
+				}
 			}
-			return nil
 		}
 	} else {
 		// Remove old bundle if not keeping it
@@ -311,13 +322,13 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 		Version:               version,
 		Permissions:           permissions,
 		Custom:                custom,
-		AppGroups:            appGroups,
-		Debug:                debug,
-		KeepBundle:           keepBundle,
-		CodeSignIdentity:     codeSignIdentity,
+		AppGroups:             appGroups,
+		Debug:                 debug,
+		KeepBundle:            keepBundle,
+		CodeSignIdentity:      codeSignIdentity,
 		CodeSigningIdentifier: codeSigningIdentifier,
-		AutoSign:             autoSign,
-		AdHocSign:            adHocSign,
+		AutoSign:              autoSign,
+		AdHocSign:             adHocSign,
 	}
 
 	bundle, err := New(execPath, config)
@@ -336,3 +347,42 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 	return bundle, nil
 }
 
+// isBundleUpToDate checks if the bundle contains the same binary as the original executable
+// by comparing SHA256 hashes. Returns true if the bundle is up to date, false otherwise.
+func (b *Bundle) isBundleUpToDate() bool {
+	if b.Path == "" {
+		return false
+	}
+
+	// Get the executable inside the bundle
+	execName := filepath.Base(b.appName)
+	bundleExecPath := filepath.Join(b.Path, "Contents", "MacOS", execName)
+
+	// Check if bundle executable exists
+	if _, err := os.Stat(bundleExecPath); err != nil {
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: bundle executable not found: %v\n", err)
+		}
+		return false
+	}
+
+	// Calculate hash of original executable
+	originalHash, err := system.CalculateFileSHA256(b.execPath)
+	if err != nil {
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: failed to calculate original binary hash: %v\n", err)
+		}
+		return false
+	}
+
+	// Calculate hash of bundle executable
+	bundleHash, err := system.CalculateFileSHA256(bundleExecPath)
+	if err != nil {
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: failed to calculate bundle binary hash: %v\n", err)
+		}
+		return false
+	}
+
+	return originalHash == bundleHash
+}

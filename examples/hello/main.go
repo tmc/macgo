@@ -41,4 +41,3 @@ func main() {
 
 	fmt.Println("\nGoodbye from macgo!")
 }
-

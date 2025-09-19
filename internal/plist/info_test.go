@@ -81,12 +81,12 @@ func TestWriteInfoPlistWithCustomKeys(t *testing.T) {
 		ExecName: "testapp",
 		Version:  "1.0.0",
 		CustomKeys: map[string]interface{}{
-			"LSUIElement":                false, // Override default
-			"NSHumanReadableCopyright":   "Copyright © 2024 Example Corp",
-			"CFBundleGetInfoString":      "TestApp v1.0.0",
-			"LSMinimumSystemVersion":     "10.15.0",
+			"LSUIElement":                          false, // Override default
+			"NSHumanReadableCopyright":             "Copyright © 2024 Example Corp",
+			"CFBundleGetInfoString":                "TestApp v1.0.0",
+			"LSMinimumSystemVersion":               "10.15.0",
 			"NSSupportsAutomaticGraphicsSwitching": true,
-			"LSApplicationCategoryType":  []string{"public.app-category.productivity"},
+			"LSApplicationCategoryType":            []string{"public.app-category.productivity"},
 		},
 	}
 
@@ -204,57 +204,60 @@ func TestValidateInfoPlistConfig(t *testing.T) {
 
 func TestGenerateDefaultBundleID(t *testing.T) {
 	tests := []struct {
-		name     string
-		appName  string
-		expected string
+		name    string
+		appName string
 	}{
 		{
-			name:     "simple name",
-			appName:  "MyApp",
-			expected: "com.macgo.myapp",
+			name:    "simple name",
+			appName: "MyApp",
 		},
 		{
-			name:     "name with spaces",
-			appName:  "My Great App",
-			expected: "com.macgo.mygreatapp",
+			name:    "name with spaces",
+			appName: "My Great App",
 		},
 		{
-			name:     "name with hyphens and underscores",
-			appName:  "my-cool_app",
-			expected: "com.macgo.mycoolapp",
+			name:    "name with hyphens and underscores",
+			appName: "my-cool_app",
 		},
 		{
-			name:     "name with special characters",
-			appName:  "My App! @#$%",
-			expected: "com.macgo.myapp",
+			name:    "name with special characters",
+			appName: "My App! @#$%",
 		},
 		{
-			name:     "name with numbers",
-			appName:  "App2024",
-			expected: "com.macgo.app2024",
+			name:    "name with numbers",
+			appName: "App2024",
 		},
 		{
-			name:     "empty name",
-			appName:  "",
-			expected: "com.macgo.app",
+			name:    "empty name",
+			appName: "",
 		},
 		{
-			name:     "name with only special characters",
-			appName:  "!@#$%",
-			expected: "com.macgo.app",
+			name:    "name with only special characters",
+			appName: "!@#$%",
 		},
 		{
-			name:     "mixed case with numbers",
-			appName:  "TestApp123",
-			expected: "com.macgo.testapp123",
+			name:    "mixed case with numbers",
+			appName: "TestApp123",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GenerateDefaultBundleID(tt.appName)
-			if result != tt.expected {
-				t.Errorf("GenerateDefaultBundleID(%q) = %q, want %q", tt.appName, result, tt.expected)
+
+			// Should return a valid bundle ID (contains at least one dot)
+			if !strings.Contains(result, ".") {
+				t.Errorf("GenerateDefaultBundleID(%q) = %q, should contain at least one dot", tt.appName, result)
+			}
+
+			// Should not be empty
+			if result == "" {
+				t.Errorf("GenerateDefaultBundleID(%q) returned empty string", tt.appName)
+			}
+
+			// Should not contain com.macgo anymore
+			if strings.Contains(result, "com.macgo") {
+				t.Errorf("GenerateDefaultBundleID(%q) = %q, should not contain 'com.macgo'", tt.appName, result)
 			}
 		})
 	}

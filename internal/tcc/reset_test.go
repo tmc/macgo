@@ -1,6 +1,7 @@
 package tcc
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -28,7 +29,7 @@ func TestResolveBundleID(t *testing.T) {
 				AppName: "TestApp",
 				Debug:   false,
 			},
-			want:    "com.macgo.testapp",
+			want:    "", // Will be checked for validity instead of exact match
 			wantErr: false,
 		},
 		{
@@ -60,7 +61,20 @@ func TestResolveBundleID(t *testing.T) {
 				if tt.want != "" && got != tt.want {
 					t.Errorf("ResolveBundleID() = %v, want %v", got, tt.want)
 				}
-				// For cases where we don't specify want, just check it's not empty
+				// For cases where we don't specify want, just check it's not empty and valid
+				if tt.want == "" {
+					if got == "" {
+						t.Errorf("ResolveBundleID() returned empty string")
+					}
+					// Should not contain com.macgo anymore
+					if strings.Contains(got, "com.macgo") {
+						t.Errorf("ResolveBundleID() = %q, should not contain 'com.macgo'", got)
+					}
+					// Should contain at least one dot (valid bundle ID format)
+					if !strings.Contains(got, ".") {
+						t.Errorf("ResolveBundleID() = %q, should contain at least one dot", got)
+					}
+				}
 				if tt.want == "" && got == "" {
 					t.Errorf("ResolveBundleID() returned empty bundle ID")
 				}

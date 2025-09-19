@@ -25,8 +25,8 @@ func TestIntegrationInfoAndEntitlements(t *testing.T) {
 		ExecName: execName,
 		Version:  version,
 		CustomKeys: map[string]interface{}{
-			"LSUIElement":                false, // Show in dock for this example
-			"NSCameraUsageDescription":   "This app needs camera access to capture photos.",
+			"LSUIElement":                  false, // Show in dock for this example
+			"NSCameraUsageDescription":     "This app needs camera access to capture photos.",
 			"NSMicrophoneUsageDescription": "This app needs microphone access for audio recording.",
 		},
 	}

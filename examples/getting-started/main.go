@@ -77,4 +77,3 @@ func main() {
 
 	fmt.Println("Shutting down...")
 }
-

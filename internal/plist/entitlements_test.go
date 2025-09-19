@@ -170,8 +170,8 @@ func TestGetAvailablePermissions(t *testing.T) {
 
 func TestPermissionDescription(t *testing.T) {
 	tests := []struct {
-		name       string
-		permission Permission
+		name          string
+		permission    Permission
 		shouldContain string
 	}{
 		{

@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/tmc/misc/macgo/helpers/bundle"
 )
 
 // ResolutionConfig holds configuration for resolving bundle IDs.
@@ -80,8 +82,8 @@ func ResolveBundleID(cfg ResolutionConfig) (string, error) {
 		return "", fmt.Errorf("could not determine app name")
 	}
 
-	// Create a simple bundle ID using the app name
-	bundleID := fmt.Sprintf("com.macgo.%s", strings.ToLower(appName))
+	// Create a bundle ID using the inference logic
+	bundleID := bundle.InferBundleID(appName)
 
 	if cfg.Debug {
 		fmt.Fprintf(os.Stderr, "tcc: inferred bundle ID: %s (from app name: %s)\n", bundleID, appName)

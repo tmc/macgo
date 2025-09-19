@@ -55,7 +55,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-
 func TestBundle_Create(t *testing.T) {
 	// Create a temporary executable for testing
 	tempDir, err := os.MkdirTemp("", "bundle-test")
@@ -238,4 +237,3 @@ func TestConfig_shouldKeepBundle(t *testing.T) {
 		})
 	}
 }
-

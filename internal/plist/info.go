@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/tmc/misc/macgo/helpers/bundle"
 )
 
 // InfoPlistConfig holds configuration for generating Info.plist files.
@@ -80,25 +82,9 @@ func generateInfoPlistContent(cfg InfoPlistConfig) string {
 }
 
 // GenerateDefaultBundleID creates a default bundle ID based on the app name.
-// Format: com.macgo.{normalized-app-name}
+// Uses the same inference logic as the helpers/bundle package.
 func GenerateDefaultBundleID(appName string) string {
-	// Normalize app name for bundle ID
-	normalized := strings.ToLower(appName)
-	normalized = strings.ReplaceAll(normalized, " ", "")
-	normalized = strings.ReplaceAll(normalized, "-", "")
-	normalized = strings.ReplaceAll(normalized, "_", "")
-
-	// Remove any non-alphanumeric characters
-	var result strings.Builder
-	for _, r := range normalized {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			result.WriteRune(r)
-		}
-	}
-
-	if result.Len() == 0 {
-		return "com.macgo.app"
-	}
-
-	return "com.macgo." + result.String()
+	// Use the bundle inference logic from helpers/bundle
+	// Import is done at the top of the file
+	return bundle.InferBundleID(appName)
 }
