@@ -1,150 +1,148 @@
-// Package macgo provides simple macOS app bundle creation and TCC permission management.
+// Package macgo provides seamless macOS application bundle creation with permissions and entitlements.
 //
-// macgo enables Go applications to request macOS system permissions (camera, microphone,
-// files, etc.) by automatically creating app bundles with proper entitlements and handling
-// the relaunch process when necessary.
+// macgo enables Go programs to integrate with macOS security features by automatically creating
+// app bundles with proper structure, Info.plist, entitlements, and code signing. This allows
+// Go applications to request system permissions (camera, microphone, files, etc.) just like
+// native macOS applications.
 //
-// # Basic Usage
+// # Quick Start
 //
 // The simplest way to use macgo is with the Request function:
 //
-//	err := macgo.Request(macgo.Camera, macgo.Microphone)
+//	err := macgo.Request(macgo.Camera)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	// Camera permission granted, proceed with camera access
+//
+// Request multiple permissions at once:
+//
+//	err := macgo.Request(macgo.Camera, macgo.Microphone, macgo.Files)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //
-// # Advanced Configuration
+// # Configuration
 //
-// For more control, use the Config struct:
+// For more control, use the Config struct with builder methods:
 //
 //	cfg := macgo.NewConfig().
 //	    WithAppName("MyApp").
-//	    WithPermissions(macgo.Camera, macgo.Files).
-//	    WithDebug()
+//	    WithBundleID("com.example.myapp").
+//	    WithPermissions(macgo.Camera, macgo.Microphone).
+//	    WithAdHocSign().  // Sign for development
+//	    WithDebug()       // Enable debug output
+//
 //	err := macgo.Start(cfg)
-//
-// # TCC Database Access
-//
-// macgo now provides comprehensive TCC (Transparency, Consent, and Control) database
-// access for querying and managing permissions:
-//
-//	// Check if we have Full Disk Access
-//	if macgo.CheckFullDiskAccess() {
-//	    // Open TCC database for reading
-//	    db, err := macgo.OpenTCCDatabase()
-//	    if err != nil {
-//	        log.Fatal(err)
-//	    }
-//	    defer db.Close()
-//
-//	    // List all permissions
-//	    entries, err := db.ListAllPermissions()
-//	    if err != nil {
-//	        log.Fatal(err)
-//	    }
-//
-//	    // Format and display
-//	    output, _ := macgo.FormatTCCEntries(entries, "table")
-//	    fmt.Println(output)
-//	}
-//
-// # Permission Queries
-//
-// Simple permission queries without SQL:
-//
-//	pq, err := macgo.NewPermissionQuery()
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//
-//	if pq.HasCameraAccess() {
-//	    fmt.Println("Camera access granted")
-//	}
-//
-//	if pq.HasMicrophoneAccess() {
-//	    fmt.Println("Microphone access granted")
-//	}
-//
-//	// Get all permissions at once
-//	status, err := macgo.GetAllPermissions()
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Printf("Permissions: Camera=%v, Mic=%v, FDA=%v\n",
-//	    status.Camera, status.Microphone, status.FullDiskAccess)
-//
-// # Waiting for Permissions
-//
-// You can wait for permissions to be granted:
-//
-//	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-//	defer cancel()
-//
-//	// Wait for Full Disk Access
-//	err := macgo.WaitForFullDiskAccess(ctx, 1*time.Second)
-//	if err != nil {
-//	    log.Fatal("FDA not granted:", err)
-//	}
-//
-//	// Wait for a specific permission
-//	err = macgo.WaitForPermission(macgo.Camera, 30*time.Second)
-//	if err != nil {
-//	    log.Fatal("Camera permission not granted:", err)
-//	}
-//
-// # Resetting Permissions
-//
-// Reset TCC permissions for testing:
-//
-//	// Reset all permissions for current app
-//	err := macgo.ResetPermissions()
-//
-//	// Reset specific service
-//	err := macgo.ResetServicePermission("camera")
 //
 // # Available Permissions
 //
-// Core permissions:
-//   - Camera: Camera access
-//   - Microphone: Microphone access
-//   - Location: Location services
-//   - Files: File system access
-//   - Network: Network access
-//   - Sandbox: App sandbox
+// Core permissions that cover most use cases:
+//
+//	Camera     - Camera access (AVCaptureDevice)
+//	Microphone - Microphone access (AVAudioSession)
+//	Location   - Location services (CoreLocation)
+//	Files      - File system access with user selection
+//	Network    - Network client and server connections
+//	Sandbox    - App sandbox with restricted file access
+//
+// # Code Signing
+//
+// macgo supports multiple signing approaches:
+//
+// Ad-hoc signing for development:
+//
+//	cfg := macgo.NewConfig().WithAdHocSign()
+//
+// Automatic Developer ID detection:
+//
+//	cfg := macgo.NewConfig().WithAutoSign()
+//
+// Specific signing identity:
+//
+//	cfg := macgo.NewConfig().WithSigningIdentity("Developer ID Application: Your Name")
 //
 // # Environment Variables
 //
-// macgo can be configured via environment variables:
-//   - MACGO_APP_NAME: Application name
-//   - MACGO_APP_NAME_PREFIX: Prefix to add to all app names
-//   - MACGO_BUNDLE_ID: Bundle identifier
-//   - MACGO_BUNDLE_ID_PREFIX: Prefix to add to all bundle IDs
-//   - MACGO_DEBUG=1: Enable debug logging
-//   - MACGO_KEEP_BUNDLE=1: Preserve bundle after execution
-//   - MACGO_AUTO_SIGN=1: Enable automatic code signing
-//   - MACGO_CAMERA=1: Request camera permission
-//   - MACGO_MICROPHONE=1: Request microphone permission
-//   - MACGO_FILES=1: Request file access permission
+// Configure macgo via environment variables:
+//
+//	MACGO_APP_NAME=MyApp              # Application name
+//	MACGO_APP_NAME_PREFIX=Dev-        # Prefix for app names (e.g., "Dev-MyApp")
+//	MACGO_BUNDLE_ID=com.example.app   # Bundle identifier
+//	MACGO_BUNDLE_ID_PREFIX=test.      # Prefix for bundle IDs
+//	MACGO_DEBUG=1                      # Enable debug output
+//	MACGO_KEEP_BUNDLE=1                # Keep bundle after execution
+//	MACGO_NO_RELAUNCH=1                # Disable automatic relaunch
+//	MACGO_AD_HOC_SIGN=1                # Enable ad-hoc signing
+//	MACGO_AUTO_SIGN=1                  # Auto-detect signing identity
+//	MACGO_RESET_PERMISSIONS=1          # Reset permissions before requesting
+//
+// Permission-specific variables:
+//
+//	MACGO_CAMERA=1                     # Request camera permission
+//	MACGO_MICROPHONE=1                 # Request microphone permission
+//	MACGO_LOCATION=1                   # Request location permission
+//	MACGO_FILES=1                      # Request file access permission
+//	MACGO_NETWORK=1                    # Request network permission
+//	MACGO_SANDBOX=1                    # Enable app sandbox
+//
+// # Bundle Structure
+//
+// macgo creates a standard macOS app bundle:
+//
+//	MyApp.app/
+//	├── Contents/
+//	│   ├── Info.plist          # App metadata and configuration
+//	│   ├── MacOS/
+//	│   │   └── MyApp           # Executable (your Go binary)
+//	│   ├── Resources/          # Icons and other resources
+//	│   └── _CodeSignature/     # Code signing data
 //
 // # Bundle ID Generation
 //
-// macgo automatically generates meaningful bundle IDs from your Go module:
-//   - github.com/user/repo → com.github.user.repo.appname
-//   - gitlab.com/company/tool → com.gitlab.company.tool.appname
-//   - example.com/service → com.example.service.appname
+// macgo intelligently generates bundle IDs from your Go module path:
 //
-// This provides unique, meaningful identifiers instead of generic "com.macgo" prefixes.
+//	github.com/user/project     → com.github.user.project.appname
+//	gitlab.com/org/tool         → com.gitlab.org.tool.appname
+//	example.com/app             → com.example.app.appname
+//	Private/custom modules      → io.username.appname (using system username)
 //
-// # TCC Services
+// This ensures unique, meaningful identifiers for your applications.
 //
-// Common TCC service identifiers:
-//   - kTCCServiceCamera: Camera access
-//   - kTCCServiceMicrophone: Microphone access
-//   - kTCCServiceScreenCapture: Screen recording
-//   - kTCCServiceSystemPolicyAllFiles: Full Disk Access
-//   - kTCCServiceAddressBook: Contacts access
-//   - kTCCServiceCalendar: Calendar access
-//   - kTCCServicePhotos: Photos library access
+// # Auto Packages
 //
-// Use macgo.KnownTCCServices() to get a full list with descriptions.
+// Import auto packages for pre-configured setups:
+//
+//	import (
+//	    _ "github.com/tmc/macgo/auto/media"   // Camera + Microphone
+//	    _ "github.com/tmc/macgo/auto/files"   // File access
+//	    _ "github.com/tmc/macgo/auto/adhoc"   // Ad-hoc signing
+//	    "github.com/tmc/macgo"
+//	)
+//
+//	func main() {
+//	    // Permissions and signing are pre-configured
+//	    macgo.Request()
+//	}
+//
+// # TCC Integration
+//
+// macgo integrates with macOS TCC (Transparency, Consent, and Control) to:
+//   - Generate proper entitlements for requested permissions
+//   - Handle permission prompts automatically
+//   - Reset permissions for testing (when requested)
+//   - Support both sandboxed and non-sandboxed applications
+//
+// # Examples
+//
+// See the examples directory for complete applications demonstrating:
+//   - Basic permission requests
+//   - Camera and microphone access
+//   - File system access
+//   - Code signing workflows
+//   - Sandboxed applications
+//   - Custom bundle configuration
 package macgo

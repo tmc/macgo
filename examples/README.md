@@ -1,103 +1,196 @@
 # macgo Examples
 
-This directory contains functional examples demonstrating various macgo features and use cases. All examples have been tested and verified to build successfully.
+This directory contains example applications demonstrating various features of the macgo library.
 
-## Basic Examples
+## Quick Start Examples
 
-### getting-started
-**Purpose**: Simple introduction to macgo with basic permission requests
-**Features**: Camera and microphone permissions, basic setup
+### 📚 [getting-started](getting-started/)
+Basic example showing the simplest way to use macgo with a single permission request.
 
-### hello
-**Purpose**: Minimal "Hello World" example
-**Features**: Basic macgo initialization
+```go
+err := macgo.Request(macgo.Camera)
+```
 
-### hello-files
-**Purpose**: File access permissions example
-**Features**: User-selected file access, basic file operations
+### 👋 [hello](hello/)
+Classic "Hello, World!" as a macOS app bundle with debug logging to demonstrate the bundle creation process.
 
-### camera-mic
-**Purpose**: Camera and microphone access demonstration
-**Features**: TCC permission requests, hardware access testing
+### 📹 [camera-mic](camera-mic/)
+Request camera and microphone permissions for media applications. Shows how to request multiple permissions at once.
+
+## File Access Examples
+
+### 📁 [hello-files](hello-files/)
+Demonstrates file system access with proper permissions. Creates a test file on the Desktop to verify access.
+
+### 🖥️ [desktop-list](desktop-list/)
+Advanced file listing with command-line flags for different signing strategies:
+- `-debug` - Enable debug output
+- `-ad-hoc` - Use ad-hoc signing
+- `-auto-sign` - Auto-detect Developer ID
+- `-sign <identity>` - Use specific signing identity
+
+### 🔒 [sandboxed-file-exec](sandboxed-file-exec/)
+Execute files within the macOS app sandbox. Demonstrates the difference between sandboxed and non-sandboxed file access.
 
 ## Code Signing Examples
 
-### auto-signed
-**Purpose**: Automatic code signing with Developer ID
-**Features**: Auto-detection of signing certificates, production signing
+### ✍️ [code-signing](code-signing/)
+Comprehensive code signing demonstration:
+- Ad-hoc signing for development
+- Developer ID signing for distribution
+- Custom signing identities
+- Verification of signed bundles
 
-### code-signing
-**Purpose**: Manual code signing configuration
-**Features**: Custom signing identity, entitlements configuration
+### 🔐 [auto-signed](auto-signed/)
+Automatic code signing using the `auto/signed` package. Detects and uses available Developer ID certificates.
 
-## Advanced Features
+## Advanced Examples
 
-### app-groups
-Contains multiple sub-examples for App Groups functionality:
-- **app-groups-reader**: Reading shared data from app groups
-- **app-groups-verifier**: Verifying app group access
-- **app-groups-writer**: Writing data to shared app groups
+### 🍎 [osascript-wrapper](osascript-wrapper/)
+Execute AppleScript from Go applications:
+- Bundle AppleScript files within the app
+- Execute scripts with proper permissions
+- Handle script output and errors
 
-### app-sandbox
-Contains multiple sub-examples for App Sandbox functionality:
-- **sandbox-container**: Working with sandbox containers
-- **security-scoped-bookmarks**: Using security-scoped bookmarks for persistent file access
-- **user-selected-files**: User-selected file access patterns
+### 🔄 [permission-reset-test](permission-reset-test/)
+Test permission reset functionality using `tccutil`. Useful for development and testing workflows.
 
-### sandboxed-file-exec
-**Purpose**: File execution within app sandbox
-**Features**: Sandboxed execution, file permissions
+### 📸 [screen-capture](screen-capture/)
+Screen recording and capture with proper entitlements. Demonstrates screen capture permissions.
 
-## System Integration
+## Test Examples
 
-### desktop-list
-**Purpose**: Desktop and window management
-**Features**: System information access, desktop interaction
+These examples are primarily for testing macgo's internal functionality:
 
-### osascript-wrapper
-**Purpose**: AppleScript integration and script management
-**Features**: Running AppleScript from Go, script storage and execution
+- **comprehensive-io-test** - Test I/O handling in bundles
+- **env-test** - Verify environment variable propagation
+- **signal-test** - Test signal handling
+- **stdio-test** - Test stdin/stdout/stderr redirection
+- **test-signing** - Verify signing configurations
 
-## Building and Running Examples
+## Running Examples
 
-Each example can be built and run independently:
-
-```bash
-# Navigate to any example directory
-cd examples/getting-started
-
-# Build the example
-go build .
-
-# Run the example
-./getting-started
-```
-
-For examples with subdirectories (app-groups, app-sandbox), navigate to the specific sub-example:
+### Direct Execution
+Run any example directly with `go run`:
 
 ```bash
-cd examples/app-groups/app-groups-writer
-go build .
-./app-groups-writer
+cd getting-started
+go run .
 ```
 
-## Example Categories
+### With Environment Variables
+Configure behavior via environment:
 
-- **Beginner**: getting-started, hello, hello-files
-- **Hardware Access**: camera-mic
-- **Code Signing**: auto-signed, code-signing
-- **Advanced Permissions**: app-groups/*, app-sandbox/*, sandboxed-file-exec
-- **System Integration**: desktop-list, osascript-wrapper
+```bash
+# Enable debug output
+MACGO_DEBUG=1 go run .
+
+# Use ad-hoc signing
+MACGO_AD_HOC_SIGN=1 go run .
+
+# Keep bundle for inspection
+MACGO_KEEP_BUNDLE=1 go run .
+
+# Custom app name
+MACGO_APP_NAME="My Test App" go run .
+```
+
+### Building Standalone Apps
+Build as a regular executable:
+
+```bash
+go build -o myapp
+./myapp
+```
+
+The executable will create its bundle on first run.
+
+## Common Patterns
+
+### Basic Permission Request
+```go
+package main
+
+import (
+    "log"
+    "github.com/tmc/macgo"
+)
+
+func main() {
+    err := macgo.Request(macgo.Camera)
+    if err != nil {
+        log.Fatal(err)
+    }
+    // Use camera...
+}
+```
+
+### Multiple Permissions
+```go
+err := macgo.Request(
+    macgo.Camera,
+    macgo.Microphone,
+    macgo.Files,
+)
+```
+
+### Custom Configuration
+```go
+cfg := macgo.NewConfig().
+    WithAppName("MyApp").
+    WithBundleID("com.example.myapp").
+    WithPermissions(macgo.Camera).
+    WithAdHocSign().
+    WithDebug()
+
+err := macgo.Start(cfg)
+```
+
+### Using Auto Packages
+```go
+import (
+    _ "github.com/tmc/macgo/auto/media"   // Camera + Microphone
+    _ "github.com/tmc/macgo/auto/adhoc"   // Ad-hoc signing
+    "github.com/tmc/macgo"
+)
+
+func main() {
+    // Permissions and signing pre-configured
+    macgo.Request()
+}
+```
+
+## Troubleshooting
+
+### Bundle Location
+By default, bundles are created in:
+- `$GOPATH/bin/` (if GOPATH is set)
+- `/tmp/` (fallback location)
+- Use `MACGO_KEEP_BUNDLE=1` to preserve bundles
+
+### Code Signing Issues
+- Ensure Xcode Command Line Tools are installed: `xcode-select --install`
+- List available identities: `security find-identity -v -p codesigning`
+- Use `-debug` flag for detailed signing output
+
+### Permission Prompts
+- Permissions are requested on first run
+- Use permission-reset-test example to reset for testing
+- Check System Settings → Privacy & Security for current status
+
+### Debug Output
+Enable debug mode to see:
+- Bundle creation process
+- Entitlements being added
+- Code signing commands
+- Relaunch behavior
+
+```bash
+MACGO_DEBUG=1 go run .
+```
 
 ## Requirements
 
-- macOS 10.15 or later
 - Go 1.21 or later
+- macOS 11.0 or later
 - Xcode Command Line Tools (for code signing)
-
-## Notes
-
-- Some examples require specific macOS permissions that will be requested at runtime
-- Code signing examples may require valid Developer ID certificates
-- App Groups examples require proper app group configuration
-- AppleScript examples may require Automation permissions for target applications
