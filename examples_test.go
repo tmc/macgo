@@ -124,8 +124,8 @@ func TestExampleFunctions(t *testing.T) {
 	// Ensure all example functions can be called without panicking
 
 	// Test environment setup for examples
-	os.Setenv("MACGO_NO_RELAUNCH", "1")
-	defer os.Unsetenv("MACGO_NO_RELAUNCH")
+	_ = os.Setenv("MACGO_NO_RELAUNCH", "1")
+	defer func() { _ = os.Unsetenv("MACGO_NO_RELAUNCH") }()
 
 	// Test each example function exists and can be called
 	// These won't actually run macgo since MACGO_NO_RELAUNCH=1
@@ -169,8 +169,8 @@ func TestExampleFunctions(t *testing.T) {
 
 // Test the helper functions from examples
 func TestHelperFunctions(t *testing.T) {
-	os.Setenv("MACGO_NO_RELAUNCH", "1")
-	defer os.Unsetenv("MACGO_NO_RELAUNCH")
+	_ = os.Setenv("MACGO_NO_RELAUNCH", "1")
+	defer func() { _ = os.Unsetenv("MACGO_NO_RELAUNCH") }()
 
 	// Test NewConfig
 	cfg := macgo.NewConfig()
@@ -204,8 +204,8 @@ func TestHelperFunctions(t *testing.T) {
 
 // Test auto packages functionality
 func TestAutoPackages(t *testing.T) {
-	os.Setenv("MACGO_NO_RELAUNCH", "1")
-	defer os.Unsetenv("MACGO_NO_RELAUNCH")
+	_ = os.Setenv("MACGO_NO_RELAUNCH", "1")
+	defer func() { _ = os.Unsetenv("MACGO_NO_RELAUNCH") }()
 
 	// These would normally be imported as:
 	// import _ "github.com/tmc/misc/macgo/auto/camera"
@@ -231,12 +231,12 @@ func TestAutoPackages(t *testing.T) {
 func TestErrorHandling(t *testing.T) {
 	// Disable relaunch to prevent os.Exit() during test
 	original := os.Getenv("MACGO_NO_RELAUNCH")
-	os.Setenv("MACGO_NO_RELAUNCH", "1")
+	_ = os.Setenv("MACGO_NO_RELAUNCH", "1")
 	defer func() {
 		if original == "" {
-			os.Unsetenv("MACGO_NO_RELAUNCH")
+			_ = os.Unsetenv("MACGO_NO_RELAUNCH")
 		} else {
-			os.Setenv("MACGO_NO_RELAUNCH", original)
+			_ = os.Setenv("MACGO_NO_RELAUNCH", original)
 		}
 	}()
 
@@ -273,11 +273,11 @@ func Example_environmentVariables() {
 	// MACGO_SANDBOX=1               - Enable app sandbox
 
 	// Example: Reset permissions before requesting new ones
-	os.Setenv("MACGO_RESET_PERMISSIONS", "1")
-	os.Setenv("MACGO_DEBUG", "1")
+	_ = os.Setenv("MACGO_RESET_PERMISSIONS", "1")
+	_ = os.Setenv("MACGO_DEBUG", "1")
 	defer func() {
-		os.Unsetenv("MACGO_RESET_PERMISSIONS")
-		os.Unsetenv("MACGO_DEBUG")
+		_ = os.Unsetenv("MACGO_RESET_PERMISSIONS")
+		_ = os.Unsetenv("MACGO_DEBUG")
 	}()
 
 	err := macgo.Request(macgo.Camera)

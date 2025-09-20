@@ -15,20 +15,20 @@ func TestEnvironmentPrefixes(t *testing.T) {
 
 	defer func() {
 		if originalAppPrefix == "" {
-			os.Unsetenv("MACGO_APP_NAME_PREFIX")
+			_ = os.Unsetenv("MACGO_APP_NAME_PREFIX")
 		} else {
-			os.Setenv("MACGO_APP_NAME_PREFIX", originalAppPrefix)
+			_ = os.Setenv("MACGO_APP_NAME_PREFIX", originalAppPrefix)
 		}
 		if originalBundlePrefix == "" {
-			os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
+			_ = os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
 		} else {
-			os.Setenv("MACGO_BUNDLE_ID_PREFIX", originalBundlePrefix)
+			_ = os.Setenv("MACGO_BUNDLE_ID_PREFIX", originalBundlePrefix)
 		}
 	}()
 
 	t.Run("app_name_prefix", func(t *testing.T) {
-		os.Setenv("MACGO_APP_NAME_PREFIX", "Dev-")
-		defer os.Unsetenv("MACGO_APP_NAME_PREFIX")
+		_ = os.Setenv("MACGO_APP_NAME_PREFIX", "Dev-")
+		defer func() { _ = os.Unsetenv("MACGO_APP_NAME_PREFIX") }()
 
 		result := bundle.CleanAppName("MyApp")
 		expected := "Dev-MyApp"
@@ -39,8 +39,8 @@ func TestEnvironmentPrefixes(t *testing.T) {
 	})
 
 	t.Run("bundle_id_prefix", func(t *testing.T) {
-		os.Setenv("MACGO_BUNDLE_ID_PREFIX", "development")
-		defer os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
+		_ = os.Setenv("MACGO_BUNDLE_ID_PREFIX", "development")
+		defer func() { _ = os.Unsetenv("MACGO_BUNDLE_ID_PREFIX") }()
 
 		result := bundle.InferBundleID("MyApp")
 
@@ -50,8 +50,8 @@ func TestEnvironmentPrefixes(t *testing.T) {
 	})
 
 	t.Run("bundle_id_prefix_with_dot", func(t *testing.T) {
-		os.Setenv("MACGO_BUNDLE_ID_PREFIX", "test.")
-		defer os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
+		_ = os.Setenv("MACGO_BUNDLE_ID_PREFIX", "test.")
+		defer func() { _ = os.Unsetenv("MACGO_BUNDLE_ID_PREFIX") }()
 
 		result := bundle.InferBundleID("MyApp")
 
@@ -66,8 +66,8 @@ func TestEnvironmentPrefixes(t *testing.T) {
 	})
 
 	t.Run("empty_prefixes", func(t *testing.T) {
-		os.Unsetenv("MACGO_APP_NAME_PREFIX")
-		os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
+		_ = os.Unsetenv("MACGO_APP_NAME_PREFIX")
+		_ = os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
 
 		appResult := bundle.CleanAppName("MyApp")
 		bundleResult := bundle.InferBundleID("MyApp")
@@ -88,18 +88,18 @@ func Example_environmentPrefixes() {
 	// Example showing how to use environment variables for prefixes
 
 	// Set app name prefix
-	os.Setenv("MACGO_APP_NAME_PREFIX", "Dev-")
+	_ = os.Setenv("MACGO_APP_NAME_PREFIX", "Dev-")
 	appName := bundle.CleanAppName("MyApp")
 	// appName is now "Dev-MyApp"
 	_ = appName
 
 	// Set bundle ID prefix
-	os.Setenv("MACGO_BUNDLE_ID_PREFIX", "development")
+	_ = os.Setenv("MACGO_BUNDLE_ID_PREFIX", "development")
 	bundleID := bundle.InferBundleID("MyApp")
 	// bundleID now starts with "development." followed by the inferred ID
 	_ = bundleID
 
 	// Clean up
-	os.Unsetenv("MACGO_APP_NAME_PREFIX")
-	os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
+	_ = os.Unsetenv("MACGO_APP_NAME_PREFIX")
+	_ = os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
 }

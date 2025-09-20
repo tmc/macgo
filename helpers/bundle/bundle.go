@@ -285,7 +285,7 @@ func ExtractAppNameFromPath(execPath string) string {
 			validExt = false
 		} else {
 			for _, r := range ext[1:] {
-				if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+				if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
 					validExt = false
 					break
 				}

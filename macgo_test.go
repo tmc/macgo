@@ -62,19 +62,19 @@ func TestFromEnv(t *testing.T) {
 	defer func() {
 		for k, v := range originalEnv {
 			if v == "" {
-				os.Unsetenv(k)
+				_ = os.Unsetenv(k)
 			} else {
-				os.Setenv(k, v)
+				_ = os.Setenv(k, v)
 			}
 		}
 	}()
 
 	// Test environment loading
-	os.Setenv("MACGO_APP_NAME", "TestApp")
-	os.Setenv("MACGO_BUNDLE_ID", "com.test.app")
-	os.Setenv("MACGO_DEBUG", "1")
-	os.Setenv("MACGO_CAMERA", "1")
-	os.Setenv("MACGO_MICROPHONE", "1")
+	_ = os.Setenv("MACGO_APP_NAME", "TestApp")
+	_ = os.Setenv("MACGO_BUNDLE_ID", "com.test.app")
+	_ = os.Setenv("MACGO_DEBUG", "1")
+	_ = os.Setenv("MACGO_CAMERA", "1")
+	_ = os.Setenv("MACGO_MICROPHONE", "1")
 
 	cfg := new(Config).FromEnv()
 
@@ -229,17 +229,17 @@ func BenchmarkStart(b *testing.B) {
 
 	// Set environment to prevent actual relaunch
 	originalEnv := os.Getenv("MACGO_NO_RELAUNCH")
-	os.Setenv("MACGO_NO_RELAUNCH", "1")
+	_ = os.Setenv("MACGO_NO_RELAUNCH", "1")
 	defer func() {
 		if originalEnv == "" {
-			os.Unsetenv("MACGO_NO_RELAUNCH")
+			_ = os.Unsetenv("MACGO_NO_RELAUNCH")
 		} else {
-			os.Setenv("MACGO_NO_RELAUNCH", originalEnv)
+			_ = os.Setenv("MACGO_NO_RELAUNCH", originalEnv)
 		}
 	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Start(cfg)
+		_ = Start(cfg)
 	}
 }

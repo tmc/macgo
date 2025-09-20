@@ -61,7 +61,7 @@ func TestBundle_Create(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	execPath := filepath.Join(tempDir, "testexec")
 	if err := os.WriteFile(execPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
@@ -122,7 +122,7 @@ func TestBundle_Validate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	bundlePath := filepath.Join(tempDir, "TestApp.app")
 	contentsDir := filepath.Join(bundlePath, "Contents")

@@ -475,42 +475,6 @@ func syncScriptToBundle(externalDir, bundleDir, scriptName string) error {
 	return nil
 }
 
-// syncScriptsToBundle copies scripts from external directory to bundle when they're newer
-func syncScriptsToBundle(externalDir, bundleDir string) error {
-	scriptsDir := filepath.Join(bundleDir, "scripts")
-
-	// Read scripts from external directory
-	entries, err := os.ReadDir(externalDir)
-	if err != nil {
-		// External directory doesn't exist, nothing to sync
-		return nil
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".applescript") {
-			continue
-		}
-
-		srcPath := filepath.Join(externalDir, entry.Name())
-		dstPath := filepath.Join(scriptsDir, entry.Name())
-
-		needsUpdate, err := scriptNeedsUpdate(srcPath, dstPath)
-		if err != nil {
-			log.Printf("Warning: Failed to check if script %s needs update: %v", entry.Name(), err)
-			continue
-		}
-
-		if needsUpdate {
-			if err := copyScript(srcPath, dstPath); err != nil {
-				log.Printf("Warning: Failed to copy script %s to bundle: %v", entry.Name(), err)
-				continue
-			}
-			fmt.Printf("Updated embedded script: %s\n", entry.Name())
-		}
-	}
-
-	return nil
-}
 
 // scriptNeedsUpdate checks if a script needs to be updated in the bundle
 func scriptNeedsUpdate(srcPath, dstPath string) (bool, error) {
@@ -553,7 +517,7 @@ func copyScript(srcPath, dstPath string) error {
 	if err != nil {
 		return err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	// Ensure destination directory exists
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
@@ -564,7 +528,7 @@ func copyScript(srcPath, dstPath string) error {
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	_, err = io.Copy(dst, src)
 	if err != nil {
@@ -586,7 +550,7 @@ func getFileHash(filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {

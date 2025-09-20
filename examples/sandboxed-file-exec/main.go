@@ -123,15 +123,6 @@ func main() {
 	fmt.Println("• v2: Single 'Files' permission for sandboxed file access")
 
 	fmt.Println("\nPress Enter to exit...")
-	fmt.Scanln()
+	_, _ = fmt.Scanln()
 }
 
-// Alternative: Even simpler for basic sandbox
-func simpleVersion() {
-	// One line to enable sandboxed file access
-	if err := macgo.Request(macgo.Files); err != nil {
-		log.Fatal(err)
-	}
-
-	// Your sandboxed app code here...
-}

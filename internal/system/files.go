@@ -24,7 +24,7 @@ func CopyFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file %s: %w", src, err)
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	// Get source file info for permissions
 	srcInfo, err := srcFile.Stat()
@@ -42,7 +42,7 @@ func CopyFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	// Copy the file content
 	_, err = io.Copy(dstFile, srcFile)
@@ -90,8 +90,8 @@ func SafeWriteFile(filename string, data []byte, perm os.FileMode) error {
 	// Clean up temp file on error
 	defer func() {
 		if tmpFile != nil {
-			tmpFile.Close()
-			os.Remove(tmpName)
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpName)
 		}
 	}()
 
@@ -113,7 +113,7 @@ func SafeWriteFile(filename string, data []byte, perm os.FileMode) error {
 
 	// Atomically move temp file to final location
 	if err := os.Rename(tmpName, filename); err != nil {
-		os.Remove(tmpName) // Clean up on error
+		_ = os.Remove(tmpName) // Clean up on error
 		return fmt.Errorf("failed to move temporary file to final location: %w", err)
 	}
 
@@ -247,7 +247,7 @@ func CalculateFileSHA256(filePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {

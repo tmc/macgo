@@ -70,7 +70,7 @@ func main() {
 			}
 
 			// Clean up
-			os.Remove(testFile)
+			_ = os.Remove(testFile)
 		}
 		return
 	}

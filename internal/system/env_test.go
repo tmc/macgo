@@ -77,12 +77,12 @@ func TestGetBool(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up first
-			os.Unsetenv(tt.key)
+			_ = os.Unsetenv(tt.key)
 
 			// Set the environment variable if value is not empty or if we want to test empty
 			if tt.value != "" || tt.name == "false value empty" {
-				os.Setenv(tt.key, tt.value)
-				defer os.Unsetenv(tt.key)
+				_ = os.Setenv(tt.key, tt.value)
+				defer func() { _ = os.Unsetenv(tt.key) }()
 			}
 
 			got := GetBool(tt.key)
@@ -134,12 +134,12 @@ func TestGetString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up first
-			os.Unsetenv(tt.key)
+			_ = os.Unsetenv(tt.key)
 
 			// Set the environment variable if we want to test non-unset cases
 			if tt.name != "unset value returns default" {
-				os.Setenv(tt.key, tt.value)
-				defer os.Unsetenv(tt.key)
+				_ = os.Setenv(tt.key, tt.value)
+				defer func() { _ = os.Unsetenv(tt.key) }()
 			}
 
 			got := GetString(tt.key, tt.defaultValue)
@@ -198,12 +198,12 @@ func TestGetInt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up first
-			os.Unsetenv(tt.key)
+			_ = os.Unsetenv(tt.key)
 
 			// Set the environment variable if we want to test non-unset cases
 			if tt.name != "unset value returns default" {
-				os.Setenv(tt.key, tt.value)
-				defer os.Unsetenv(tt.key)
+				_ = os.Setenv(tt.key, tt.value)
+				defer func() { _ = os.Unsetenv(tt.key) }()
 			}
 
 			got := GetInt(tt.key, tt.defaultValue)
@@ -262,12 +262,12 @@ func TestGetStringSlice(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up first
-			os.Unsetenv(tt.key)
+			_ = os.Unsetenv(tt.key)
 
 			// Set the environment variable if we want to test non-unset cases
 			if tt.name != "unset variable" {
-				os.Setenv(tt.key, tt.value)
-				defer os.Unsetenv(tt.key)
+				_ = os.Setenv(tt.key, tt.value)
+				defer func() { _ = os.Unsetenv(tt.key) }()
 			}
 
 			got := GetStringSlice(tt.key)
@@ -301,7 +301,7 @@ func TestSetBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer os.Unsetenv(tt.key)
+			defer func() { _ = os.Unsetenv(tt.key) }()
 
 			err := SetBool(tt.key, tt.value)
 			if err != nil {
@@ -318,44 +318,44 @@ func TestSetBool(t *testing.T) {
 }
 
 func TestIsDebugEnabled(t *testing.T) {
-	defer os.Unsetenv(EnvDebug)
+	defer func() { _ = os.Unsetenv(EnvDebug) }()
 
 	// Test enabled
-	os.Setenv(EnvDebug, "1")
+	_ = os.Setenv(EnvDebug, "1")
 	if !IsDebugEnabled() {
 		t.Errorf("IsDebugEnabled() = false, want true")
 	}
 
 	// Test disabled
-	os.Setenv(EnvDebug, "0")
+	_ = os.Setenv(EnvDebug, "0")
 	if IsDebugEnabled() {
 		t.Errorf("IsDebugEnabled() = true, want false")
 	}
 
 	// Test unset
-	os.Unsetenv(EnvDebug)
+	_ = os.Unsetenv(EnvDebug)
 	if IsDebugEnabled() {
 		t.Errorf("IsDebugEnabled() = true, want false when unset")
 	}
 }
 
 func TestIsRelaunchDisabled(t *testing.T) {
-	defer os.Unsetenv(EnvNoRelaunch)
+	defer func() { _ = os.Unsetenv(EnvNoRelaunch) }()
 
 	// Test enabled (disabled relaunch)
-	os.Setenv(EnvNoRelaunch, "1")
+	_ = os.Setenv(EnvNoRelaunch, "1")
 	if !IsRelaunchDisabled() {
 		t.Errorf("IsRelaunchDisabled() = false, want true")
 	}
 
 	// Test disabled (enabled relaunch)
-	os.Setenv(EnvNoRelaunch, "0")
+	_ = os.Setenv(EnvNoRelaunch, "0")
 	if IsRelaunchDisabled() {
 		t.Errorf("IsRelaunchDisabled() = true, want false")
 	}
 
 	// Test unset
-	os.Unsetenv(EnvNoRelaunch)
+	_ = os.Unsetenv(EnvNoRelaunch)
 	if IsRelaunchDisabled() {
 		t.Errorf("IsRelaunchDisabled() = true, want false when unset")
 	}
@@ -363,11 +363,11 @@ func TestIsRelaunchDisabled(t *testing.T) {
 
 func TestGetLaunchMode(t *testing.T) {
 	// Clean up first
-	os.Unsetenv(EnvForceLaunchServices)
-	os.Unsetenv(EnvForceDirectExecution)
+	_ = os.Unsetenv(EnvForceLaunchServices)
+	_ = os.Unsetenv(EnvForceDirectExecution)
 	defer func() {
-		os.Unsetenv(EnvForceLaunchServices)
-		os.Unsetenv(EnvForceDirectExecution)
+		_ = os.Unsetenv(EnvForceLaunchServices)
+		_ = os.Unsetenv(EnvForceDirectExecution)
 	}()
 
 	tests := []struct {
@@ -405,15 +405,15 @@ func TestGetLaunchMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up
-			os.Unsetenv(EnvForceLaunchServices)
-			os.Unsetenv(EnvForceDirectExecution)
+			_ = os.Unsetenv(EnvForceLaunchServices)
+			_ = os.Unsetenv(EnvForceDirectExecution)
 
 			// Set environment variables
 			if tt.launchServices != "" {
-				os.Setenv(EnvForceLaunchServices, tt.launchServices)
+				_ = os.Setenv(EnvForceLaunchServices, tt.launchServices)
 			}
 			if tt.directExecution != "" {
-				os.Setenv(EnvForceDirectExecution, tt.directExecution)
+				_ = os.Setenv(EnvForceDirectExecution, tt.directExecution)
 			}
 
 			got := GetLaunchMode()
@@ -431,18 +431,18 @@ func TestGetPermissionFlags(t *testing.T) {
 		EnvFiles, EnvNetwork, EnvSandbox,
 	}
 	for _, env := range permissionEnvs {
-		os.Unsetenv(env)
+		_ = os.Unsetenv(env)
 	}
 	defer func() {
 		for _, env := range permissionEnvs {
-			os.Unsetenv(env)
+			_ = os.Unsetenv(env)
 		}
 	}()
 
 	// Set some permissions
-	os.Setenv(EnvCamera, "1")
-	os.Setenv(EnvMicrophone, "1")
-	os.Setenv(EnvNetwork, "0") // Explicitly disabled
+	_ = os.Setenv(EnvCamera, "1")
+	_ = os.Setenv(EnvMicrophone, "1")
+	_ = os.Setenv(EnvNetwork, "0") // Explicitly disabled
 	// Leave others unset
 
 	flags := GetPermissionFlags()
@@ -470,17 +470,17 @@ func TestGetEnabledPermissions(t *testing.T) {
 		EnvFiles, EnvNetwork, EnvSandbox,
 	}
 	for _, env := range permissionEnvs {
-		os.Unsetenv(env)
+		_ = os.Unsetenv(env)
 	}
 	defer func() {
 		for _, env := range permissionEnvs {
-			os.Unsetenv(env)
+			_ = os.Unsetenv(env)
 		}
 	}()
 
 	// Set some permissions
-	os.Setenv(EnvCamera, "1")
-	os.Setenv(EnvFiles, "1")
+	_ = os.Setenv(EnvCamera, "1")
+	_ = os.Setenv(EnvFiles, "1")
 
 	enabled := GetEnabledPermissions()
 	expected := []string{"camera", "files"}
@@ -501,17 +501,17 @@ func TestSaveAndRestoreEnv(t *testing.T) {
 	keys := []string{"TEST_ENV_1", "TEST_ENV_2", "TEST_ENV_3"}
 
 	// Set initial values
-	os.Setenv("TEST_ENV_1", "initial1")
-	os.Setenv("TEST_ENV_2", "initial2")
+	_ = os.Setenv("TEST_ENV_1", "initial1")
+	_ = os.Setenv("TEST_ENV_2", "initial2")
 	// Leave TEST_ENV_3 unset
 
 	// Save current state
 	saved := SaveEnv(keys)
 
 	// Modify environment
-	os.Setenv("TEST_ENV_1", "modified1")
-	os.Setenv("TEST_ENV_2", "modified2")
-	os.Setenv("TEST_ENV_3", "modified3")
+	_ = os.Setenv("TEST_ENV_1", "modified1")
+	_ = os.Setenv("TEST_ENV_2", "modified2")
+	_ = os.Setenv("TEST_ENV_3", "modified3")
 
 	// Verify changes
 	if os.Getenv("TEST_ENV_1") != "modified1" {
@@ -534,15 +534,15 @@ func TestSaveAndRestoreEnv(t *testing.T) {
 
 	// Clean up
 	for _, key := range keys {
-		os.Unsetenv(key)
+		_ = os.Unsetenv(key)
 	}
 }
 
 func TestClearAllMacgoEnv(t *testing.T) {
 	// Set some macgo environment variables
-	os.Setenv(EnvDebug, "1")
-	os.Setenv(EnvCamera, "1")
-	os.Setenv(EnvAppName, "TestApp")
+	_ = os.Setenv(EnvDebug, "1")
+	_ = os.Setenv(EnvCamera, "1")
+	_ = os.Setenv(EnvAppName, "TestApp")
 
 	// Clear all
 	ClearAllMacgoEnv()
@@ -561,11 +561,11 @@ func TestClearAllMacgoEnv(t *testing.T) {
 
 func TestGetMacgoEnvSnapshot(t *testing.T) {
 	// Set some macgo environment variables
-	os.Setenv(EnvDebug, "1")
-	os.Setenv(EnvCamera, "1")
+	_ = os.Setenv(EnvDebug, "1")
+	_ = os.Setenv(EnvCamera, "1")
 	defer func() {
-		os.Unsetenv(EnvDebug)
-		os.Unsetenv(EnvCamera)
+		_ = os.Unsetenv(EnvDebug)
+		_ = os.Unsetenv(EnvCamera)
 	}()
 
 	snapshot := GetMacgoEnvSnapshot()

@@ -107,14 +107,14 @@ func TestEnvironmentBasedInference(t *testing.T) {
 	originalUser := os.Getenv("LOGNAME")
 	defer func() {
 		if originalUser == "" {
-			os.Unsetenv("LOGNAME")
+			_ = os.Unsetenv("LOGNAME")
 		} else {
-			os.Setenv("LOGNAME", originalUser)
+			_ = os.Setenv("LOGNAME", originalUser)
 		}
 	}()
 
 	// Set a test username
-	os.Setenv("LOGNAME", "testuser")
+	_ = os.Setenv("LOGNAME", "testuser")
 
 	// Test the fallback function directly, which uses environment variables
 	bundleID := bundle.InferFallbackBundleID("TestApp")

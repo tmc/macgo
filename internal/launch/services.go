@@ -181,7 +181,7 @@ func (s *ServicesLauncher) forwardStdin(stdinPipe string) error {
 	if err != nil {
 		return fmt.Errorf("open stdin pipe for writing: %w", err)
 	}
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	_, err = io.Copy(w, os.Stdin)
 	if err != nil {
@@ -196,7 +196,7 @@ func (s *ServicesLauncher) forwardStdout(stdoutPipe string) error {
 	if err != nil {
 		return fmt.Errorf("open stdout pipe for reading: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	_, err = io.Copy(os.Stdout, r)
 	if err != nil {
@@ -211,7 +211,7 @@ func (s *ServicesLauncher) forwardStderr(stderrPipe string) error {
 	if err != nil {
 		return fmt.Errorf("open stderr pipe for reading: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	_, err = io.Copy(os.Stderr, r)
 	if err != nil {

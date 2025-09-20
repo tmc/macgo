@@ -84,7 +84,7 @@ func isAlphanumeric(s string) bool {
 		return false
 	}
 	for _, r := range s {
-		if !((r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+		if (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
 			return false
 		}
 	}

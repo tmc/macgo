@@ -16,21 +16,21 @@ import (
 func init() {
 	// Customize flag usage
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Desktop List - macgo\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Lists Desktop files with proper macOS permissions\n\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags]\n\n", os.Args[0])
-		fmt.Fprintf(flag.CommandLine.Output(), "Flags:\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Desktop List - macgo\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Lists Desktop files with proper macOS permissions\n\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags]\n\n", os.Args[0])
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Flags:\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(flag.CommandLine.Output(), "\nExamples:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  %s                           # Basic usage\n", os.Args[0])
-		fmt.Fprintf(flag.CommandLine.Output(), "  %s -debug                    # With debug output\n", os.Args[0])
-		fmt.Fprintf(flag.CommandLine.Output(), "  %s -ad-hoc                   # With ad-hoc signing\n", os.Args[0])
-		fmt.Fprintf(flag.CommandLine.Output(), "  %s -auto-sign                # With auto-detected signing\n", os.Args[0])
-		fmt.Fprintf(flag.CommandLine.Output(), "  %s -sign \"Developer ID\"       # With specific identity\n", os.Args[0])
-		fmt.Fprintf(flag.CommandLine.Output(), "\nCode Signing:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  Ad-hoc signing provides basic code signing for development.\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  Auto-sign detects Developer ID certificates automatically.\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  List available identities: security find-identity -v -p codesigning\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "\nExamples:\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  %s                           # Basic usage\n", os.Args[0])
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  %s -debug                    # With debug output\n", os.Args[0])
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  %s -ad-hoc                   # With ad-hoc signing\n", os.Args[0])
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  %s -auto-sign                # With auto-detected signing\n", os.Args[0])
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  %s -sign \"Developer ID\"       # With specific identity\n", os.Args[0])
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "\nCode Signing:\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  Ad-hoc signing provides basic code signing for development.\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  Auto-sign detects Developer ID certificates automatically.\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  List available identities: security find-identity -v -p codesigning\n")
 	}
 }
 

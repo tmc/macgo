@@ -36,9 +36,9 @@ func TestCleanAppNameWithPrefix(t *testing.T) {
 	originalPrefix := os.Getenv("MACGO_APP_NAME_PREFIX")
 	defer func() {
 		if originalPrefix == "" {
-			os.Unsetenv("MACGO_APP_NAME_PREFIX")
+			_ = os.Unsetenv("MACGO_APP_NAME_PREFIX")
 		} else {
-			os.Setenv("MACGO_APP_NAME_PREFIX", originalPrefix)
+			_ = os.Setenv("MACGO_APP_NAME_PREFIX", originalPrefix)
 		}
 	}()
 
@@ -57,9 +57,9 @@ func TestCleanAppNameWithPrefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.prefix == "" {
-				os.Unsetenv("MACGO_APP_NAME_PREFIX")
+				_ = os.Unsetenv("MACGO_APP_NAME_PREFIX")
 			} else {
-				os.Setenv("MACGO_APP_NAME_PREFIX", tt.prefix)
+				_ = os.Setenv("MACGO_APP_NAME_PREFIX", tt.prefix)
 			}
 
 			result := bundle.CleanAppName(tt.input)
@@ -107,9 +107,9 @@ func TestInferBundleIDWithPrefix(t *testing.T) {
 	originalPrefix := os.Getenv("MACGO_BUNDLE_ID_PREFIX")
 	defer func() {
 		if originalPrefix == "" {
-			os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
+			_ = os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
 		} else {
-			os.Setenv("MACGO_BUNDLE_ID_PREFIX", originalPrefix)
+			_ = os.Setenv("MACGO_BUNDLE_ID_PREFIX", originalPrefix)
 		}
 	}()
 
@@ -128,9 +128,9 @@ func TestInferBundleIDWithPrefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.prefix == "" {
-				os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
+				_ = os.Unsetenv("MACGO_BUNDLE_ID_PREFIX")
 			} else {
-				os.Setenv("MACGO_BUNDLE_ID_PREFIX", tt.prefix)
+				_ = os.Setenv("MACGO_BUNDLE_ID_PREFIX", tt.prefix)
 			}
 
 			result := bundle.InferBundleID(tt.input)
@@ -224,8 +224,8 @@ func startsWith(s, prefix string) bool {
 
 func containsInvalidBundleIDChars(s string) bool {
 	for _, r := range s {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') || r == '.' || r == '-') {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') &&
+			(r < '0' || r > '9') && r != '.' && r != '-' {
 			return true
 		}
 	}

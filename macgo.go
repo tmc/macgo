@@ -257,14 +257,6 @@ func (c *Config) WithAdHocSign() *Config {
 	return c
 }
 
-// shouldKeepBundle returns the effective KeepBundle value.
-// Defaults to true to preserve bundles for inspection and reuse.
-func (c *Config) shouldKeepBundle() bool {
-	if c.KeepBundle == nil {
-		return true // Default to keeping bundles
-	}
-	return *c.KeepBundle
-}
 
 // Validate checks the configuration for common issues and dependency requirements.
 // Returns an error if the configuration is invalid.
@@ -371,12 +363,6 @@ func OpenSystemPreferences() error {
 	return nil
 }
 
-// copyToClipboard copies text to the system clipboard using pbcopy.
-func copyToClipboard(text string) error {
-	cmd := exec.Command("pbcopy")
-	cmd.Stdin = strings.NewReader(text)
-	return cmd.Run()
-}
 
 // LaunchAppBundle launches an app bundle using the open command.
 // This ensures proper registration with TCC for permission dialogs.
@@ -395,7 +381,7 @@ func LaunchAppBundle(bundlePath string) error {
 func ShowFullDiskAccessInstructions(programPath string, openSettings bool) {
 	if openSettings {
 		// Open System Settings
-		OpenSystemPreferences()
+		_ = OpenSystemPreferences()
 	}
 
 	// The programPath parameter is available for future enhancements

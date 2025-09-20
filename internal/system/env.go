@@ -182,9 +182,9 @@ func SaveEnv(keys []string) map[string]string {
 func RestoreEnv(saved map[string]string) {
 	for key, value := range saved {
 		if value == "" {
-			os.Unsetenv(key)
+			_ = os.Unsetenv(key)
 		} else {
-			os.Setenv(key, value)
+			_ = os.Setenv(key, value)
 		}
 	}
 }
@@ -218,7 +218,7 @@ func AllMacgoEnvVars() []string {
 // Useful for testing to ensure clean state.
 func ClearAllMacgoEnv() {
 	for _, key := range AllMacgoEnvVars() {
-		os.Unsetenv(key)
+		_ = os.Unsetenv(key)
 	}
 }
 

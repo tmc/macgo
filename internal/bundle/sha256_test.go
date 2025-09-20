@@ -91,12 +91,12 @@ func TestBundle_SHA256_Integration(t *testing.T) {
 	originalGOPATH := os.Getenv("GOPATH")
 	defer func() {
 		if originalGOPATH == "" {
-			os.Unsetenv("GOPATH")
+			_ = os.Unsetenv("GOPATH")
 		} else {
-			os.Setenv("GOPATH", originalGOPATH)
+			_ = os.Setenv("GOPATH", originalGOPATH)
 		}
 	}()
-	os.Setenv("GOPATH", tmpDir)
+	_ = os.Setenv("GOPATH", tmpDir)
 
 	// Create the bin directory
 	binDir := filepath.Join(tmpDir, "bin")

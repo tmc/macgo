@@ -11,7 +11,7 @@ import (
 
 func init() {
 	// Enable ad-hoc signing by default when this package is imported
-	os.Setenv("MACGO_AD_HOC_SIGN", "1")
+	_ = os.Setenv("MACGO_AD_HOC_SIGN", "1")
 }
 
 // Request is a convenience function that creates a config with ad-hoc signing and the given permissions.

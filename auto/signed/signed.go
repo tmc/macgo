@@ -11,7 +11,7 @@ import (
 
 func init() {
 	// Enable auto-signing by default when this package is imported
-	os.Setenv("MACGO_AUTO_SIGN", "1")
+	_ = os.Setenv("MACGO_AUTO_SIGN", "1")
 }
 
 // Request is a convenience function that creates a config with auto-signing and the given permissions.

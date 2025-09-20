@@ -91,7 +91,7 @@ func TestDirectLauncher_Launch_Integration(t *testing.T) {
 	if err != nil {
 		t.Skipf("Cannot create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a mock bundle structure
 	bundlePath := filepath.Join(tmpDir, "TestApp.app")

@@ -45,7 +45,7 @@ func TestReadBundleIDFromPlist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create a test bundle structure
 	bundlePath := filepath.Join(tempDir, "TestApp.app")
@@ -91,7 +91,7 @@ func TestCodeSignBundle_AdHoc(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create minimal bundle structure
 	bundlePath := filepath.Join(tempDir, "TestApp.app")
@@ -183,7 +183,7 @@ func TestVerifySignature(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	bundlePath := filepath.Join(tempDir, "TestApp.app")
 	contentsDir := filepath.Join(bundlePath, "Contents")
@@ -218,7 +218,7 @@ func TestGetSignatureInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	bundlePath := filepath.Join(tempDir, "TestApp.app")
 	contentsDir := filepath.Join(bundlePath, "Contents")
@@ -235,7 +235,7 @@ func TestGetSignatureInfo(t *testing.T) {
 	}
 
 	// Test getting signature info (should fail for unsigned bundle)
-	info, err := GetSignatureInfo(bundlePath)
+	_, err = GetSignatureInfo(bundlePath)
 	if err == nil {
 		t.Error("GetSignatureInfo() should fail for unsigned bundle")
 	} else {
@@ -243,12 +243,10 @@ func TestGetSignatureInfo(t *testing.T) {
 	}
 
 	// Test with non-existent bundle
-	info, err = GetSignatureInfo("/nonexistent/bundle.app")
+	_, err = GetSignatureInfo("/nonexistent/bundle.app")
 	if err == nil {
 		t.Error("GetSignatureInfo() should fail for non-existent bundle")
 	}
-
-	_ = info // Avoid unused variable warning
 }
 
 // TestCodeSignBundle_Config tests the configuration parsing for code signing
@@ -258,7 +256,7 @@ func TestCodeSignBundle_Config(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	bundlePath := filepath.Join(tempDir, "TestApp.app")
 	contentsDir := filepath.Join(bundlePath, "Contents")

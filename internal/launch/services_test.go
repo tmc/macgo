@@ -15,7 +15,7 @@ func TestServicesLauncher_createPipeDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createPipeDirectory() failed: %v", err)
 	}
-	defer os.RemoveAll(pipeDir)
+	defer func() { _ = os.RemoveAll(pipeDir) }()
 
 	// Check that the directory was created
 	if _, err := os.Stat(pipeDir); os.IsNotExist(err) {
@@ -46,7 +46,7 @@ func TestServicesLauncher_createNamedPipes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	pipes, err := launcher.createNamedPipes(tmpDir)
 	if err != nil {
