@@ -2,7 +2,7 @@
 package tcc
 
 import (
-	"github.com/tmc/misc/macgo/helpers/permissions"
+	"github.com/tmc/misc/macgo/permissions"
 )
 
 // Permission represents a macOS system permission that can be requested.

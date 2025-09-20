@@ -1,7 +1,7 @@
 package system
 
 import (
-	"github.com/tmc/misc/macgo/helpers/bundle"
+	"github.com/tmc/misc/macgo/bundle"
 )
 
 // CleanAppName removes problematic characters from app names.

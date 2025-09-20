@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tmc/misc/macgo/helpers/codesign"
+	"github.com/tmc/misc/macgo/codesign"
 	"github.com/tmc/misc/macgo/internal/system"
 )
 

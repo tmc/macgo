@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/tmc/misc/macgo/helpers/bundle"
+	"github.com/tmc/misc/macgo/bundle"
 )
 
 // InfoPlistConfig holds configuration for generating Info.plist files.

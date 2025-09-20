@@ -1,11 +1,11 @@
-package macgo_test
+package bundle_test
 
 import (
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/tmc/misc/macgo/helpers/bundle"
+	"github.com/tmc/misc/macgo/bundle"
 )
 
 func TestEnvironmentPrefixes(t *testing.T) {

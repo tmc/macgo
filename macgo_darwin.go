@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tmc/misc/macgo/helpers/teamid"
+	"github.com/tmc/misc/macgo/teamid"
 	"github.com/tmc/misc/macgo/internal/bundle"
 	"github.com/tmc/misc/macgo/internal/launch"
 	"github.com/tmc/misc/macgo/internal/system"

@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tmc/misc/macgo/helpers/bundle"
+	"github.com/tmc/misc/macgo/bundle"
 )
 
 func TestCleanAppName(t *testing.T) {

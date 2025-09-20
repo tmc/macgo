@@ -3,7 +3,7 @@ package system
 import (
 	"testing"
 
-	"github.com/tmc/misc/macgo/helpers/bundle"
+	"github.com/tmc/misc/macgo/bundle"
 )
 
 func TestModulePathToBundleID(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/tmc/misc/macgo/helpers/teamid"
+	"github.com/tmc/misc/macgo/teamid"
 )
 
 // FindDeveloperID attempts to find a Developer ID Application certificate
