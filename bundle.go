@@ -830,6 +830,30 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, data, 0755)
 }
 
+// escapeXML escapes XML special characters to prevent XML injection vulnerabilities.
+// It replaces the following characters with their XML entity equivalents:
+// & -> &amp;
+// < -> &lt;
+// > -> &gt;
+// " -> &quot;
+// ' -> &apos;
+func escapeXML(s string) string {
+	if s == "" {
+		return s
+	}
+	
+	// Use strings.Replacer for efficient multiple replacements
+	replacer := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+		"\"", "&quot;",
+		"'", "&apos;",
+	)
+	
+	return replacer.Replace(s)
+}
+
 // writePlist writes a map to a plist file.
 func writePlist[K ~string](path string, data map[K]any) error {
 	var sb strings.Builder
@@ -841,7 +865,8 @@ func writePlist[K ~string](path string, data map[K]any) error {
 `)
 
 	for k, v := range data {
-		sb.WriteString(fmt.Sprintf("\t<key>%s</key>\n", k))
+		// Escape the key to prevent XML injection
+		sb.WriteString(fmt.Sprintf("\t<key>%s</key>\n", escapeXML(string(k))))
 
 		switch val := v.(type) {
 		case bool:
@@ -851,13 +876,15 @@ func writePlist[K ~string](path string, data map[K]any) error {
 				sb.WriteString("\t<false/>\n")
 			}
 		case string:
-			sb.WriteString(fmt.Sprintf("\t<string>%s</string>\n", val))
+			// Escape the string value to prevent XML injection
+			sb.WriteString(fmt.Sprintf("\t<string>%s</string>\n", escapeXML(val)))
 		case int, int32, int64:
 			sb.WriteString(fmt.Sprintf("\t<integer>%v</integer>\n", val))
 		case float32, float64:
 			sb.WriteString(fmt.Sprintf("\t<real>%v</real>\n", val))
 		default:
-			sb.WriteString(fmt.Sprintf("\t<string>%v</string>\n", val))
+			// Escape the stringified value to prevent XML injection
+			sb.WriteString(fmt.Sprintf("\t<string>%s</string>\n", escapeXML(fmt.Sprintf("%v", val))))
 		}
 	}
 
@@ -1000,21 +1027,22 @@ func createFromTemplate(template fs.FS, appPath, execPath, appName string) (stri
 				return fmt.Errorf("read template Info.plist: %w", err)
 			}
 
-			// Replace placeholder values
+			// Replace placeholder values with properly escaped values
 			content := string(data)
-			content = strings.ReplaceAll(content, "{{BundleName}}", appName)
-			content = strings.ReplaceAll(content, "{{BundleExecutable}}", filepath.Base(execPath))
+			content = strings.ReplaceAll(content, "{{BundleName}}", escapeXML(appName))
+			content = strings.ReplaceAll(content, "{{BundleExecutable}}", escapeXML(filepath.Base(execPath)))
 
 			bundleID := DefaultConfig.BundleID
 			if bundleID == "" {
 				bundleID = fmt.Sprintf("com.macgo.%s", appName)
 			}
-			content = strings.ReplaceAll(content, "{{BundleIdentifier}}", bundleID)
+			content = strings.ReplaceAll(content, "{{BundleIdentifier}}", escapeXML(bundleID))
 
 			// Add user-defined plist entries
 			// This is a simple approach - for more complex needs, use a proper plist library
 			for k, v := range DefaultConfig.PlistEntries {
-				key := fmt.Sprintf("<key>%s</key>", k)
+				// Escape key to prevent XML injection
+				key := fmt.Sprintf("<key>%s</key>", escapeXML(k))
 				var valueTag string
 				switch val := v.(type) {
 				case bool:
@@ -1024,13 +1052,15 @@ func createFromTemplate(template fs.FS, appPath, execPath, appName string) (stri
 						valueTag = "<false/>"
 					}
 				case string:
-					valueTag = fmt.Sprintf("<string>%s</string>", val)
+					// Escape string value to prevent XML injection
+					valueTag = fmt.Sprintf("<string>%s</string>", escapeXML(val))
 				case int, int32, int64:
 					valueTag = fmt.Sprintf("<integer>%v</integer>", val)
 				case float32, float64:
 					valueTag = fmt.Sprintf("<real>%v</real>", val)
 				default:
-					valueTag = fmt.Sprintf("<string>%v</string>", val)
+					// Escape stringified value to prevent XML injection
+					valueTag = fmt.Sprintf("<string>%s</string>", escapeXML(fmt.Sprintf("%v", val)))
 				}
 
 				// Insert before closing dict

@@ -1608,8 +1608,8 @@ func TestDefaultConfigInitialization(t *testing.T) {
 	}
 
 	// Test default LSUIElement value
-	if val, exists := DefaultConfig.PlistEntries["LSUIElement"]; !exists || val != false {
-		t.Error("Expected LSUIElement to be false by default in DefaultConfig")
+	if val, exists := DefaultConfig.PlistEntries["LSUIElement"]; !exists || val != true {
+		t.Error("Expected LSUIElement to be true by default in DefaultConfig (dock icon hidden)")
 	}
 }
 

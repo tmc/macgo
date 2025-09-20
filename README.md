@@ -64,6 +64,7 @@ import (
 // Or use pre-configured packages:
 // _ "github.com/tmc/misc/macgo/auto/sandbox"         // App sandbox only
 // _ "github.com/tmc/misc/macgo/auto/sandbox/readonly" // App sandbox with read-only file access
+// _ "github.com/tmc/misc/macgo/auto/sandbox/signalhandler" // App sandbox with improved signal handling
 
 func main() {
     // Your code will automatically run in an app bundle
@@ -105,6 +106,10 @@ func main() {
     // Start macgo - this creates the app bundle and relaunches if needed
     macgo.Start()
     
+    // Or use StartWithContext for better control over cancellation
+    // ctx := context.WithTimeout(context.Background(), 30*time.Second)
+    // macgo.StartWithContext(ctx)
+    
     // Your code will run with the specified entitlements
     files, _ := os.ReadDir("~/Desktop")
     // ...
@@ -127,6 +132,7 @@ import (
     _ "github.com/tmc/misc/macgo/entitlements/camera"
     _ "github.com/tmc/misc/macgo/entitlements/mic"
     "github.com/tmc/misc/macgo/entitlements"
+    "github.com/tmc/misc/macgo"
 )
 
 func init() {
@@ -138,11 +144,15 @@ func init() {
         entitlements.EntAppSandbox,
         entitlements.EntNetworkClient
     )
+    
+    // Start macgo
+    macgo.Start()
 }
 
 func main() {
     // Your code will have the specified entitlements
     files, _ := os.ReadDir("~/Desktop")
+    _ = files // avoid unused variable warning
     // ...
 }
 ```
@@ -160,9 +170,6 @@ import (
 )
 
 func init() {
-    // Disable auto-initialization to allow complete customization
-    macgo.DisableAutoInit()
-    
     // Create a custom configuration
     cfg := macgo.NewConfig()
     
@@ -194,8 +201,8 @@ func init() {
     // Apply configuration (must be called)
     macgo.Configure(cfg)
     
-    // Explicitly initialize macgo now that configuration is complete
-    macgo.Initialize()
+    // Start macgo now that configuration is complete
+    macgo.Start()
 }
 
 func main() {
@@ -233,27 +240,32 @@ MACGO_DEBUG=1 MACGO_SHOW_DOCK_ICON=1 ./myapp
 
 | Entitlement | Function | Constant | Environment Var |
 |------------|----------|----------|----------------|
-| Camera     | `SetCamera()`   | `EntCamera`   | `MACGO_CAMERA=1` |
-| Microphone | `SetMic()`      | `EntMicrophone` | `MACGO_MIC=1` |
-| Location   | `SetLocation()` | `EntLocation` | `MACGO_LOCATION=1` |
-| Contacts   | `SetContacts()` | `EntAddressBook` | `MACGO_CONTACTS=1` |
-| Photos     | `SetPhotos()`   | `EntPhotos`   | `MACGO_PHOTOS=1` |
-| Calendar   | `SetCalendar()` | `EntCalendars` | `MACGO_CALENDAR=1` |
-| Reminders  | `SetReminders()`| `EntReminders`| `MACGO_REMINDERS=1` |
+| Camera     | `entitlements.SetCamera()`   | `EntCamera`   | `MACGO_CAMERA=1` |
+| Microphone | `entitlements.SetMic()`      | `EntMicrophone` | `MACGO_MIC=1` |
+| Location   | `entitlements.SetLocation()` | `EntLocation` | `MACGO_LOCATION=1` |
+| Contacts   | `entitlements.SetContacts()` | `EntAddressBook` | `MACGO_CONTACTS=1` |
+| Photos     | `entitlements.SetPhotos()`   | `EntPhotos`   | `MACGO_PHOTOS=1` |
+| Calendar   | `entitlements.SetCalendar()` | `EntCalendars` | `MACGO_CALENDAR=1` |
+| Reminders  | `entitlements.SetReminders()`| `EntReminders`| `MACGO_REMINDERS=1` |
 
 ### App Sandbox Entitlements
 
 | Entitlement | Function | Constant | Environment Var |
 |------------|----------|----------|----------------|
-| App Sandbox | `SetAppSandbox()` | `EntAppSandbox` | `MACGO_APP_SANDBOX=1` |
-| Outgoing Network* | `SetNetworkClient()` | `EntNetworkClient` | `MACGO_NETWORK_CLIENT=1` |
-| Incoming Network* | `SetNetworkServer()` | `EntNetworkServer` | `MACGO_NETWORK_SERVER=1` |
+| App Sandbox | `entitlements.SetAppSandbox()` | `EntAppSandbox` | `MACGO_APP_SANDBOX=1` |
+| Outgoing Network* | `entitlements.SetNetworkClient()` | `EntNetworkClient` | `MACGO_NETWORK_CLIENT=1` |
+| Incoming Network* | `entitlements.SetNetworkServer()` | `EntNetworkServer` | `MACGO_NETWORK_SERVER=1` |
 
 > *NOTE: The network entitlements only affect Objective-C/Swift network APIs. Go's standard networking (net/http, etc.) bypasses these restrictions and will work regardless of these entitlements being present or not. To properly restrict network access in Go applications, additional measures are required.
-| Bluetooth | `SetBluetooth()` | `EntBluetooth` | `MACGO_BLUETOOTH=1` |
-| USB | `SetUSB()` | `EntUSB` | `MACGO_USB=1` |
-| Audio Input | `SetAudioInput()` | `EntAudioInput` | `MACGO_AUDIO_INPUT=1` |
-| Printing | `SetPrinting()` | `EntPrint` | `MACGO_PRINT=1` |
+
+### Hardware Access Entitlements
+
+| Entitlement | Function | Constant | Environment Var |
+|------------|----------|----------|----------------|
+| Bluetooth | `entitlements.SetBluetooth()` | `EntBluetooth` | `MACGO_BLUETOOTH=1` |
+| USB | `entitlements.SetUSB()` | `EntUSB` | `MACGO_USB=1` |
+| Audio Input | `entitlements.SetAudioInput()` | `EntAudioInput` | `MACGO_AUDIO_INPUT=1` |
+| Printing | `entitlements.SetPrinting()` | `EntPrint` | `MACGO_PRINT=1` |
 
 ### File Access Entitlements
 
@@ -274,18 +286,25 @@ MACGO_DEBUG=1 MACGO_SHOW_DOCK_ICON=1 ./myapp
 
 | Entitlement | Function | Constant | Environment Var |
 |------------|----------|----------|----------------|
-| Allow JIT | `SetAllowJIT()` | `EntAllowJIT` | `MACGO_ALLOW_JIT=1` |
-| Allow Unsigned Memory | `SetAllowUnsignedMemory()` | `EntAllowUnsignedExecutableMemory` | `MACGO_ALLOW_UNSIGNED_MEMORY=1` |
-| Allow DYLD Env Vars | `SetAllowDyldEnvVars()` | `EntAllowDyldEnvVars` | `MACGO_ALLOW_DYLD_ENV=1` |
-| Disable Library Validation | `SetDisableLibraryValidation()` | `EntDisableLibraryValidation` | `MACGO_DISABLE_LIBRARY_VALIDATION=1` |
-| Disable Exec Page Protection | `SetDisableExecutablePageProtection()` | `EntDisableExecutablePageProtection` | `MACGO_DISABLE_EXEC_PAGE_PROTECTION=1` |
-| Debugger | `SetDebugger()` | `EntDebugger` | `MACGO_DEBUGGER=1` |
+| Allow JIT | `entitlements.SetAllowJIT()` | `EntAllowJIT` | `MACGO_ALLOW_JIT=1` |
+| Allow Unsigned Memory | `entitlements.SetAllowUnsignedMemory()` | `EntAllowUnsignedExecutableMemory` | `MACGO_ALLOW_UNSIGNED_MEMORY=1` |
+| Allow DYLD Env Vars | `entitlements.SetAllowDyldEnvVars()` | `EntAllowDyldEnvVars` | `MACGO_ALLOW_DYLD_ENV=1` |
+| Disable Library Validation | `entitlements.SetDisableLibraryValidation()` | `EntDisableLibraryValidation` | `MACGO_DISABLE_LIBRARY_VALIDATION=1` |
+| Disable Exec Page Protection | `entitlements.SetDisableExecutablePageProtection()` | `EntDisableExecutablePageProtection` | `MACGO_DISABLE_EXEC_PAGE_PROTECTION=1` |
+| Debugger | `entitlements.SetDebugger()` | `EntDebugger` | `MACGO_DEBUGGER=1` |
 
 ## API Reference
 
 ### Core Functions
 
 ```go
+// Core startup functions
+macgo.Start()                    // Initialize macgo and create app bundle
+macgo.StartWithContext(ctx)      // Initialize with context for cancellation control
+
+// Utility functions
+macgo.IsInAppBundle()            // Check if currently running in an app bundle
+
 // Request entitlements
 macgo.RequestEntitlements(macgo.EntCamera, macgo.EntMicrophone)
 macgo.RequestEntitlement(macgo.EntAppSandbox)
@@ -306,22 +325,116 @@ macgo.DisableRelaunch() // Disable auto-relaunch
 macgo.EnableDebug()     // Enable debug output
 macgo.EnableSigning()   // Enable code signing
 
+// Signal handling
+macgo.EnableImprovedSignalHandling()  // Enable improved signal handling (better Ctrl+C handling)
+
+// App customization
+macgo.SetIconFile("/path/to/icon.icns")  // Set custom app icon
+
 // Configuration from embedded resources
 macgo.LoadEntitlementsFromJSON(jsonData)
 macgo.SetCustomAppBundle(templateFS)
+
+// Custom app icon
+macgo.SetIconFile("/path/to/icon.icns")  // Set custom icon file for the app bundle
 
 // Custom Info.plist entries
 macgo.AddPlistEntry("LSMinimumSystemVersion", "10.15")
 macgo.AddPlistEntry("NSHighResolutionCapable", true)   // Retina support
 ```
 
+### Improved Signal Handling
+
+For better signal propagation (especially Ctrl+C handling), macgo provides enhanced signal handling:
+
+```go
+package main
+
+import (
+    "github.com/tmc/misc/macgo"
+)
+
+func init() {
+    // Enable improved signal handling for better Ctrl+C support
+    macgo.EnableImprovedSignalHandling()
+    
+    // Request your entitlements
+    macgo.RequestEntitlements(macgo.EntCamera, macgo.EntMicrophone)
+}
+
+func main() {
+    macgo.Start()
+    
+    // Your code will have better signal handling
+    // Ctrl+C will be properly forwarded to the app bundle
+    // ...
+}
+```
+
+**Alternative: Use the signalhandler auto package**
+
+```go
+package main
+
+import (
+    // This automatically enables app sandbox and improved signal handling
+    _ "github.com/tmc/misc/macgo/auto/sandbox/signalhandler"
+)
+
+func main() {
+    // Your code runs with improved signal handling automatically
+    // No need to call macgo.Start() when using auto packages
+    // ...
+}
+```
+
+**Benefits of improved signal handling:**
+- Better Ctrl+C (SIGINT) forwarding between processes
+- Proper signal propagation to the app bundle
+- Uses named pipes for robust I/O redirection
+- Handles process groups correctly for signal forwarding
+
+### Custom App Icon
+
+You can set a custom icon for your app bundle:
+
+```go
+package main
+
+import (
+    "github.com/tmc/misc/macgo"
+)
+
+func init() {
+    // Set a custom icon file for the app bundle
+    macgo.SetIconFile("/path/to/your/icon.icns")
+    
+    // Or use a system icon
+    macgo.SetIconFile("/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ToolbarCustomizeIcon.icns")
+    
+    // Request your entitlements
+    macgo.RequestEntitlements(macgo.EntCamera)
+}
+
+func main() {
+    macgo.Start()
+    // Your app will use the custom icon
+}
+```
+
+**Notes about custom icons:**
+- Icon files should be in `.icns` format for best compatibility
+- If not set, macgo uses the default system executable icon
+- The icon file path should be absolute and accessible at runtime
+- Icons are copied into the app bundle's `Resources` directory
+
 ### Convenience Functions
 
 ```go
 // Set groups of permissions at once
-macgo.SetAllTCCPermissions()  // Set all TCC permissions
-macgo.SetAllDeviceAccess()    // Set all device permissions
-macgo.SetAllNetworking()      // Set all networking permissions
+entitlements.SetAllTCCPermissions()  // Set all TCC permissions
+entitlements.SetAllDeviceAccess()    // Set all device permissions
+entitlements.SetAllNetworking()      // Set all networking permissions
 ```
 
 ## Features
@@ -361,6 +474,11 @@ See the examples directory for complete examples:
 - [Custom Template Example](examples/custom-template/main.go): Using a custom app template with embedded files
 - [Entitlements Example](examples/entitlements/main.go): Loading entitlements from JSON
 - [Customization Example](examples/customization/main.go): Custom app behaviors
+- [Signal Handling Example](examples/signal-test/main.go): Improved signal handling with Ctrl+C support
+- [Signal Debug Example](examples/signal-debug/main.go): Debugging signal handling behavior
+- [Debug Features Example](examples/debug-features/main.go): Using debug features and improved signal handling
+- [New Features Example](examples/new-features/main.go): Demonstrates newly documented features
+- [Comprehensive Features Example](examples/comprehensive-features/main.go): All new features including SetIconFile, EnableImprovedSignalHandling, StartWithContext, and IsInAppBundle
 
 ## Package Organization
 

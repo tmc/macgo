@@ -253,7 +253,7 @@ func TestMacOSIntegrationPlistGeneration(t *testing.T) {
 				"<key>ArrayKey</key>",
 				"<string>[item1 item2 item3]</string>", // Arrays are converted to string
 				"<key>NilKey</key>",
-				"<string><nil></string>", // nil is converted to string without escaping
+				"<string>&lt;nil&gt;</string>", // nil is converted to string with XML escaping
 				"<key>MapKey</key>",
 				"<string>map[nested:value]</string>", // Maps are converted to string
 			},

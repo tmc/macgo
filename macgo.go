@@ -154,7 +154,7 @@ var DefaultConfig = &Config{
 		// EntUserSelectedReadWrite: true, // Enable user-selected file access by default
 	},
 	PlistEntries: map[string]any{
-		"LSUIElement": false, // Hide dock icon and app menu by default
+		"LSUIElement": true, // Hide dock icon and app menu by default (true = hidden)
 	},
 }
 
@@ -274,7 +274,7 @@ func init() {
 		if DefaultConfig.PlistEntries == nil {
 			DefaultConfig.PlistEntries = make(map[string]any)
 		}
-		DefaultConfig.PlistEntries["LSUIElement"] = true
+		DefaultConfig.PlistEntries["LSUIElement"] = false
 	}
 }
 
@@ -492,7 +492,7 @@ func NewConfig() *Config {
 		Relaunch:     true,
 		Entitlements: map[Entitlement]bool{},
 		PlistEntries: map[string]any{
-			"LSUIElement": true, // Hide dock icon and app menu by default
+			"LSUIElement": true, // Hide dock icon and app menu by default (true = hidden)
 		},
 		AutoSign: true,
 	}

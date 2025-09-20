@@ -217,7 +217,7 @@ func TestBundlePlistEntryTypes(t *testing.T) {
 				"Unicode":  "Hello 世界 🌍",
 			},
 			expected: []string{
-				"<>&\"'", // writePlist doesn't escape XML characters
+				"&lt;&gt;&amp;&quot;&apos;", // writePlist properly escapes XML characters
 				"Hello 世界 🌍",
 			},
 		},

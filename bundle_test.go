@@ -1145,6 +1145,206 @@ func TestCreatePipe(t *testing.T) {
 	}
 }
 
+// TestEscapeXML tests the escapeXML function
+func TestEscapeXML(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "no special characters",
+			input:    "hello world",
+			expected: "hello world",
+		},
+		{
+			name:     "ampersand",
+			input:    "A & B",
+			expected: "A &amp; B",
+		},
+		{
+			name:     "less than",
+			input:    "a < b",
+			expected: "a &lt; b",
+		},
+		{
+			name:     "greater than",
+			input:    "a > b",
+			expected: "a &gt; b",
+		},
+		{
+			name:     "double quote",
+			input:    "say \"hello\"",
+			expected: "say &quot;hello&quot;",
+		},
+		{
+			name:     "single quote",
+			input:    "it's working",
+			expected: "it&apos;s working",
+		},
+		{
+			name:     "all special characters",
+			input:    "<tag attr=\"value\" other='value2'>content & more</tag>",
+			expected: "&lt;tag attr=&quot;value&quot; other=&apos;value2&apos;&gt;content &amp; more&lt;/tag&gt;",
+		},
+		{
+			name:     "XML injection attempt",
+			input:    "</string><key>injected</key><string>malicious",
+			expected: "&lt;/string&gt;&lt;key&gt;injected&lt;/key&gt;&lt;string&gt;malicious",
+		},
+		{
+			name:     "multiple ampersands",
+			input:    "A & B & C",
+			expected: "A &amp; B &amp; C",
+		},
+		{
+			name:     "script injection attempt",
+			input:    "<script>alert('xss')</script>",
+			expected: "&lt;script&gt;alert(&apos;xss&apos;)&lt;/script&gt;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := escapeXML(tt.input)
+			if result != tt.expected {
+				t.Errorf("escapeXML(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestPlistXMLEscaping tests that writePlist properly escapes XML
+func TestPlistXMLEscaping(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "macgo-plist-escape-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tests := []struct {
+		name        string
+		data        map[string]any
+		expected    []string // Expected escaped strings in output
+		notExpected []string // Strings that should NOT be in output (unescaped)
+	}{
+		{
+			name: "string values with special characters",
+			data: map[string]any{
+				"NormalKey": "normal value",
+				"AmpersandKey": "A & B",
+				"LessKey": "a < b",
+				"GreaterKey": "a > b",
+				"QuoteKey": "say \"hello\"",
+				"AposKey": "it's working",
+			},
+			expected: []string{
+				"<string>normal value</string>",
+				"<string>A &amp; B</string>",
+				"<string>a &lt; b</string>",
+				"<string>a &gt; b</string>",
+				"<string>say &quot;hello&quot;</string>",
+				"<string>it&apos;s working</string>",
+			},
+			notExpected: []string{
+				"<string>A & B</string>",
+				"<string>a < b</string>",
+				"<string>a > b</string>",
+				"<string>say \"hello\"</string>",
+				"<string>it's working</string>",
+			},
+		},
+		{
+			name: "keys with special characters",
+			data: map[string]any{
+				"Key<with>brackets": "value1",
+				"Key&with&ampersand": "value2",
+				"Key\"with\"quotes": "value3",
+			},
+			expected: []string{
+				"<key>Key&lt;with&gt;brackets</key>",
+				"<key>Key&amp;with&amp;ampersand</key>",
+				"<key>Key&quot;with&quot;quotes</key>",
+			},
+			notExpected: []string{
+				"<key>Key<with>brackets</key>",
+				"<key>Key&with&ampersand</key>",
+				"<key>Key\"with\"quotes</key>",
+			},
+		},
+		{
+			name: "XML injection attempt in values",
+			data: map[string]any{
+				"InjectionKey": "</string><key>injected</key><string>malicious",
+				"ScriptKey": "<script>alert('xss')</script>",
+			},
+			expected: []string{
+				"<string>&lt;/string&gt;&lt;key&gt;injected&lt;/key&gt;&lt;string&gt;malicious</string>",
+				"<string>&lt;script&gt;alert(&apos;xss&apos;)&lt;/script&gt;</string>",
+			},
+			notExpected: []string{
+				"<string></string><key>injected</key><string>malicious</string>",
+				"<string><script>alert('xss')</script></string>",
+			},
+		},
+		{
+			name: "complex structures (converted to string)",
+			data: map[string]any{
+				"StructKey": struct{ Field string }{Field: "<value>"},
+				"ArrayKey": []string{"<item1>", "item2&more"},
+			},
+			expected: []string{
+				"<string>{&lt;value&gt;}</string>",
+				"<string>[&lt;item1&gt; item2&amp;more]</string>",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plistPath := filepath.Join(tmpDir, fmt.Sprintf("%s.plist", tt.name))
+			err := writePlist(plistPath, tt.data)
+			if err != nil {
+				t.Errorf("Failed to write plist: %v", err)
+				return
+			}
+
+			content, _ := os.ReadFile(plistPath)
+			contentStr := string(content)
+
+			// Check for expected escaped strings
+			for _, expected := range tt.expected {
+				if !strings.Contains(contentStr, expected) {
+					t.Errorf("Expected %s in plist content", expected)
+				}
+			}
+
+			// Check that unescaped strings are NOT present
+			for _, notExpected := range tt.notExpected {
+				if strings.Contains(contentStr, notExpected) {
+					t.Errorf("Found unescaped string %s in plist content (security vulnerability)", notExpected)
+				}
+			}
+
+			// Verify the plist is still valid XML by checking structure
+			if !strings.Contains(contentStr, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>") {
+				t.Error("Missing XML declaration")
+			}
+			if !strings.Contains(contentStr, "<plist version=\"1.0\">") {
+				t.Error("Missing plist declaration")
+			}
+			if !strings.Contains(contentStr, "<dict>") || !strings.Contains(contentStr, "</dict>") {
+				t.Error("Missing dict tags")
+			}
+		})
+	}
+}
+
 // TestPlistValueTypes tests writePlist with various value types
 func TestPlistValueTypes(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "macgo-plist-types-*")
@@ -1210,6 +1410,301 @@ func TestPlistValueTypes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPlistSecurityVulnerabilityPrevention tests that XML injection vulnerabilities are prevented
+func TestPlistSecurityVulnerabilityPrevention(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "macgo-plist-security-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Test various XML injection attack scenarios
+	tests := []struct {
+		name        string
+		data        map[string]any
+		description string
+	}{
+		{
+			name: "XML tag injection in key",
+			data: map[string]any{
+				"</key><key>injected</key><key>": "malicious_value",
+			},
+			description: "Attempts to inject XML tags in key names",
+		},
+		{
+			name: "XML tag injection in value",
+			data: map[string]any{
+				"NormalKey": "</string><key>injected</key><string>malicious",
+			},
+			description: "Attempts to inject XML tags in string values",
+		},
+		{
+			name: "CDATA injection attempt",
+			data: map[string]any{
+				"CDATAKey": "<![CDATA[malicious]]>",
+			},
+			description: "Attempts to inject CDATA sections",
+		},
+		{
+			name: "DOCTYPE injection attempt",
+			data: map[string]any{
+				"DOCTYPEKey": "<!DOCTYPE html><html><body>malicious</body></html>",
+			},
+			description: "Attempts to inject DOCTYPE declarations",
+		},
+		{
+			name: "Entity reference injection",
+			data: map[string]any{
+				"EntityKey": "&lt;script&gt;alert('xss')&lt;/script&gt;",
+			},
+			description: "Attempts to inject entity references",
+		},
+		{
+			name: "Complex XML structure injection",
+			data: map[string]any{
+				"ComplexKey": "</string></dict><dict><key>injected</key><string>payload</string></dict><dict><key>original</key><string>",
+			},
+			description: "Attempts to inject complex XML structures",
+		},
+		{
+			name: "Bundle ID injection attempt",
+			data: map[string]any{
+				"CFBundleIdentifier": "com.evil.app</string><key>LSUIElement</key><false/><key>CFBundleIdentifier</key><string>com.normal.app",
+			},
+			description: "Attempts to inject malicious bundle configuration",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plistPath := filepath.Join(tmpDir, fmt.Sprintf("%s.plist", tt.name))
+			err := writePlist(plistPath, tt.data)
+			if err != nil {
+				t.Errorf("Failed to write plist: %v", err)
+				return
+			}
+
+			content, _ := os.ReadFile(plistPath)
+			contentStr := string(content)
+
+			// The content should be properly escaped
+			// Count opening and closing tags to ensure structure is maintained
+			openingDictCount := strings.Count(contentStr, "<dict>")
+			closingDictCount := strings.Count(contentStr, "</dict>")
+			if openingDictCount != closingDictCount {
+				t.Errorf("XML structure corrupted: %d opening <dict> tags vs %d closing </dict> tags", openingDictCount, closingDictCount)
+			}
+
+			// Ensure only one plist element
+			plistCount := strings.Count(contentStr, "<plist")
+			if plistCount != 1 {
+				t.Errorf("Expected exactly 1 plist element, found %d", plistCount)
+			}
+
+			// Check that XML special characters are properly escaped
+			for key, value := range tt.data {
+				if strVal, ok := value.(string); ok {
+					// If the original value contains unescaped < or >, the output should contain escaped versions
+					if strings.Contains(strVal, "<") && !strings.Contains(contentStr, "&lt;") {
+						t.Error("Expected < characters to be escaped as &lt;")
+					}
+					if strings.Contains(strVal, ">") && !strings.Contains(contentStr, "&gt;") {
+						t.Error("Expected > characters to be escaped as &gt;")
+					}
+				}
+				if strings.Contains(key, "<") && !strings.Contains(contentStr, "&lt;") {
+					t.Error("Expected < characters in keys to be escaped as &lt;")
+				}
+				if strings.Contains(key, ">") && !strings.Contains(contentStr, "&gt;") {
+					t.Error("Expected > characters in keys to be escaped as &gt;")
+				}
+			}
+
+			// Verify the plist structure is intact
+			if !strings.Contains(contentStr, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>") {
+				t.Error("Missing or corrupted XML declaration")
+			}
+			if !strings.Contains(contentStr, "<!DOCTYPE plist") {
+				t.Error("Missing or corrupted DOCTYPE declaration")
+			}
+
+			t.Logf("Test '%s' passed: %s", tt.name, tt.description)
+		})
+	}
+}
+
+// TestPlistEscapingEdgeCases tests edge cases for XML escaping
+func TestPlistEscapingEdgeCases(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "macgo-plist-edge-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tests := []struct {
+		name   string
+		data   map[string]any
+		check  func(t *testing.T, content string)
+	}{
+		{
+			name: "empty strings",
+			data: map[string]any{
+				"EmptyKey": "",
+			},
+			check: func(t *testing.T, content string) {
+				if !strings.Contains(content, "<string></string>") {
+					t.Error("Empty string should produce <string></string>")
+				}
+			},
+		},
+		{
+			name: "only special characters",
+			data: map[string]any{
+				"SpecialKey": "&<>\"'",
+			},
+			check: func(t *testing.T, content string) {
+				expected := "<string>&amp;&lt;&gt;&quot;&apos;</string>"
+				if !strings.Contains(content, expected) {
+					t.Errorf("Expected %s in content", expected)
+				}
+			},
+		},
+		{
+			name: "unicode characters mixed with special",
+			data: map[string]any{
+				"UnicodeKey": "Hello 世界 & <test>",
+			},
+			check: func(t *testing.T, content string) {
+				expected := "<string>Hello 世界 &amp; &lt;test&gt;</string>"
+				if !strings.Contains(content, expected) {
+					t.Errorf("Expected %s in content", expected)
+				}
+			},
+		},
+		{
+			name: "very long string with special chars",
+			data: map[string]any{
+				"LongKey": strings.Repeat("a&b<c>d\"e'f", 100),
+			},
+			check: func(t *testing.T, content string) {
+				expectedPattern := "a&amp;b&lt;c&gt;d&quot;e&apos;f"
+				if !strings.Contains(content, expectedPattern) {
+					t.Errorf("Expected pattern %s in content", expectedPattern)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plistPath := filepath.Join(tmpDir, fmt.Sprintf("%s.plist", tt.name))
+			err := writePlist(plistPath, tt.data)
+			if err != nil {
+				t.Errorf("Failed to write plist: %v", err)
+				return
+			}
+
+			content, _ := os.ReadFile(plistPath)
+			tt.check(t, string(content))
+		})
+	}
+}
+
+// TestXMLEscapingBeforeAfterDemo demonstrates the security fix by showing before/after XML output
+func TestXMLEscapingBeforeAfterDemo(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "macgo-demo-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Test data with potentially malicious XML content
+	testData := map[string]any{
+		"NormalKey": "normal value",
+		"InjectionKey": "</string><key>injected</key><string>malicious",
+		"ScriptKey": "<script>alert('xss')</script>",
+		"BundleKey": "com.evil.app</string><key>LSUIElement</key><false/>",
+		"MultiChar": "A & B < C > D \"quoted\" 'apostrophe'",
+		"Key<with>brackets": "value with & symbols",
+	}
+
+	plistPath := filepath.Join(tmpDir, "demo.plist")
+	err = writePlist(plistPath, testData)
+	if err != nil {
+		t.Fatalf("Failed to write plist: %v", err)
+	}
+
+	content, err := os.ReadFile(plistPath)
+	if err != nil {
+		t.Fatalf("Failed to read plist: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Log the secure output for demonstration
+	t.Logf("=== SECURE PLIST OUTPUT (with XML escaping) ===\n%s", contentStr)
+
+	// Verify XML structure integrity
+	plistCount := strings.Count(contentStr, "<plist")
+	dictOpen := strings.Count(contentStr, "<dict>")
+	dictClose := strings.Count(contentStr, "</dict>")
+
+	t.Logf("\n=== SECURITY VALIDATION ===")
+	t.Logf("Number of <plist> tags: %d (should be 1)", plistCount)
+	t.Logf("Number of <dict> tags: %d", dictOpen)
+	t.Logf("Number of </dict> tags: %d", dictClose)
+	t.Logf("XML structure integrity: %s", map[bool]string{true: "PASS", false: "FAIL"}[dictOpen == dictClose])
+
+	if plistCount != 1 {
+		t.Errorf("Expected exactly 1 plist tag, got %d", plistCount)
+	}
+	if dictOpen != dictClose {
+		t.Errorf("XML structure compromised: %d opening vs %d closing dict tags", dictOpen, dictClose)
+	}
+
+	// Verify escaping works
+	t.Logf("\n=== ESCAPING VERIFICATION ===")
+	escapingChecks := map[string]bool{
+		"&amp; (escaped &)": strings.Contains(contentStr, "&amp;"),
+		"&lt; (escaped <)": strings.Contains(contentStr, "&lt;"),
+		"&gt; (escaped >)": strings.Contains(contentStr, "&gt;"),
+		"&quot; (escaped \")": strings.Contains(contentStr, "&quot;"),
+		"&apos; (escaped ')": strings.Contains(contentStr, "&apos;"),
+	}
+
+	for check, found := range escapingChecks {
+		t.Logf("Contains %s: %t", check, found)
+		if !found {
+			t.Errorf("Expected to find escaped character: %s", check)
+		}
+	}
+
+	// Verify injection prevention
+	t.Logf("\n=== INJECTION PREVENTION ===")
+	dangerous := []string{
+		"</string><key>injected</key><string>",
+		"<script>alert('xss')</script>",
+		"<key>LSUIElement</key><false/>",
+	}
+
+	for _, pattern := range dangerous {
+		found := strings.Contains(contentStr, pattern)
+		t.Logf("Dangerous pattern '%s' found: %t (should be false)", pattern, found)
+		if found {
+			t.Errorf("Security vulnerability: Found unescaped dangerous pattern '%s'", pattern)
+		}
+	}
+
+	// Demonstrate what would happen WITHOUT escaping (simulated)
+	t.Logf("\n=== BEFORE vs AFTER COMPARISON ===")
+	t.Logf("BEFORE (vulnerable): <string>A & B < C > D</string>")
+	t.Logf("AFTER (secure): <string>A &amp; B &lt; C &gt; D</string>")
+	t.Logf("\nBEFORE (vulnerable): <key>Key<with>brackets</key>")
+	t.Logf("AFTER (secure): <key>Key&lt;with&gt;brackets</key>")
+	t.Logf("\nINJECTION ATTEMPT: </string><key>injected</key><string>malicious")
+	t.Logf("SECURED OUTPUT: &lt;/string&gt;&lt;key&gt;injected&lt;/key&gt;&lt;string&gt;malicious")
 }
 
 // TestEnvironmentVariableDetection tests the init() function's env var handling
