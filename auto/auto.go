@@ -1,4 +1,4 @@
-// Package auto provides automatic initialization for macgo v2 API.
+// Package auto provides automatic initialization for macgo API.
 //
 // Import this package to automatically initialize macgo with no permissions:
 //
@@ -6,7 +6,7 @@
 //	    _ "github.com/tmc/misc/macgo/auto"
 //	)
 //
-// This is the simplest way to use macgo v2 - just import and your app will
+// This is the simplest way to use macgo - just import and your app will
 // be properly bundled for macOS without any additional permissions.
 //
 // For apps that need specific permissions, use one of the specialized auto

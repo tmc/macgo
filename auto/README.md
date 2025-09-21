@@ -8,25 +8,25 @@ Pick the auto package that matches your app's needs:
 
 ```go
 // No permissions needed - just proper macOS app bundling
-import _ "github.com/tmc/misc/macgo/auto"
+import _ "github.com/tmc/macgo/auto"
 
 // File access for document processors, editors
-import _ "github.com/tmc/misc/macgo/auto/files"
+import _ "github.com/tmc/macgo/auto/files"
 
 // Camera access for video apps
-import _ "github.com/tmc/misc/macgo/auto/camera"
+import _ "github.com/tmc/macgo/auto/camera"
 
 // Network access for web servers, API clients
-import _ "github.com/tmc/misc/macgo/auto/network"
+import _ "github.com/tmc/macgo/auto/network"
 
 // Media capture for screen recorders, conferencing
-import _ "github.com/tmc/misc/macgo/auto/media"
+import _ "github.com/tmc/macgo/auto/media"
 
 // Development tools permissions
-import _ "github.com/tmc/misc/macgo/auto/dev"
+import _ "github.com/tmc/macgo/auto/dev"
 
 // Everything enabled (files + network + camera + mic)
-import _ "github.com/tmc/misc/macgo/auto/all"
+import _ "github.com/tmc/macgo/auto/all"
 ```
 
 That's it! No configuration needed.
@@ -71,15 +71,15 @@ func init() {
 
 **Auto Style (clean)**:
 ```go
-import _ "github.com/tmc/misc/macgo/auto/all"
+import _ "github.com/tmc/macgo/auto/all"
 ```
 
 ## 🔧 Manual Configuration
 
-If you need custom configuration, use the explicit v2 API instead:
+If you need custom configuration, use the explicit API instead:
 
 ```go
-import "github.com/tmc/misc/macgo"
+import "github.com/tmc/macgo"
 
 func main() {
     cfg := &macgo.Config{
@@ -96,7 +96,7 @@ func main() {
 
 ## 📋 Permission Reference
 
-| v2 Permission | Description | TCC Prompt |
+| Permission | Description | TCC Prompt |
 |---------------|-------------|-------------|
 | `macgo.Files` | User-selected file access | "Allow access to files you choose" |
 | `macgo.Network` | Network client/server | No prompt (sandbox restriction) |
@@ -121,7 +121,7 @@ cd examples/hello
 go run main.go
 
 # Test with auto import
-echo 'import _ "github.com/tmc/misc/macgo/auto/files"' > test.go
+echo 'import _ "github.com/tmc/macgo/auto/files"' > test.go
 echo 'func main() { println("Hello from auto!") }' >> test.go
 go run test.go
 ```

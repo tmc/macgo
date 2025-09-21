@@ -1,4 +1,4 @@
-// Package adhoc provides ad-hoc code signing for macgo v2.
+// Package adhoc provides ad-hoc code signing for macgo.
 // Simply import this package to enable ad-hoc signing automatically.
 package adhoc
 

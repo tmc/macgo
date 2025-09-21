@@ -1,4 +1,4 @@
-// Package network provides automatic initialization for macgo v2 with network access.
+// Package network provides automatic initialization for macgo with network access.
 //
 // Import this package to automatically enable network permissions:
 //
@@ -19,7 +19,7 @@ import (
 )
 
 func init() {
-	// Enable network access - unified permission in v2
+	// Enable network access - unified permission
 	if err := macgo.Request(macgo.Network); err != nil {
 		// Log the error for debugging, but allow the app to continue
 		fmt.Fprintf(os.Stderr, "macgo/auto/network: failed to request network permissions: %v\n", err)

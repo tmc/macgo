@@ -1,4 +1,4 @@
-// Package all provides automatic initialization for macgo v2 with common permissions.
+// Package all provides automatic initialization for macgo with common permissions.
 //
 // Import this package to automatically enable a comprehensive set of permissions:
 //
@@ -24,7 +24,7 @@ import (
 )
 
 func init() {
-	// Enable common permissions all at once - so clean in v2!
+	// Enable common permissions all at once - so clean !
 	if err := macgo.Request(
 		macgo.Files,
 		macgo.Network,

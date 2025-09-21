@@ -1,4 +1,4 @@
-// Package camera provides automatic initialization for macgo v2 with camera access.
+// Package camera provides automatic initialization for macgo with camera access.
 //
 // Import this package to automatically enable camera permissions:
 //

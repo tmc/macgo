@@ -1,4 +1,4 @@
-// Package dev provides automatic initialization for macgo v2 with developer tool permissions.
+// Package dev provides automatic initialization for macgo with developer tool permissions.
 //
 // Import this package to automatically enable permissions for development tools:
 //

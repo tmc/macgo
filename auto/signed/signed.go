@@ -1,4 +1,4 @@
-// Package signed provides automatic code signing for macgo v2.
+// Package signed provides automatic code signing for macgo.
 // Simply import this package to enable automatic Developer ID detection.
 package signed
 

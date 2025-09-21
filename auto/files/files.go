@@ -1,4 +1,4 @@
-// Package files provides automatic initialization for macgo v2 with file access.
+// Package files provides automatic initialization for macgo with file access.
 //
 // Import this package to automatically enable file system access:
 //

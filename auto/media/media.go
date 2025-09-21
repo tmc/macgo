@@ -1,4 +1,4 @@
-// Package media provides automatic initialization for macgo v2 with media permissions.
+// Package media provides automatic initialization for macgo with media permissions.
 //
 // Import this package to automatically enable media capture permissions:
 //
