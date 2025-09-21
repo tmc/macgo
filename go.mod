@@ -1,3 +1,3 @@
-module github.com/tmc/misc/macgo
+module github.com/tmc/macgo
 
 go 1.24
