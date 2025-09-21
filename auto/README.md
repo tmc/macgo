@@ -2,7 +2,7 @@
 
 The `auto` packages provide the simplest way to use macgo - just import and go! These packages use Go's `init()` function to automatically configure macgo with common permission sets.
 
-## 🚀 Quick Start
+## Quick Start
 
 Pick the auto package that matches your app's needs:
 
@@ -31,7 +31,7 @@ import _ "github.com/tmc/macgo/auto/all"
 
 That's it! No configuration needed.
 
-## 📦 Available Packages
+## Available Packages
 
 ### Basic Packages
 
@@ -51,7 +51,7 @@ That's it! No configuration needed.
 | `dev` | Files + Network | Development tools, build systems |
 | `all` | Files + Network + Camera + Mic | Full-featured multimedia apps |
 
-## 🎯 Why Auto Packages?
+## Why Auto Packages?
 
 **Manual Style (verbose)**:
 ```go
@@ -74,7 +74,7 @@ func init() {
 import _ "github.com/tmc/macgo/auto/all"
 ```
 
-## 🔧 Manual Configuration
+## Manual Configuration
 
 If you need custom configuration, use the explicit API instead:
 
@@ -94,7 +94,7 @@ func main() {
 }
 ```
 
-## 📋 Permission Reference
+## Permission Reference
 
 | Permission | Description | TCC Prompt |
 |---------------|-------------|-------------|
@@ -105,7 +105,7 @@ func main() {
 | `macgo.Screen` | Screen recording | "Allow screen recording" |
 | `macgo.Sandbox` | App sandbox isolation | No prompt (enhanced security) |
 
-## ✨ Benefits of Auto Packages
+## Benefits of Auto Packages
 
 1. **One Line**: Single import vs multiple init() calls
 2. **No Global State**: Each import is isolated and predictable
@@ -113,7 +113,7 @@ func main() {
 4. **Cross-Platform**: Safe no-ops on non-macOS systems
 5. **Explicit**: Clear intent from import path
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Test basic auto package

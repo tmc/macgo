@@ -257,7 +257,6 @@ func (c *Config) WithAdHocSign() *Config {
 	return c
 }
 
-
 // Validate checks the configuration for common issues and dependency requirements.
 // Returns an error if the configuration is invalid.
 func (c *Config) Validate() error {
@@ -362,7 +361,6 @@ func OpenSystemPreferences() error {
 	}
 	return nil
 }
-
 
 // LaunchAppBundle launches an app bundle using the open command.
 // This ensures proper registration with TCC for permission dialogs.

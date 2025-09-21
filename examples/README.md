@@ -4,49 +4,49 @@ This directory contains example applications demonstrating various features of t
 
 ## Quick Start Examples
 
-### 📚 [getting-started](getting-started/)
+### [getting-started](getting-started/)
 Basic example showing the simplest way to use macgo with a single permission request.
 
 ```go
 err := macgo.Request(macgo.Camera)
 ```
 
-### 👋 [hello](hello/)
+### [hello](hello/)
 Classic "Hello, World!" as a macOS app bundle with debug logging to demonstrate the bundle creation process.
 
-### 📹 [camera-mic](camera-mic/)
+### [camera-mic](camera-mic/)
 Request camera and microphone permissions for media applications. Shows how to request multiple permissions at once.
 
 ## File Access Examples
 
-### 📁 [hello-files](hello-files/)
+### [hello-files](hello-files/)
 Demonstrates file system access with proper permissions. Creates a test file on the Desktop to verify access.
 
-### 🖥️ [desktop-list](desktop-list/)
+### [desktop-list](desktop-list/)
 Advanced file listing with command-line flags for different signing strategies:
 - `-debug` - Enable debug output
 - `-ad-hoc` - Use ad-hoc signing
 - `-auto-sign` - Auto-detect Developer ID
 - `-sign <identity>` - Use specific signing identity
 
-### 🔒 [sandboxed-file-exec](sandboxed-file-exec/)
+### [sandboxed-file-exec](sandboxed-file-exec/)
 Execute files within the macOS app sandbox. Demonstrates the difference between sandboxed and non-sandboxed file access.
 
 ## Code Signing Examples
 
-### ✍️ [code-signing](code-signing/)
+### [code-signing](code-signing/)
 Comprehensive code signing demonstration:
 - Ad-hoc signing for development
 - Developer ID signing for distribution
 - Custom signing identities
 - Verification of signed bundles
 
-### 🔐 [auto-signed](auto-signed/)
+### [auto-signed](auto-signed/)
 Automatic code signing using the `auto/signed` package. Detects and uses available Developer ID certificates.
 
 ## Advanced Examples
 
-### 🍎 [osascript-wrapper](osascript-wrapper/)
+### [osascript-wrapper](osascript-wrapper/)
 Execute AppleScript from Go applications:
 - Bundle AppleScript files within the app
 - Execute scripts with proper permissions

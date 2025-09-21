@@ -43,7 +43,7 @@ func main() {
 
 ## Core Features
 
-### 🎯 Simple Permission Requests
+### Simple Permission Requests
 
 Request macOS permissions with a single function call:
 
@@ -55,7 +55,7 @@ macgo.Request(macgo.Camera)
 macgo.Request(macgo.Camera, macgo.Microphone, macgo.Files)
 ```
 
-### 📦 Automatic Bundle Creation
+### Automatic Bundle Creation
 
 macgo automatically creates a proper `.app` bundle structure with:
 - Info.plist with required metadata
@@ -63,7 +63,7 @@ macgo automatically creates a proper `.app` bundle structure with:
 - Proper executable location
 - App icons (if provided)
 
-### 🔐 Code Signing Support
+### Code Signing Support
 
 Built-in support for code signing:
 
@@ -79,7 +79,7 @@ cfg := macgo.NewConfig().
     WithAutoSign() // Auto-detects Developer ID
 ```
 
-### 🔧 Environment Configuration
+### Environment Configuration
 
 Configure via environment variables:
 

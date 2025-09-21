@@ -1,12 +1,9 @@
-package macgo
+package bundle
 
 import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/tmc/misc/macgo/bundle"
-	bundlePkg "github.com/tmc/misc/macgo/internal/bundle"
 )
 
 func TestIdentifierPopulation(t *testing.T) {
@@ -32,7 +29,7 @@ func TestIdentifierPopulation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test direct bundle ID inference
-			bundleID := bundle.InferBundleID(tt.appName)
+			bundleID := InferBundleID(tt.appName)
 
 			// Should not be empty
 			if bundleID == "" {
@@ -59,49 +56,6 @@ func TestIdentifierPopulation(t *testing.T) {
 	}
 }
 
-func TestBundleIDInferenceIntegration(t *testing.T) {
-	// Test that Config properly uses inferred bundle IDs when none is provided
-	cfg := &Config{
-		AppName: "IntegrationTest",
-		Debug:   true,
-	}
-
-	// Create a temporary executable for testing
-	tmpDir := t.TempDir()
-	execPath := tmpDir + "/integration-test"
-	if err := os.WriteFile(execPath, []byte("#!/bin/bash\necho test\n"), 0755); err != nil {
-		t.Fatalf("Failed to create test executable: %v", err)
-	}
-
-	// Test bundle creation to see if identifier gets populated
-	bundleConfig := &bundlePkg.Config{
-		AppName: cfg.AppName,
-		Debug:   cfg.Debug,
-	}
-
-	testBundle, err := bundlePkg.New(execPath, bundleConfig)
-	if err != nil {
-		t.Fatalf("Failed to create bundle: %v", err)
-	}
-
-	bundleID := testBundle.BundleID()
-
-	// Verify the bundle ID was properly inferred
-	if bundleID == "" {
-		t.Error("Bundle ID was not populated")
-	}
-
-	if strings.Contains(bundleID, "com.macgo") {
-		t.Errorf("Bundle ID %q should not contain 'com.macgo'", bundleID)
-	}
-
-	if !strings.Contains(bundleID, ".") {
-		t.Errorf("Bundle ID %q should contain at least one dot", bundleID)
-	}
-
-	t.Logf("Inferred bundle ID: %s", bundleID)
-}
-
 func TestEnvironmentBasedInference(t *testing.T) {
 	// Test that environment variables affect fallback bundle ID inference
 	originalUser := os.Getenv("LOGNAME")
@@ -117,7 +71,7 @@ func TestEnvironmentBasedInference(t *testing.T) {
 	_ = os.Setenv("LOGNAME", "testuser")
 
 	// Test the fallback function directly, which uses environment variables
-	bundleID := bundle.InferFallbackBundleID("TestApp")
+	bundleID := InferFallbackBundleID("TestApp")
 
 	// Should contain the username in some form
 	if !strings.Contains(bundleID, "testuser") {

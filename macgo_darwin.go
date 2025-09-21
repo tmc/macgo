@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tmc/misc/macgo/teamid"
 	"github.com/tmc/misc/macgo/internal/bundle"
 	"github.com/tmc/misc/macgo/internal/launch"
 	"github.com/tmc/misc/macgo/internal/system"
 	"github.com/tmc/misc/macgo/internal/tcc"
+	"github.com/tmc/misc/macgo/teamid"
 )
 
 // startDarwin implements the macOS-specific logic.

@@ -475,7 +475,6 @@ func syncScriptToBundle(externalDir, bundleDir, scriptName string) error {
 	return nil
 }
 
-
 // scriptNeedsUpdate checks if a script needs to be updated in the bundle
 func scriptNeedsUpdate(srcPath, dstPath string) (bool, error) {
 	// If destination doesn't exist, needs update
