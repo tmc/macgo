@@ -42,12 +42,14 @@
 //
 // Core permissions that cover most use cases:
 //
-//	Camera     - Camera access (AVCaptureDevice)
-//	Microphone - Microphone access (AVAudioSession)
-//	Location   - Location services (CoreLocation)
-//	Files      - File system access with user selection
-//	Network    - Network client and server connections
-//	Sandbox    - App sandbox with restricted file access
+//		Camera  //   - macgo.Camera: Access to camera
+//	  - macgo.Microphone: Access to microphone
+//	  - macgo.Location: Access to location services
+//	  - macgo.ScreenRecording: Access to screen recording
+//	  - macgo.Accessibility: Access to Accessibility features (e.g. input simulation)
+//	  - macgo.Files: Access to user-selected files
+//	  - macgo.Network: Network client/server access
+//	  - macgo.Sandbox: Enable app sandbox with restricted file access
 //
 // # Code Signing
 //
@@ -63,7 +65,7 @@
 //
 // Specific signing identity:
 //
-//	cfg := macgo.NewConfig().WithSigningIdentity("Developer ID Application: Your Name")
+//	cfg := macgo.NewConfig().WithCodeSigning("Developer ID Application: Your Name")
 //
 // # Environment Variables
 //
@@ -127,6 +129,20 @@
 //	    // Permissions and signing are pre-configured
 //	    macgo.Request()
 //	}
+//
+// # Cleanup
+//
+// When using macgo with I/O forwarding (the default), call Cleanup() on exit:
+//
+//	func main() {
+//	    defer macgo.Cleanup()
+//	    err := macgo.Request(macgo.Camera)
+//	    // ...
+//	}
+//
+// This ensures proper cleanup of pipe files and signals completion to the parent.
+// Signal handlers (SIGINT, SIGTERM) automatically call cleanup, but explicit
+// cleanup ensures proper behavior on normal exit.
 //
 // # TCC Integration
 //

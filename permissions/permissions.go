@@ -15,6 +15,7 @@ const (
 	Microphone      Permission = "microphone"       // Microphone access (com.apple.security.device.audio-input)
 	Location        Permission = "location"         // Location services (com.apple.security.personal-information.location)
 	ScreenRecording Permission = "screen-recording" // Screen recording/capture (requires TCC approval)
+	Accessibility   Permission = "accessibility"    // Accessibility (simulating input, etc.)
 	Files           Permission = "files"            // File system access with user selection
 	Network         Permission = "network"          // Network client/server access
 	Sandbox         Permission = "sandbox"          // App sandbox with restricted file access
@@ -31,6 +32,7 @@ var EntitlementMapping = map[Permission][]string{
 	Microphone:      {"com.apple.security.device.microphone"},
 	Location:        {"com.apple.security.personal-information.location"},
 	ScreenRecording: {}, // No entitlement needed - TCC handles this at runtime
+	Accessibility:   {"com.apple.security.temporary-exception.apple-events", "com.apple.security.automation.apple-events"},
 	Files:           {"com.apple.security.files.user-selected.read-only"},
 	Network:         {"com.apple.security.network.client"},
 	Sandbox:         {"com.apple.security.app-sandbox"},
@@ -43,6 +45,7 @@ var TCCServiceMapping = map[Permission]string{
 	Microphone:      "Microphone",
 	Location:        "Location",
 	ScreenRecording: "ScreenCapture",
+	Accessibility:   "Accessibility",
 }
 
 // PermissionDependencies defines which permissions require other permissions.
@@ -156,7 +159,7 @@ func GetEntitlements(perms []Permission) []string {
 func RequiresTCC(perms []Permission) bool {
 	for _, perm := range perms {
 		switch perm {
-		case Camera, Microphone, Location, ScreenRecording, Files:
+		case Camera, Microphone, Location, ScreenRecording, Accessibility, Files:
 			return true
 		}
 	}
@@ -221,6 +224,7 @@ func PermissionDescription(perm Permission) string {
 		Microphone:      "Access to microphone for audio recording",
 		Location:        "Access to device location services",
 		ScreenRecording: "Access to screen recording and capture",
+		Accessibility:   "Access to Accessibility APIs (simulating input, etc.)",
 		Files:           "Access to user-selected files and folders",
 		Network:         "Network access for client connections",
 		Sandbox:         "App sandbox with restricted file system access",

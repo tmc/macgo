@@ -51,6 +51,9 @@ func main() {
 	}
 	cfg := &macgo.Config{
 		AppName: appName,
+		Permissions: []macgo.Permission{
+			macgo.Accessibility,
+		},
 		Custom: []string{
 			"com.apple.security.automation.apple-events",
 		},

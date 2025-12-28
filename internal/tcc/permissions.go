@@ -15,6 +15,7 @@ const (
 	Microphone      = permissions.Microphone      // Microphone access (com.apple.security.device.audio-input)
 	Location        = permissions.Location        // Location services (com.apple.security.personal-information.location)
 	ScreenRecording = permissions.ScreenRecording // Screen recording/capture (requires TCC approval)
+	Accessibility   = permissions.Accessibility   // Accessibility (simulating input, etc.)
 	Files           = permissions.Files           // File system access with user selection
 	Network         = permissions.Network         // Network client/server access
 	Sandbox         = permissions.Sandbox         // App sandbox with restricted file access

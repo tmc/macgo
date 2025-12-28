@@ -95,12 +95,16 @@ MACGO_FORCE_LAUNCH_SERVICES=1 # Force use of LaunchServices
 
 ## Available Permissions
 
-- **Camera** (`macgo.Camera`) - Camera access
-- **Microphone** (`macgo.Microphone`) - Microphone access
-- **Location** (`macgo.Location`) - Location services
-- **Files** (`macgo.Files`) - File system access
-- **Network** (`macgo.Network`) - Network connections
-- **Sandbox** (`macgo.Sandbox`) - App sandboxing
+| Permission | Description |
+|------------|-------------|
+| `macgo.Camera` | Camera access |
+| `macgo.Microphone` | Microphone access |
+| `macgo.Location` | Location services |
+| `macgo.ScreenRecording` | Screen recording/capture |
+| `macgo.Accessibility` | Accessibility features (e.g., input simulation) |
+| `macgo.Files` | User-selected file access |
+| `macgo.Network` | Network access |
+| `macgo.Sandbox` | App sandbox |
 
 ## Advanced Usage
 

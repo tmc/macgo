@@ -104,6 +104,7 @@ import "C"
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -122,14 +123,14 @@ var keyMap = map[string]C.CGKeyCode{
 	"`": 0x32,
 
 	// Special keys
-	"space":     0x31,
-	"return":    0x24,
-	"enter":     0x4C,
-	"tab":       0x30,
-	"escape":    0x35,
-	"esc":       0x35,
-	"delete":    0x33,
-	"backspace": 0x33,
+	"space":          0x31,
+	"return":         0x24,
+	"enter":          0x4C,
+	"tab":            0x30,
+	"escape":         0x35,
+	"esc":            0x35,
+	"delete":         0x33,
+	"backspace":      0x33,
 	"forward-delete": 0x75,
 
 	// Arrow keys
@@ -159,6 +160,8 @@ var keyMap = map[string]C.CGKeyCode{
 	"f12": 0x6F,
 }
 
+var logger = log.New(os.Stderr, "macgo: ", log.LstdFlags)
+
 func main() {
 	if len(os.Args) < 2 {
 		showUsage()
@@ -167,8 +170,7 @@ func main() {
 
 	// Initialize macgo for Accessibility permission
 	cfg := macgo.NewConfig().
-		WithAppName("press-keys").
-		WithCustom("com.apple.security.temporary-exception.apple-events").
+		WithPermissions(macgo.Accessibility).
 		FromEnv()
 
 	if err := macgo.Start(cfg); err != nil {

@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/tmc/macgo/internal/bundle"
@@ -84,6 +86,9 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 				fmt.Fprintf(os.Stderr, "macgo: failed to setup pipe redirection: %v\n", err)
 			}
 		}
+
+		// Register signal handler to write done file on termination
+		registerExitHandler(cfg.Debug)
 
 		return nil
 	}
@@ -377,35 +382,24 @@ func setupPipeRedirection(debug bool) error {
 	return nil
 }
 
-// registerExitHandler sets up a handler to write the done file when the process exits.
-// This uses runtime.SetFinalizer on a sentinel object to detect process exit.
+// registerExitHandler sets up signal handlers to write the done file on termination.
+// This catches SIGINT, SIGTERM, and SIGQUIT to ensure cleanup happens even when
+// the process is killed externally.
 func registerExitHandler(debug bool) {
 	doneFile := os.Getenv("MACGO_DONE_FILE")
 	if doneFile == "" {
 		return
 	}
 
-	if debug {
-		fmt.Fprintf(os.Stderr, "macgo: registered exit handler to write done file: %s\n", doneFile)
-	}
-
-	// Use a goroutine that runs a finalizer-based exit detector
-	// Since Go doesn't have true atexit, we write the done file here and rely on
-	// the application to either call os.Exit (which we can't intercept) or return
-	// from main normally.
-	//
-	// For now, we'll write the done file proactively after a short delay or when
-	// the main goroutine signals completion. This is a best-effort approach.
-	//
-	// A better approach: override os.Exit via a wrapper function
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
-		// Use runtime to detect when the main goroutine finishes
-		// This is a polling approach - not ideal but works for most cases
-		for {
-			time.Sleep(100 * time.Millisecond)
-			// Check if we should write the done file
-			// The done file is written when the main goroutine finishes
+		sig := <-c
+		if debug {
+			fmt.Fprintf(os.Stderr, "macgo: received signal %v, writing done file\n", sig)
 		}
+		writeDoneFile()
+		os.Exit(1)
 	}()
 }
 

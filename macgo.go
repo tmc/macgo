@@ -37,21 +37,25 @@ import (
 
 	"github.com/tmc/macgo/internal/system"
 	"github.com/tmc/macgo/internal/tcc"
+	"github.com/tmc/macgo/permissions"
 )
 
 // Permission represents a macOS system permission that can be requested.
 // These correspond to TCC (Transparency, Consent, Control) permission types.
-type Permission string
+// This is an alias for permissions.Permission for convenience.
+type Permission = permissions.Permission
 
 // Core permissions covering 95% of use cases.
+// Re-exported from the permissions package for convenience.
 const (
-	Camera          Permission = "camera"           // Camera access (com.apple.security.device.camera)
-	Microphone      Permission = "microphone"       // Microphone access (com.apple.security.device.audio-input)
-	Location        Permission = "location"         // Location services (com.apple.security.personal-information.location)
-	ScreenRecording Permission = "screen-recording" // Screen recording/capture (requires TCC approval)
-	Files           Permission = "files"            // File system access with user selection
-	Network         Permission = "network"          // Network client/server access
-	Sandbox         Permission = "sandbox"          // App sandbox with restricted file access
+	Camera          = permissions.Camera
+	Microphone      = permissions.Microphone
+	Location        = permissions.Location
+	ScreenRecording = permissions.ScreenRecording
+	Accessibility   = permissions.Accessibility
+	Files           = permissions.Files
+	Network         = permissions.Network
+	Sandbox         = permissions.Sandbox
 )
 
 // NewConfig creates a new Config with sensible defaults.
@@ -330,6 +334,11 @@ func StartContext(ctx context.Context, cfg *Config) error {
 
 	if cfg == nil {
 		cfg = &Config{}
+	}
+
+	// Emit deprecation warning for ForceLaunchServices
+	if cfg.ForceLaunchServices {
+		fmt.Fprintln(os.Stderr, "macgo: warning: ForceLaunchServices is deprecated (LaunchServices is now default)")
 	}
 
 	return startDarwin(ctx, cfg)
