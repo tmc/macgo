@@ -8,13 +8,14 @@ import (
 
 // Record represents a single entry in the lsregister dump
 type Record struct {
-	Raw       string `json:"raw,omitempty"`
-	BundleID  string `json:"bundle_id"`
-	Path      string `json:"path"`
-	Name      string `json:"name"`
-	Container string `json:"container,omitempty"`
-	Class     string `json:"class,omitempty"`
-	Type      string `json:"type,omitempty"`
+	Raw        string `json:"raw,omitempty"`
+	BundleID   string `json:"bundle_id"`
+	Path       string `json:"path"`
+	Name       string `json:"name"`
+	Container  string `json:"container,omitempty"`
+	Class      string `json:"class,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Identifier string `json:"identifier,omitempty"`
 }
 
 // ParseDump parses the output of lsregister -dump
@@ -101,6 +102,8 @@ func parseRecord(ls lines) *Record {
 			r.Class = val
 		case "type code":
 			r.Type = val
+		case "identifier":
+			r.Identifier = val
 		}
 	}
 

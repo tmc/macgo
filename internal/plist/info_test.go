@@ -263,6 +263,134 @@ func TestGenerateDefaultBundleID(t *testing.T) {
 	}
 }
 
+// TestInfoPlistBackgroundModes tests the LSBackgroundOnly and LSUIElement combinations
+func TestInfoPlistBackgroundModes(t *testing.T) {
+	tests := []struct {
+		name             string
+		backgroundOnly   bool
+		showInDockEnv    string
+		wantLSBackground bool   // expect LSBackgroundOnly=true
+		wantLSUIElement  *bool  // nil=absent, true/false=present with value
+	}{
+		{
+			name:             "default: LSUIElement=true (no dock icon)",
+			backgroundOnly:   false,
+			showInDockEnv:    "",
+			wantLSBackground: false,
+			wantLSUIElement:  boolPtr(true),
+		},
+		{
+			name:             "MACGO_SHOW_IN_DOCK=1: LSUIElement=false (show in dock)",
+			backgroundOnly:   false,
+			showInDockEnv:    "1",
+			wantLSBackground: false,
+			wantLSUIElement:  boolPtr(false),
+		},
+		{
+			name:             "BackgroundOnly=true: LSBackgroundOnly=true (no LSUIElement)",
+			backgroundOnly:   true,
+			showInDockEnv:    "",
+			wantLSBackground: true,
+			wantLSUIElement:  nil, // should not be present
+		},
+		{
+			name:             "BackgroundOnly=true ignores SHOW_IN_DOCK",
+			backgroundOnly:   true,
+			showInDockEnv:    "1",
+			wantLSBackground: true,
+			wantLSUIElement:  nil, // should not be present even with SHOW_IN_DOCK
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set/unset environment variable
+			if tt.showInDockEnv != "" {
+				os.Setenv("MACGO_SHOW_IN_DOCK", tt.showInDockEnv)
+				defer os.Unsetenv("MACGO_SHOW_IN_DOCK")
+			} else {
+				os.Unsetenv("MACGO_SHOW_IN_DOCK")
+			}
+
+			tempDir := t.TempDir()
+			plistPath := filepath.Join(tempDir, "Info.plist")
+
+			cfg := InfoPlistConfig{
+				AppName:        "TestApp",
+				BundleID:       "com.example.testapp",
+				ExecName:       "testapp",
+				Version:        "1.0.0",
+				BackgroundOnly: tt.backgroundOnly,
+			}
+
+			err := WriteInfoPlist(plistPath, cfg)
+			if err != nil {
+				t.Fatalf("WriteInfoPlist failed: %v", err)
+			}
+
+			content, err := os.ReadFile(plistPath)
+			if err != nil {
+				t.Fatalf("Failed to read plist file: %v", err)
+			}
+			contentStr := string(content)
+
+			// Check LSBackgroundOnly
+			hasLSBackgroundOnly := strings.Contains(contentStr, "<key>LSBackgroundOnly</key>")
+			hasLSBackgroundOnlyTrue := strings.Contains(contentStr, "<key>LSBackgroundOnly</key>") &&
+				strings.Contains(contentStr, "<true/>")
+			if tt.wantLSBackground {
+				if !hasLSBackgroundOnly {
+					t.Errorf("Expected LSBackgroundOnly but not found")
+				}
+				if !hasLSBackgroundOnlyTrue {
+					t.Errorf("LSBackgroundOnly should be true")
+				}
+			} else {
+				if hasLSBackgroundOnly {
+					t.Errorf("Did not expect LSBackgroundOnly but found it")
+				}
+			}
+
+			// Check LSUIElement
+			hasLSUIElement := strings.Contains(contentStr, "<key>LSUIElement</key>")
+			if tt.wantLSUIElement == nil {
+				if hasLSUIElement {
+					t.Errorf("Expected no LSUIElement but found it")
+				}
+			} else {
+				if !hasLSUIElement {
+					t.Errorf("Expected LSUIElement but not found")
+				}
+				// Check the value follows the key
+				expectedValue := "<true/>"
+				if !*tt.wantLSUIElement {
+					expectedValue = "<false/>"
+				}
+				// Find LSUIElement key and check next line has expected value
+				lines := strings.Split(contentStr, "\n")
+				found := false
+				for i, line := range lines {
+					if strings.Contains(line, "<key>LSUIElement</key>") && i+1 < len(lines) {
+						if strings.Contains(lines[i+1], expectedValue) {
+							found = true
+							break
+						}
+					}
+				}
+				if !found {
+					t.Errorf("LSUIElement should be %v", *tt.wantLSUIElement)
+				}
+			}
+
+			t.Logf("Content:\n%s", contentStr)
+		})
+	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
 func TestInfoPlistXMLEscaping(t *testing.T) {
 	tempDir := t.TempDir()
 	plistPath := filepath.Join(tempDir, "Info.plist")

@@ -13,6 +13,23 @@ import (
 	"github.com/tmc/macgo/internal/system"
 )
 
+// UIMode controls how the app appears in the macOS UI.
+type UIMode string
+
+const (
+	// UIModeBackground sets LSBackgroundOnly=true. No UI at all.
+	// Use for CLI tools, MCP servers, daemons. Prevents -1712 timeout.
+	UIModeBackground UIMode = "background"
+
+	// UIModeAccessory sets LSUIElement=true. Can show windows/menu bar but no Dock icon.
+	// Use for menu bar apps, floating utilities.
+	UIModeAccessory UIMode = "accessory"
+
+	// UIModeRegular is a normal app with Dock icon and full UI.
+	// Use for standard GUI applications.
+	UIModeRegular UIMode = "regular"
+)
+
 // Bundle represents a macOS app bundle with its configuration and management methods.
 type Bundle struct {
 	// Path is the full path to the .app bundle directory
@@ -72,6 +89,13 @@ type Config struct {
 
 	// CodeSigningIdentifier is the identifier to use for code signing.
 	CodeSigningIdentifier string
+
+	// Info allows specifying custom Info.plist keys.
+	Info map[string]interface{}
+
+	// UIMode controls how the app appears in the UI.
+	// Default (empty or UIModeBackground): LSBackgroundOnly=true for CLI tools.
+	UIMode UIMode
 }
 
 // shouldKeepBundle returns the effective KeepBundle value.
@@ -190,21 +214,62 @@ func (b *Bundle) Create() error {
 		return fmt.Errorf("failed to set executable permissions: %w", err)
 	}
 
-	// Create Info.plist
+	// Create Info.plist path
 	plistPath := filepath.Join(contentsDir, "Info.plist")
+
+	// Prepare Info.plist config
 	infoCfg := plist.InfoPlistConfig{
-		AppName:  b.appName,
-		BundleID: b.bundleID,
-		ExecName: execName,
-		Version:  b.version,
+		AppName:    b.appName,
+		BundleID:   b.bundleID,
+		ExecName:   execName,
+		Version:    b.version,
+		CustomKeys: make(map[string]interface{}),
 	}
+
+	// Set UI mode based on config (default: background for CLI tools)
+	switch b.Config.UIMode {
+	case UIModeAccessory:
+		// LSUIElement=true: menu bar apps, no Dock icon but can show UI
+		infoCfg.CustomKeys["LSUIElement"] = true
+	case UIModeRegular:
+		// Normal app: appears in Dock, full UI
+		// Don't set LSBackgroundOnly or LSUIElement
+	default:
+		// UIModeBackground or empty: LSBackgroundOnly=true for CLI tools
+		// Prevents -1712 AppleEvent timeout for pure Go binaries
+		infoCfg.BackgroundOnly = true
+	}
+
+	// Copy custom Info keys
+	for k, v := range b.Config.Info {
+		infoCfg.CustomKeys[k] = v
+	}
+
+	// Helper: Auto-inject Usage Descriptions for known TCC permissions if missing
+	for _, perm := range b.Config.Permissions {
+		if strings.Contains(strings.ToLower(perm), "accessibility") { // matches "accessibility"
+			const key = "NSAccessibilityUsageDescription"
+			if _, exists := infoCfg.CustomKeys[key]; !exists {
+				infoCfg.CustomKeys[key] = "This application requires accessibility permissions to function properly."
+				if b.Config.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: auto-injected %s\n", key)
+				}
+			}
+		}
+		// Add others (Camera, Mic) as needed in future
+	}
+
 	if err := plist.WriteInfoPlist(plistPath, infoCfg); err != nil {
 		return fmt.Errorf("failed to write Info.plist: %w", err)
 	}
 
-	// Create entitlements if needed (not for ad-hoc signing)
-	if (len(b.Config.Permissions) > 0 || len(b.Config.Custom) > 0) &&
-		b.Config.CodeSignIdentity != "-" && !b.Config.AdHocSign {
+	// Create entitlements if needed
+	// We now include entitlements for ad-hoc signing to support Apple Silicon (get-task-allow).
+	needsEntitlements := (len(b.Config.Permissions) > 0 || len(b.Config.Custom) > 0) ||
+		(b.Config.CodeSignIdentity != "-" && !b.Config.AdHocSign) ||
+		b.Config.AdHocSign || b.Config.CodeSignIdentity == "-"
+
+	if needsEntitlements {
 		entPath := filepath.Join(contentsDir, "entitlements.plist")
 
 		// Convert string permissions to plist.Permission
@@ -213,9 +278,24 @@ func (b *Bundle) Create() error {
 			plistPermissions = append(plistPermissions, plist.Permission(p))
 		}
 
+		customEntitlements := b.Config.Custom
+		// Inject get-task-allow for ad-hoc signing if not already present
+		if b.Config.AdHocSign || b.Config.CodeSignIdentity == "-" {
+			hasGetTaskAllow := false
+			for _, c := range customEntitlements {
+				if c == "com.apple.security.get-task-allow" {
+					hasGetTaskAllow = true
+					break
+				}
+			}
+			if !hasGetTaskAllow {
+				customEntitlements = append(customEntitlements, "com.apple.security.get-task-allow")
+			}
+		}
+
 		entCfg := plist.EntitlementsConfig{
 			Permissions: plistPermissions,
-			Custom:      b.Config.Custom,
+			Custom:      customEntitlements,
 			AppGroups:   b.Config.AppGroups,
 		}
 		if err := plist.WriteEntitlements(entPath, entCfg); err != nil {
@@ -363,7 +443,8 @@ func (b *Bundle) ExecutablePath() string {
 // This avoids the need for complex config conversion.
 func Create(execPath string, appName, bundleID, version string, permissions []string,
 	custom []string, appGroups []string, debug bool, keepBundle *bool,
-	codeSignIdentity, codeSigningIdentifier string, autoSign, adHocSign bool) (*Bundle, error) {
+	codeSignIdentity, codeSigningIdentifier string, autoSign, adHocSign bool,
+	info map[string]interface{}, uiMode UIMode) (*Bundle, error) {
 
 	config := &Config{
 		AppName:               appName,
@@ -378,6 +459,8 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 		CodeSigningIdentifier: codeSigningIdentifier,
 		AutoSign:              autoSign,
 		AdHocSign:             adHocSign,
+		Info:                  info,
+		UIMode:                uiMode,
 	}
 
 	bundle, err := New(execPath, config)

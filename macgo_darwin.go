@@ -154,6 +154,7 @@ func createSimpleBundle(execPath string, cfg *Config) (*bundle.Bundle, error) {
 		cfg.CodeSigningIdentifier,
 		cfg.AutoSign,
 		cfg.AdHocSign,
+		cfg.Info,
 	)
 }
 
@@ -210,7 +211,15 @@ func findPipeConfig(debug bool) string {
 	}
 
 	if debug {
-		fmt.Fprintf(os.Stderr, "macgo: looking for config for bundle: %s\n", bundlePath)
+		fmt.Fprintf(os.Stderr, "macgo: findPipeConfig: execPath=%q\n", execPath)
+		fmt.Fprintf(os.Stderr, "macgo: findPipeConfig: determined bundlePath=%q\n", bundlePath)
+	}
+
+	if bundlePath == "" {
+		if debug {
+			fmt.Fprintf(os.Stderr, "macgo: findPipeConfig: no .app/ found in path, assuming CLI mode, checking parent PID configs...\n")
+		}
+		// Logic to handle CLI tool scenario?
 	}
 
 	// Look for recent config files in ~/Library/Application Support/macgo/pipes/
@@ -248,14 +257,19 @@ func findPipeConfig(debug bool) string {
 		// Read the config file to check if it's for our bundle
 		configBundle := readBundlePathFromConfig(match)
 
+		if debug {
+			fmt.Fprintf(os.Stderr, "macgo: checking candidate %s: bundlePath=%q vs configBundle=%q\n", filepath.Base(match), bundlePath, configBundle)
+		}
+
 		// Only use configs that match our bundle path
+		// If bundlePath is empty (CLI tool?), matches might be ambiguous.
 		if configBundle != "" && configBundle != bundlePath {
 			skippedMismatch++
 			continue
 		}
 
 		if debug {
-			fmt.Fprintf(os.Stderr, "macgo: config candidate: %s (age: %v)\n", match, age)
+			fmt.Fprintf(os.Stderr, "macgo: config candidate match found: %s\n", match)
 		}
 
 		if newestConfig == "" || info.ModTime().After(newestTime) {

@@ -122,6 +122,10 @@ type Config struct {
 	// ForceLaunchServices is deprecated and currently a no-op as LaunchServices
 	// is the default strategy. Use ForceDirectExecution=true to opt out.
 	ForceLaunchServices bool
+
+	// Info allows specifying custom Info.plist keys.
+	// This is useful for UsageDescriptions (e.g. NSAccessibilityUsageDescription).
+	Info map[string]interface{}
 }
 
 // FromEnv loads configuration from environment variables.
@@ -268,6 +272,22 @@ func (c *Config) WithAdHocSign() *Config {
 	return c
 }
 
+// WithInfo adds a custom key/value pair to the Info.plist.
+func (c *Config) WithInfo(key string, value interface{}) *Config {
+	if c.Info == nil {
+		c.Info = make(map[string]interface{})
+	}
+	c.Info[key] = value
+	return c
+}
+
+// WithUsageDescription sets a usage description string for a specific permission.
+// This is required for permissions like Accessibility, Camera, etc. to trigger prompts.
+// Example: WithUsageDescription("NSAccessibilityUsageDescription", "Needed to inspect UI")
+func (c *Config) WithUsageDescription(key, description string) *Config {
+	return c.WithInfo(key, description)
+}
+
 // Validate checks the configuration for common issues and dependency requirements.
 // Returns an error if the configuration is invalid.
 func (c *Config) Validate() error {
@@ -310,6 +330,9 @@ func (c *Config) Validate() error {
 // Creates an app bundle if needed and handles permission requests.
 // On non-macOS platforms, this is a no-op that returns nil.
 func Start(cfg *Config) error {
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: Start called (PID: %d)\n", os.Getpid())
+	}
 	if runtime.GOOS != "darwin" {
 		if cfg != nil && cfg.Debug {
 			fmt.Fprintf(os.Stderr, "macgo: skipping on %s\n", runtime.GOOS)

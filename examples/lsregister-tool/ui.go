@@ -21,7 +21,11 @@ func printTable(records []Record) {
 	fmt.Fprintln(w, "NAME\tBUNDLE ID\tPATH")
 	for _, r := range records {
 		name := limit(r.Name, 30)
-		bid := limit(r.BundleID, 40)
+		bid := limit(r.Identifier, 40)
+		// Fallback if Identifier is empty but BundleID (short name) exists?
+		if bid == "" {
+			bid = limit(r.BundleID, 40)
+		}
 		path := limit(r.Path, 50)
 		fmt.Fprintf(w, "%s\t%s\t%s\n", name, bid, path)
 	}
@@ -49,6 +53,7 @@ func filterRecords(records []Record, query string) []Record {
 	for _, r := range records {
 		if strings.Contains(strings.ToLower(r.Name), query) ||
 			strings.Contains(strings.ToLower(r.BundleID), query) ||
+			strings.Contains(strings.ToLower(r.Identifier), query) ||
 			strings.Contains(strings.ToLower(r.Path), query) {
 			matches = append(matches, r)
 		}

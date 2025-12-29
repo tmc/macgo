@@ -10,11 +10,12 @@ import (
 
 // InfoPlistConfig holds configuration for generating Info.plist files.
 type InfoPlistConfig struct {
-	AppName    string
-	BundleID   string
-	ExecName   string
-	Version    string
-	CustomKeys map[string]interface{}
+	AppName        string
+	BundleID       string
+	ExecName       string
+	Version        string
+	BackgroundOnly bool
+	CustomKeys     map[string]interface{}
 }
 
 // WriteInfoPlist creates a minimal Info.plist file at the specified path.
@@ -49,20 +50,51 @@ func validateInfoPlistConfig(cfg InfoPlistConfig) error {
 func generateInfoPlistContent(cfg InfoPlistConfig) string {
 	var entries []string
 
+	// Helper to check if a key is overridden by CustomKeys
+	isOverridden := func(key string) bool {
+		_, ok := cfg.CustomKeys[key]
+		return ok
+	}
+
 	// Standard required entries
-	entries = append(entries, xmlKeyValue("CFBundleDisplayName", cfg.AppName))
-	entries = append(entries, xmlKeyValue("CFBundleExecutable", cfg.ExecName))
-	entries = append(entries, xmlKeyValue("CFBundleIdentifier", cfg.BundleID))
-	entries = append(entries, xmlKeyValue("CFBundleName", cfg.AppName))
-	entries = append(entries, xmlKeyValue("CFBundlePackageType", "APPL"))
-	entries = append(entries, xmlKeyValue("CFBundleVersion", cfg.Version))
-	entries = append(entries, xmlKeyValue("CFBundleShortVersionString", cfg.Version))
+	if !isOverridden("CFBundleDisplayName") {
+		entries = append(entries, xmlKeyValue("CFBundleDisplayName", cfg.AppName))
+	}
+	if !isOverridden("CFBundleExecutable") {
+		entries = append(entries, xmlKeyValue("CFBundleExecutable", cfg.ExecName))
+	}
+	if !isOverridden("CFBundleIdentifier") {
+		entries = append(entries, xmlKeyValue("CFBundleIdentifier", cfg.BundleID))
+	}
+	if !isOverridden("CFBundleName") {
+		entries = append(entries, xmlKeyValue("CFBundleName", cfg.AppName))
+	}
+	if !isOverridden("CFBundlePackageType") {
+		entries = append(entries, xmlKeyValue("CFBundlePackageType", "APPL"))
+	}
+	if !isOverridden("CFBundleVersion") {
+		entries = append(entries, xmlKeyValue("CFBundleVersion", cfg.Version))
+	}
+	if !isOverridden("CFBundleShortVersionString") {
+		entries = append(entries, xmlKeyValue("CFBundleShortVersionString", cfg.Version))
+	}
 
 	// Default behavior: no dock icon (unless disabled for FDA registration), high resolution capable
 	// LSUIElement=true makes app background (no dock icon) but may prevent FDA panel registration
 	showInDock := os.Getenv("MACGO_SHOW_IN_DOCK") == "1"
-	entries = append(entries, xmlKeyBool("LSUIElement", !showInDock))
-	entries = append(entries, xmlKeyBool("NSHighResolutionCapable", true))
+
+	// Only apply default background/UI element logic if neither is overridden
+	if !isOverridden("LSBackgroundOnly") && !isOverridden("LSUIElement") {
+		if cfg.BackgroundOnly {
+			entries = append(entries, xmlKeyBool("LSBackgroundOnly", true))
+		} else {
+			entries = append(entries, xmlKeyBool("LSUIElement", !showInDock))
+		}
+	}
+
+	if !isOverridden("NSHighResolutionCapable") {
+		entries = append(entries, xmlKeyBool("NSHighResolutionCapable", true))
+	}
 
 	// Add custom keys if provided
 	for key, value := range cfg.CustomKeys {

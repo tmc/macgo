@@ -177,9 +177,9 @@ func TestE2E_BundleIdentifierGeneration(t *testing.T) {
 	defer os.Unsetenv("MACGO_NO_RELAUNCH")
 
 	tests := []struct {
-		name           string
-		config         *macgo.Config
-		shouldContain  string
+		name             string
+		config           *macgo.Config
+		shouldContain    string
 		shouldNotContain string
 	}{
 		{
@@ -235,11 +235,11 @@ func TestE2E_EnvironmentConfiguration(t *testing.T) {
 
 	// Save original environment
 	originalEnv := map[string]string{
-		"MACGO_APP_NAME":   os.Getenv("MACGO_APP_NAME"),
-		"MACGO_BUNDLE_ID":  os.Getenv("MACGO_BUNDLE_ID"),
-		"MACGO_DEBUG":      os.Getenv("MACGO_DEBUG"),
-		"MACGO_CAMERA":     os.Getenv("MACGO_CAMERA"),
-		"MACGO_MICROPHONE": os.Getenv("MACGO_MICROPHONE"),
+		"MACGO_APP_NAME":    os.Getenv("MACGO_APP_NAME"),
+		"MACGO_BUNDLE_ID":   os.Getenv("MACGO_BUNDLE_ID"),
+		"MACGO_DEBUG":       os.Getenv("MACGO_DEBUG"),
+		"MACGO_CAMERA":      os.Getenv("MACGO_CAMERA"),
+		"MACGO_MICROPHONE":  os.Getenv("MACGO_MICROPHONE"),
 		"MACGO_NO_RELAUNCH": os.Getenv("MACGO_NO_RELAUNCH"),
 	}
 	defer func() {
@@ -438,6 +438,8 @@ func TestE2E_BundleStructure(t *testing.T) {
 		"",    // codeSigningIdentifier
 		false, // autoSign
 		true,  // adHocSign
+		nil,   // customInfo
+		"",    // uiMode (default: background)
 	)
 
 	if err != nil {
@@ -705,6 +707,8 @@ func BenchmarkE2E_BundleCreation(b *testing.B) {
 			"",    // codeSigningIdentifier
 			false, // autoSign
 			true,  // adHocSign
+			nil,   // customInfo
+			"",    // uiMode (default: background)
 		)
 		if err != nil {
 			b.Fatalf("Bundle creation failed: %v", err)

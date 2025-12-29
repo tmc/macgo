@@ -49,11 +49,10 @@ func codeSignBundle(bundlePath string, cfg *Config) error {
 	// Always add the identifier flag
 	args = append(args, "--identifier", identifier)
 
-	if cfg.CodeSignIdentity != "-" {
-		entitlementsPath := filepath.Join(bundlePath, "Contents", "entitlements.plist")
-		if _, err := os.Stat(entitlementsPath); err == nil {
-			args = append(args, "--entitlements", entitlementsPath)
-		}
+	// Check for entitlements file and add it if present
+	entitlementsPath := filepath.Join(bundlePath, "Contents", "entitlements.plist")
+	if _, err := os.Stat(entitlementsPath); err == nil {
+		args = append(args, "--entitlements", entitlementsPath)
 	}
 
 	args = append(args, bundlePath)
