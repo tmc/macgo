@@ -35,6 +35,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/tmc/macgo/internal/bundle"
 	"github.com/tmc/macgo/internal/system"
 	"github.com/tmc/macgo/internal/tcc"
 	"github.com/tmc/macgo/permissions"
@@ -56,6 +57,24 @@ const (
 	Files           = permissions.Files
 	Network         = permissions.Network
 	Sandbox         = permissions.Sandbox
+)
+
+// UIMode controls how the app appears in the macOS UI.
+type UIMode = bundle.UIMode
+
+const (
+	// UIModeBackground sets LSBackgroundOnly=true. No UI at all.
+	// Use for CLI tools, MCP servers, daemons. Prevents -1712 timeout.
+	// This is the default.
+	UIModeBackground = bundle.UIModeBackground
+
+	// UIModeAccessory sets LSUIElement=true. Can show windows/menu bar but no Dock icon.
+	// Use for menu bar apps, floating utilities.
+	UIModeAccessory = bundle.UIModeAccessory
+
+	// UIModeRegular is a normal app with Dock icon and full UI.
+	// Use for standard GUI applications.
+	UIModeRegular = bundle.UIModeRegular
 )
 
 // NewConfig creates a new Config with sensible defaults.
@@ -126,6 +145,10 @@ type Config struct {
 	// Info allows specifying custom Info.plist keys.
 	// This is useful for UsageDescriptions (e.g. NSAccessibilityUsageDescription).
 	Info map[string]interface{}
+
+	// UIMode controls how the app appears in the UI.
+	// Default (UIModeBackground): LSBackgroundOnly=true for CLI tools.
+	UIMode UIMode
 }
 
 // FromEnv loads configuration from environment variables.
@@ -151,6 +174,7 @@ type Config struct {
 //	MACGO_SANDBOX=1         - Enable app sandbox
 //	MACGO_FORCE_LAUNCH_SERVICES=1 - Force use of LaunchServices
 //	MACGO_FORCE_DIRECT=1    - Force direct execution
+//	MACGO_TTY_PASSTHROUGH=1 - Pass TTY device to child (experimental; default: pipe-based I/O)
 //	MACGO_OPEN_NEW_INSTANCE=0 - Disable -n flag (new instance) for open command (enabled by default)
 func (c *Config) FromEnv() *Config {
 	if name := os.Getenv("MACGO_APP_NAME"); name != "" {
@@ -286,6 +310,13 @@ func (c *Config) WithInfo(key string, value interface{}) *Config {
 // Example: WithUsageDescription("NSAccessibilityUsageDescription", "Needed to inspect UI")
 func (c *Config) WithUsageDescription(key, description string) *Config {
 	return c.WithInfo(key, description)
+}
+
+// WithUIMode sets how the app appears in the macOS UI.
+// Options: UIModeBackground (default), UIModeAccessory, UIModeRegular
+func (c *Config) WithUIMode(mode UIMode) *Config {
+	c.UIMode = mode
+	return c
 }
 
 // Validate checks the configuration for common issues and dependency requirements.

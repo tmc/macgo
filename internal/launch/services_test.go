@@ -103,53 +103,26 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
 
+	// NOTE: open-flags and env-vars strategies were removed as they don't work with LaunchServices.
+	// Only config-file strategy is supported, which doesn't add I/O flags to the open command.
 	tests := []struct {
-		name       string
-		args       []string
-		ioStrategy string
-		wantArgs   []string
+		name     string
+		args     []string
+		wantArgs []string
 	}{
 		{
-			name:       "config-file strategy (default) - no args",
-			args:       []string{"program"},
-			ioStrategy: "config-file",
+			name: "no args",
+			args: []string{"program"},
 			wantArgs: []string{
 				"open",
 				bundlePath,
 			},
 		},
 		{
-			name:       "config-file strategy (default) - with args",
-			args:       []string{"program", "arg1", "arg2", "--flag"},
-			ioStrategy: "config-file",
+			name: "with args",
+			args: []string{"program", "arg1", "arg2", "--flag"},
 			wantArgs: []string{
 				"open",
-				bundlePath,
-				"--args",
-				"arg1", "arg2", "--flag",
-			},
-		},
-		{
-			name:       "open-flags strategy - no args",
-			args:       []string{"program"},
-			ioStrategy: "open-flags",
-			wantArgs: []string{
-				"open",
-				"-i", "/tmp/stdin",
-				"-o", "/tmp/stdout",
-				"--stderr", "/tmp/stderr",
-				bundlePath,
-			},
-		},
-		{
-			name:       "open-flags strategy - with args",
-			args:       []string{"program", "arg1", "arg2", "--flag"},
-			ioStrategy: "open-flags",
-			wantArgs: []string{
-				"open",
-				"-i", "/tmp/stdin",
-				"-o", "/tmp/stdout",
-				"--stderr", "/tmp/stderr",
 				bundlePath,
 				"--args",
 				"arg1", "arg2", "--flag",
@@ -161,11 +134,7 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Args = tt.args
 
-			// Set the I/O strategy for this test
-			os.Setenv("MACGO_IO_STRATEGY", tt.ioStrategy)
-			defer os.Unsetenv("MACGO_IO_STRATEGY")
-
-			cmd, err := launcher.buildOpenCommand(ctx, bundlePath, pipes, false)
+			cmd, err := launcher.buildOpenCommand(ctx, bundlePath, pipes, false, nil)
 			if err != nil {
 				t.Fatalf("buildOpenCommand() failed: %v", err)
 			}

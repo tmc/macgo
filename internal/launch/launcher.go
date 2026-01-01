@@ -49,32 +49,10 @@ type Manager struct {
 }
 
 // New creates a new launch manager with default launchers.
-// The services launcher version is selected via MACGO_LAUNCHER_VERSION or MACGO_SERVICES_VERSION env var.
-// - Default: ServicesLauncher (v1, STABLE - uses config-file strategy with continuous polling)
-// - Version "2" or "v2": ServicesLauncherV2 (EXPERIMENTAL - similar to v1 but with future enhancements)
 func New() *Manager {
-	// Determine which services launcher to use
-	var servicesLauncher Launcher
-	version := os.Getenv("MACGO_LAUNCHER_VERSION")
-	if version == "" {
-		version = os.Getenv("MACGO_SERVICES_VERSION")
-	}
-
-	if version == "2" || version == "v2" {
-		servicesLauncher = &ServicesLauncherV2{}
-		if os.Getenv("MACGO_DEBUG") == "1" {
-			fmt.Fprintf(os.Stderr, "macgo: selected ServicesLauncherV2\n")
-		}
-	} else {
-		servicesLauncher = &ServicesLauncher{}
-		if os.Getenv("MACGO_DEBUG") == "1" && version != "" {
-			fmt.Fprintf(os.Stderr, "macgo: selected ServicesLauncher (v1) - unknown version %q\n", version)
-		}
-	}
-
 	return &Manager{
 		directLauncher:   &DirectLauncher{},
-		servicesLauncher: servicesLauncher,
+		servicesLauncher: &ServicesLauncher{},
 	}
 }
 

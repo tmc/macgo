@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-// TestServicesLauncherV2_LargeStdoutOutput verifies that V2 correctly handles
+// TestServicesLauncher_LargeStdoutOutput verifies that V2 correctly handles
 // multi-MB stdout output without truncation or deadlocks.
-func TestServicesLauncherV2_LargeStdoutOutput(t *testing.T) {
+func TestServicesLauncher_LargeStdoutOutput(t *testing.T) {
 	t.Skip("Skipping large output test due to persistent FIFO flakiness on macOS CI environment")
-	launcher := &ServicesLauncherV2{
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -132,11 +132,11 @@ func TestServicesLauncherV2_LargeStdoutOutput(t *testing.T) {
 	}
 }
 
-// TestServicesLauncherV2_LargeStderrOutput verifies that V2 correctly handles
+// TestServicesLauncher_LargeStderrOutput verifies that V2 correctly handles
 // multi-MB stderr output without truncation or deadlocks.
-func TestServicesLauncherV2_LargeStderrOutput(t *testing.T) {
+func TestServicesLauncher_LargeStderrOutput(t *testing.T) {
 	t.Skip("Skipping large output test due to persistent FIFO flakiness on macOS CI environment")
-	launcher := &ServicesLauncherV2{
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -241,11 +241,11 @@ func TestServicesLauncherV2_LargeStderrOutput(t *testing.T) {
 	}
 }
 
-// TestServicesLauncherV2_ConcurrentLargeOutput verifies that V2 correctly handles
+// TestServicesLauncher_ConcurrentLargeOutput verifies that V2 correctly handles
 // simultaneous large stdout and stderr output without deadlocks.
-func TestServicesLauncherV2_ConcurrentLargeOutput(t *testing.T) {
+func TestServicesLauncher_ConcurrentLargeOutput(t *testing.T) {
 	t.Skip("Skipping concurrent large output test due to persistent FIFO flakiness on macOS CI environment")
-	launcher := &ServicesLauncherV2{
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -410,11 +410,11 @@ func TestServicesLauncherV2_ConcurrentLargeOutput(t *testing.T) {
 		stdoutCaptured.Len(), stderrCaptured.Len())
 }
 
-// TestServicesLauncherV2_BufferBoundaryConditions tests edge cases around
+// TestServicesLauncher_BufferBoundaryConditions tests edge cases around
 // the 32KB buffer boundary to ensure correct handling.
-func TestServicesLauncherV2_BufferBoundaryConditions(t *testing.T) {
+func TestServicesLauncher_BufferBoundaryConditions(t *testing.T) {
 	t.Skip("Skipping buffer boundary test due to persistent FIFO flakiness on macOS CI environment")
-	launcher := &ServicesLauncherV2{
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -500,15 +500,15 @@ func TestServicesLauncherV2_BufferBoundaryConditions(t *testing.T) {
 	}
 }
 
-// TestServicesLauncherV2_MemoryUsage verifies that V2 doesn't accumulate
+// TestServicesLauncher_MemoryUsage verifies that V2 doesn't accumulate
 // memory when processing large streams.
-func TestServicesLauncherV2_MemoryUsage(t *testing.T) {
+func TestServicesLauncher_MemoryUsage(t *testing.T) {
 	t.Skip("Skipping memory usage test due to persistent FIFO flakiness on macOS CI environment")
 	if testing.Short() {
 		t.Skip("Skipping memory usage test in short mode")
 	}
 
-	launcher := &ServicesLauncherV2{
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 

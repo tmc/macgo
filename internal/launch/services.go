@@ -9,20 +9,48 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // ServicesLauncher implements launching via LaunchServices using the 'open' command.
+//
+// # Signal Handling Architecture
+//
+// When launching apps via LaunchServices, the child process is adopted by launchd
+// (PPID=1) and is NOT in the parent's process group. This means terminal signals
+// like Ctrl+C (SIGINT) only reach the parent wrapper, not the child.
+//
+// To ensure proper signal handling, we implement the following:
+//
+//   - PID Tracking: Child writes its PID to a file in the pipe directory after
+//     startup. Parent polls for this file and stores the PID for signal forwarding.
+//
+//   - Signal Forwarding: When parent receives SIGINT/SIGTERM (via context
+//     cancellation), it forwards these signals to the child before exiting.
+//     This prevents orphaned child processes.
+//
+//   - SIGWINCH Forwarding: Terminal resize events are forwarded to the child
+//     so apps can adjust their output to the new terminal size.
+//
+//   - Exit Codes: Parent exits with 130 (128+SIGINT) when interrupted by Ctrl+C.
+//     Child exits with 128+signal when terminated by a signal.
+//
+// Note: SIGTSTP/SIGCONT (job control) is not currently supported. Pressing Ctrl+Z
+// will suspend the parent but the child will continue running.
 type ServicesLauncher struct {
 	logger        *Logger
 	mu            sync.Mutex    // protects process access during signal forwarding
 	doneFile      string        // path to sentinel file that child writes when exiting
 	firstOutputCh chan struct{} // closed when first output is received (signals successful launch)
 	useFifo       bool          // true if using FIFOs (EOF signals completion, no done file needed)
+	childPID      int           // PID of the actual app process (for signal forwarding)
+	pidFile       string        // path to file where child writes its PID
 }
 
 // pipeSet holds the paths to the named pipes used for I/O forwarding.
@@ -31,6 +59,55 @@ type pipeSet struct {
 	stdout string
 	stderr string
 	done   string // sentinel file written by child when it exits
+	pid    string // file where child writes its PID
+}
+
+// waitForChildPID waits for the child to write its PID file and returns the PID.
+// Returns 0 if the PID file doesn't appear within the timeout.
+func (s *ServicesLauncher) waitForChildPID(pidFile string, timeout time.Duration) int {
+	if pidFile == "" {
+		return 0
+	}
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		data, err := os.ReadFile(pidFile)
+		if err == nil {
+			pidStr := strings.TrimSpace(string(data))
+			if pid, err := strconv.Atoi(pidStr); err == nil && pid > 0 {
+				s.mu.Lock()
+				s.childPID = pid
+				s.mu.Unlock()
+				s.logger.Info("read child PID for signal forwarding", "pid", pid)
+				return pid
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	s.logger.Warn("timeout waiting for child PID file", "file", pidFile, "timeout", timeout)
+	return 0
+}
+
+// forwardSignalToChild sends a signal to the child process if we know its PID.
+func (s *ServicesLauncher) forwardSignalToChild(sig syscall.Signal) {
+	s.mu.Lock()
+	pid := s.childPID
+	s.mu.Unlock()
+
+	if pid <= 0 {
+		s.logger.Warn("cannot forward signal - child PID unknown", "signal", sig)
+		return
+	}
+
+	if err := syscall.Kill(pid, sig); err != nil {
+		// Process may have already exited
+		if err != syscall.ESRCH {
+			s.logger.Warn("failed to forward signal to child", "signal", sig, "pid", pid, "error", err)
+		}
+	} else {
+		s.logger.Info("forwarded signal to child", "signal", sig, "pid", pid)
+	}
 }
 
 // Launch executes the application using LaunchServices with I/O forwarding.
@@ -41,10 +118,10 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	}
 
 	// Set up signal handling context
+	// Note: SIGQUIT is handled separately for stack dumps (forwarded to child)
 	sigCtx, stop := signal.NotifyContext(ctx,
 		syscall.SIGINT,
 		syscall.SIGTERM,
-		syscall.SIGQUIT,
 		syscall.SIGHUP,
 		syscall.SIGPIPE, // Handle broken pipe when output is piped
 	)
@@ -96,64 +173,67 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	// 3. Direct execution bypasses TCC permission prompts
 	//    - Works for I/O but user never sees permission dialogs
 	//
-	// I/O forwarding is enabled by default for stdout and stderr (like V2)
-	// Can be disabled with MACGO_DISABLE_IO_FORWARDING=1
-	// Environment variables for I/O forwarding control:
+	// I/O Forwarding Control:
+	// - Default: Pipe-based I/O forwarding (works reliably with LaunchServices)
+	// - MACGO_TTY_PASSTHROUGH=1           Pass TTY device directly to child (experimental)
 	// - MACGO_DISABLE_IO_FORWARDING=1     Disable all I/O forwarding
-	// - MACGO_ENABLE_IO_FORWARDING=1      Enable all I/O forwarding (stdin+stdout+stderr)
-	// - MACGO_ENABLE_STDIN_FORWARDING=1   Enable only stdin forwarding
-	// - MACGO_ENABLE_STDOUT_FORWARDING=1  Enable only stdout forwarding
-	// - MACGO_ENABLE_STDERR_FORWARDING=1  Enable only stderr forwarding
-	// - MACGO_USE_FIFO=0                  Use regular files instead of FIFOs (FIFOs are default with config-file)
-	// - MACGO_IO_STRATEGY=config-file     Use config file strategy (DEFAULT, WORKS, FIFOs safe)
-	// - MACGO_IO_STRATEGY=env-vars        Use environment variables (DOES NOT WORK with LaunchServices!)
-	// - MACGO_IO_STRATEGY=open-flags      Use open flags (DOES NOT WORK with LaunchServices!)
-	// - MACGO_IO_TIMEOUT=5s               Timeout for I/O operations (default: 5s, prevents hangs)
-	// - MACGO_IO_LOG_DIR=<path>           Directory to write I/O debug logs (stdin.log, stdout.log, stderr.log)
-	disableAll := os.Getenv("MACGO_DISABLE_IO_FORWARDING") == "1"
-	enableAll := os.Getenv("MACGO_ENABLE_IO_FORWARDING") == "1"
+	// - MACGO_USE_FIFO=0                  Use regular files instead of FIFOs (when using pipes)
+	// - MACGO_IO_LOG_DIR=<path>           Directory to write I/O debug logs
+	//
+	// TTY Passthrough (experimental):
+	// When MACGO_TTY_PASSTHROUGH=1 is set and running on a terminal, the parent's
+	// terminal device is passed directly to the child. This preserves isatty()=true
+	// but may have issues with some terminal configurations.
+	useTTYPassthrough := os.Getenv("MACGO_TTY_PASSTHROUGH") == "1" && getTTYPath() != ""
+	if useTTYPassthrough {
+		s.logger.Debug("TTY passthrough enabled via MACGO_TTY_PASSTHROUGH=1", "tty", getTTYPath())
+	}
 
-	// Default: enable stdout and stderr always, stdin only when explicitly enabled or auto-detected
-	// Auto-detection enables stdin for TTY, pipes, and regular files; disables for /dev/null
-	enableStdin := !disableAll && (enableAll || os.Getenv("MACGO_ENABLE_STDIN_FORWARDING") == "1" ||
-		(os.Getenv("MACGO_ENABLE_STDIN_FORWARDING") == "" && shouldAutoEnableStdin()))
-	enableStdout := !disableAll && (enableAll || os.Getenv("MACGO_ENABLE_STDOUT_FORWARDING") == "1" || (os.Getenv("MACGO_ENABLE_STDOUT_FORWARDING") == "" && !enableAll))
-	enableStderr := !disableAll && (enableAll || os.Getenv("MACGO_ENABLE_STDERR_FORWARDING") == "1" || (os.Getenv("MACGO_ENABLE_STDERR_FORWARDING") == "" && !enableAll))
+	disableIO := os.Getenv("MACGO_DISABLE_IO_FORWARDING") == "1" || useTTYPassthrough
 
-	// FIFOs are default for config-file strategy (safe, clean EOF semantics)
+	// When TTY passthrough is active, no pipes are needed
+	// When not on a TTY (CI, background, etc.), use pipe-based I/O forwarding
+	enableStdin := !disableIO && shouldAutoEnableStdin()
+	enableStdout := !disableIO
+	enableStderr := !disableIO
+
+	// FIFOs are default (clean EOF semantics)
 	// Disable with MACGO_USE_FIFO=0 to use regular files with polling instead
-	ioStrategy := os.Getenv("MACGO_IO_STRATEGY")
-	useFifo := os.Getenv("MACGO_USE_FIFO") != "0" && (ioStrategy == "" || ioStrategy == "config-file")
+	useFifo := os.Getenv("MACGO_USE_FIFO") != "0"
 	s.useFifo = useFifo
 
 	var configFile string
-	if enableStdin || enableStdout || enableStderr {
-		// Create temporary directory for named pipes
-		var err error
-		pipeDir, err = s.createPipeDirectory()
-		if err != nil {
-			return fmt.Errorf("create pipe directory: %w", err)
-		}
-		defer s.cleanupPipeDirectory(pipeDir)
+	// Always create pipe directory for PID tracking (even in TTY passthrough mode)
+	// This allows signal forwarding to work regardless of I/O mode
+	var err error
+	pipeDir, err = s.createPipeDirectory()
+	if err != nil {
+		return fmt.Errorf("create pipe directory: %w", err)
+	}
+	defer s.cleanupPipeDirectory(pipeDir)
 
+	if enableStdin || enableStdout || enableStderr {
 		// Create named pipes for I/O forwarding
 		pipes, err = s.createNamedPipes(pipeDir, enableStdin, enableStdout, enableStderr, useFifo)
 		if err != nil {
 			return fmt.Errorf("create named pipes: %w", err)
 		}
-
-		// Write config file if using config-file strategy
-		if ioStrategy == "" || ioStrategy == "config-file" {
-			configFile = filepath.Join(pipeDir, "config")
-			if err := s.writePipeConfig(configFile, pipes, bundlePath); err != nil {
-				return fmt.Errorf("write pipe config: %w", err)
-			}
-			s.logger.Debug("using config-file I/O strategy (v1)", "config", configFile)
+	} else {
+		// No I/O forwarding, but still need PID file path
+		pipes = &pipeSet{
+			pid: filepath.Join(pipeDir, "child.pid"),
 		}
 	}
 
+	// Write config file for child discovery (includes bundle path for matching)
+	configFile = filepath.Join(pipeDir, "config")
+	if err := s.writePipeConfig(configFile, pipes, bundlePath); err != nil {
+		return fmt.Errorf("write pipe config: %w", err)
+	}
+	s.logger.Debug("wrote pipe config", "config", configFile)
+
 	// Build the launch command
-	cmd, err := s.buildOpenCommand(sigCtx, bundlePath, pipes, noWait)
+	cmd, err := s.buildOpenCommand(sigCtx, bundlePath, pipes, noWait, cfg)
 	if err != nil {
 		return fmt.Errorf("build open command: %w", err)
 	}
@@ -255,7 +335,12 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 		go func() {
 			<-sigCtx.Done()
 
-			// First try SIGINT (Ctrl+C)
+			// Forward signal to child process first (the actual app)
+			// This is critical: the child has PPID=1 (adopted by launchd)
+			// and won't receive signals sent to the open command's process group
+			s.forwardSignalToChild(syscall.SIGINT)
+
+			// Also signal the open command's process group
 			s.mu.Lock()
 			if cmd.Process != nil {
 				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
@@ -265,33 +350,66 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 			// Wait a bit then escalate to SIGTERM if still running
 			time.Sleep(100 * time.Millisecond)
 
+			s.forwardSignalToChild(syscall.SIGTERM)
+
 			s.mu.Lock()
 			if cmd.Process != nil {
 				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
 			}
 			s.mu.Unlock()
 		}()
+
+		// Forward SIGWINCH (terminal resize) to child process
+		// This runs in a separate goroutine because SIGWINCH doesn't terminate
+		// the process - it's an informational signal that apps use to adjust
+		// their output to the new terminal size
+		winchChan := make(chan os.Signal, 1)
+		signal.Notify(winchChan, syscall.SIGWINCH)
+		go func() {
+			for range winchChan {
+				s.logger.Debug("received SIGWINCH, forwarding to child", "parent_pid", os.Getpid())
+				s.forwardSignalToChild(syscall.SIGWINCH)
+			}
+		}()
+
+		// Forward SIGQUIT to child for stack dumps
+		// The child's macgo signal handler will dump goroutine stacks
+		// Set MACGO_NO_SIGQUIT_FORWARD=1 to disable (for custom handling)
+		if os.Getenv("MACGO_NO_SIGQUIT_FORWARD") != "1" {
+			quitChan := make(chan os.Signal, 1)
+			signal.Notify(quitChan, syscall.SIGQUIT)
+			go func() {
+				for range quitChan {
+					s.logger.Debug("received SIGQUIT, forwarding to child for stack dump", "parent_pid", os.Getpid())
+					s.forwardSignalToChild(syscall.SIGQUIT)
+				}
+			}()
+		}
 	}
+
+	// Always set up PID tracking for signal forwarding
+	s.doneFile = pipes.done
+	s.pidFile = pipes.pid
+
+	// Start waiting for child PID in background (for signal forwarding)
+	go func() {
+		s.waitForChildPID(s.pidFile, 30*time.Second)
+	}()
 
 	// Set up I/O forwarding only if pipes are available
 	var ioErrChan chan error
 	var expectedIOCount int
-	if pipes != nil {
 
-		// Count how many output pipes we're waiting for (stdout and/or stderr)
-		if pipes.stdout != "" {
-			expectedIOCount++
-		}
-		if pipes.stderr != "" {
-			expectedIOCount++
-		}
+	// Count how many output pipes we're waiting for (stdout and/or stderr)
+	if pipes.stdout != "" {
+		expectedIOCount++
+	}
+	if pipes.stderr != "" {
+		expectedIOCount++
+	}
 
-		if expectedIOCount > 0 {
-			ioErrChan = make(chan error, expectedIOCount)
-		}
-
-		// Store the done file path for I/O forwarding to check
-		s.doneFile = pipes.done
+	if expectedIOCount > 0 {
+		ioErrChan = make(chan error, expectedIOCount)
 
 		// Create cancellable context for stdin forwarding
 		// NOTE: We use the main context, not a separate cancellable one, because
@@ -328,24 +446,15 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 	// If we have pipes, wait for stdout/stderr or command completion
 	if ioErrChan != nil && expectedIOCount > 0 {
 
-		// Set up I/O timeout to prevent indefinite hangs when open flags don't work
-		// With config-file strategy, continuous polling has its own timeout, so disable this
-		ioStrategy := os.Getenv("MACGO_IO_STRATEGY")
-		useIOTimeout := ioStrategy != "" && ioStrategy != "config-file"
-		ioTimeout := 5 * time.Second
+		// I/O timeout is disabled by default since config-file strategy has proper EOF handling.
+		// Can be explicitly enabled via MACGO_IO_TIMEOUT for debugging.
+		var ioTimerChan <-chan time.Time
 		if timeoutEnv := os.Getenv("MACGO_IO_TIMEOUT"); timeoutEnv != "" {
 			if d, err := time.ParseDuration(timeoutEnv); err == nil && d > 0 {
-				ioTimeout = d
-				useIOTimeout = true // Explicitly set timeout overrides default behavior
+				ioTimer := time.NewTimer(d)
+				defer ioTimer.Stop()
+				ioTimerChan = ioTimer.C
 			}
-		}
-
-		// Create timer channel (nil if disabled, which blocks forever in select)
-		var ioTimerChan <-chan time.Time
-		if useIOTimeout {
-			ioTimer := time.NewTimer(ioTimeout)
-			defer ioTimer.Stop()
-			ioTimerChan = ioTimer.C
 		}
 
 		// Collect IO errors
@@ -370,40 +479,25 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 			case cmdErr := <-cmdDone:
 				// "open" command finished
 				if cmdErr != nil {
-					// Check IO strategy to determine if we should handle errors specially
-					ioStrategy := os.Getenv("MACGO_IO_STRATEGY")
-					isConfigFileStrategy := ioStrategy == "" || ioStrategy == "config-file"
-
-					if isConfigFileStrategy {
-						// If open command failed with -1712 (AppleEvent timeout), treat it as success.
-						// This happens with pure Go binaries that don't process the AppleEvent loop.
-						if exitErr, ok := cmdErr.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-							stderr := openStderr.String()
-							s.logger.Debug("macgo: open command failed", "error", cmdErr, "stderr", stderr)
-							if strings.Contains(stderr, "-1712") {
-								s.logger.Warn("macgo: open command timed out (-1712) waiting for app check-in; ignoring as app seems compatible", "stderr", stderr)
-								cmdErr = nil // Treat as success
-							} else {
-								s.logger.Error("macgo: open command failed", "error", cmdErr, "stderr", stderr)
-								if pipeDir != "" {
-									s.cleanupPipeDirectory(pipeDir)
-								}
-								os.Exit(exitErr.ExitCode())
-							}
+					// If open command failed with -1712 (AppleEvent timeout), treat it as success.
+					// This happens with pure Go binaries that don't process the AppleEvent loop.
+					if exitErr, ok := cmdErr.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+						stderr := openStderr.String()
+						s.logger.Debug("open command failed", "error", cmdErr, "stderr", stderr)
+						if strings.Contains(stderr, "-1712") {
+							s.logger.Warn("open command timed out (-1712) waiting for app check-in; ignoring as app seems compatible", "stderr", stderr)
+							cmdErr = nil // Treat as success
 						} else {
-							s.logger.Error("open command failed", "error", cmdErr)
-							if pipeDir != "" {
-								s.cleanupPipeDirectory(pipeDir)
-							}
-							return fmt.Errorf("open command failed: %w", cmdErr)
-						}
-					} else {
-						// For other strategies, exit immediately on error
-						if exitErr, ok := cmdErr.(*exec.ExitError); ok {
+							s.logger.Error("open command failed", "error", cmdErr, "stderr", stderr)
 							if pipeDir != "" {
 								s.cleanupPipeDirectory(pipeDir)
 							}
 							os.Exit(exitErr.ExitCode())
+						}
+					} else {
+						s.logger.Error("open command failed", "error", cmdErr)
+						if pipeDir != "" {
+							s.cleanupPipeDirectory(pipeDir)
 						}
 						return fmt.Errorf("open command failed: %w", cmdErr)
 					}
@@ -427,11 +521,9 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 				os.Exit(130) // 128 + SIGINT(2) - standard exit code for Ctrl+C
 
 			case <-ioTimerChan:
-				s.logger.Warn("I/O forwarding timeout exceeded - likely using broken open-flags strategy with .app bundle",
+				s.logger.Warn("I/O forwarding timeout exceeded",
 					"completed", ioCompleted,
-					"expected", expectedIOCount,
-					"timeout", ioTimeout,
-					"hint", "set MACGO_IO_STRATEGY=env-vars to fix")
+					"expected", expectedIOCount)
 				// Exit gracefully - the app likely completed but I/O never connected
 				s.mu.Lock()
 				if cmd.Process != nil {
@@ -494,16 +586,42 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 		os.Exit(0)
 
 	} else {
-		// No pipes, just wait for command
-		cmdErr := <-cmdDone
-		if cmdErr != nil {
-			if exitErr, ok := cmdErr.(*exec.ExitError); ok {
-				if pipeDir != "" {
-					s.cleanupPipeDirectory(pipeDir)
+		// No pipes (TTY passthrough mode), wait for command or signal
+		select {
+		case cmdErr := <-cmdDone:
+			if cmdErr != nil {
+				// Check for -1712 (AppleEvent timeout) - treat as success
+				// This happens with pure Go binaries that don't process the AppleEvent loop.
+				if exitErr, ok := cmdErr.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+					stderr := openStderr.String()
+					if strings.Contains(stderr, "-1712") {
+						s.logger.Warn("open command timed out (-1712) waiting for app check-in; app ran successfully", "stderr", stderr)
+						if pipeDir != "" {
+							s.cleanupPipeDirectory(pipeDir)
+						}
+						os.Exit(0)
+					}
 				}
-				os.Exit(exitErr.ExitCode())
+				if exitErr, ok := cmdErr.(*exec.ExitError); ok {
+					s.logger.Error("open command failed", "error", cmdErr, "stderr", openStderr.String())
+					if pipeDir != "" {
+						s.cleanupPipeDirectory(pipeDir)
+					}
+					os.Exit(exitErr.ExitCode())
+				}
+				return fmt.Errorf("open command failed: %w", cmdErr)
 			}
-			return fmt.Errorf("open command failed: %w", cmdErr)
+		case <-ctx.Done():
+			// Signal received - kill open command and exit with signal code
+			s.mu.Lock()
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+			s.mu.Unlock()
+			if pipeDir != "" {
+				s.cleanupPipeDirectory(pipeDir)
+			}
+			os.Exit(130) // 128 + SIGINT(2)
 		}
 		if pipeDir != "" {
 			s.cleanupPipeDirectory(pipeDir)
@@ -683,7 +801,7 @@ func (s *ServicesLauncher) writePipeConfig(configFile string, pipes *pipeSet, bu
 		s.logger.Error("writePipeConfig: failed to write config file", "path", configFile, "error", err)
 		return fmt.Errorf("write config file: %w", err)
 	}
-	s.logger.Info("writePipeConfig: wrote config file", "path", configFile, "bundlePath", bundlePath)
+	s.logger.Debug("writePipeConfig: wrote config file", "path", configFile, "bundlePath", bundlePath)
 
 	return nil
 }
@@ -727,13 +845,17 @@ func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableS
 	if !useFifo {
 		pipes.done = filepath.Join(pipeDir, "done")
 	}
+
+	// Always set up PID file path - child will write its PID here
+	pipes.pid = filepath.Join(pipeDir, "child.pid")
+
 	s.logger.Debug("pipes ready", "dir", pipeDir, "fifo", useFifo)
 
 	return pipes, nil
 }
 
 // buildOpenCommand constructs the open command with appropriate arguments.
-func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath string, pipes *pipeSet, noWait bool) (*exec.Cmd, error) {
+func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath string, pipes *pipeSet, noWait bool, cfg *Config) (*exec.Cmd, error) {
 	args := []string{}
 
 	// Add -g flag to not bring app to foreground (for background/CLI apps)
@@ -752,8 +874,22 @@ func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath stri
 		args = append(args, "-n")
 	}
 
-	// Add wait flag based on mode
-	if !noWait {
+	// TTY passthrough (experimental): pass the parent's terminal device directly to the child
+	// This preserves isatty()=true and full terminal capabilities
+	// Opt-in via MACGO_TTY_PASSTHROUGH=1 (default is pipe-based I/O)
+	useTTYPassthrough := os.Getenv("MACGO_TTY_PASSTHROUGH") == "1" && getTTYPath() != ""
+	if useTTYPassthrough {
+		ttyPath := getTTYPath()
+		s.logger.Debug("TTY passthrough: passing terminal device to child", "tty", ttyPath)
+		args = append(args, "--stdin", ttyPath, "--stdout", ttyPath, "--stderr", ttyPath)
+		// With TTY passthrough, we can use -W since we're not using pipe-based I/O
+		if !noWait && !isPipeOutput() {
+			args = append(args, "-W")
+		}
+	}
+
+	// Add wait flag when not using TTY passthrough
+	if !noWait && !useTTYPassthrough {
 		// Only add -W flag if output is not being piped AND no I/O forwarding pipes
 		// When output is piped (e.g., to head/tail), we detect broken pipes
 		// and exit gracefully instead of waiting indefinitely
@@ -764,51 +900,11 @@ func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath stri
 		}
 	}
 
-	// Add I/O redirection if pipes are available
-	// Three strategies available:
-	// 1. MACGO_IO_STRATEGY=config-file (RECOMMENDED): Use config file for pipe paths (WORKS!)
-	// 2. MACGO_IO_STRATEGY=open-flags: Use open's -i/-o/--stderr flags (BROKEN with .app bundles)
-	// 3. MACGO_IO_STRATEGY=env-vars: Pass pipe paths via --env (BROKEN - env vars not passed)
-	//
-	// The config-file strategy writes pipe paths to /tmp/macgo-PID-TIMESTAMP/config
-	// which the child process discovers and reads. This is the only working strategy.
-	if pipes != nil {
-		ioStrategy := os.Getenv("MACGO_IO_STRATEGY")
-		if ioStrategy == "" {
-			ioStrategy = "config-file" // Default to working strategy
-		}
-
-		if ioStrategy == "config-file" {
-			// Strategy 1: Config file (WORKING strategy!)
-			// Config file is written by caller in Launch method
-		} else if ioStrategy == "env-vars" {
-			// Strategy 2: Pass pipe paths via environment variables (DOES NOT WORK with LaunchServices!)
-			if pipes.stdin != "" {
-				args = append(args, "--env", "MACGO_STDIN_PIPE="+pipes.stdin)
-			}
-			if pipes.stdout != "" {
-				args = append(args, "--env", "MACGO_STDOUT_PIPE="+pipes.stdout)
-			}
-			if pipes.stderr != "" {
-				args = append(args, "--env", "MACGO_STDERR_PIPE="+pipes.stderr)
-			}
-			// Also pass FIFO flag
-			if useFifo := os.Getenv("MACGO_USE_FIFO"); useFifo == "1" {
-				args = append(args, "--env", "MACGO_USE_FIFO=1")
-			}
-		} else {
-			// Strategy 3: Use open's built-in I/O redirection flags (BROKEN with .app bundles)
-			if pipes.stdin != "" {
-				args = append(args, "-i", pipes.stdin)
-			}
-			if pipes.stdout != "" {
-				args = append(args, "-o", pipes.stdout)
-			}
-			if pipes.stderr != "" {
-				args = append(args, "--stderr", pipes.stderr)
-			}
-		}
-	}
+	// When using pipes, the config-file strategy is used:
+	// Pipe paths are written to a config file that the child discovers and reads.
+	// NOTE: Other strategies (open-flags, env-vars) do NOT work with LaunchServices
+	// because xpcproxy causes deadlocks with FIFO flags or doesn't pass env vars.
+	// The config-file approach is the only working strategy.
 
 	// Add the bundle path
 	if noWait {
@@ -872,7 +968,7 @@ func (s *ServicesLauncher) forwardStdin(ctx context.Context, stdinPipe string) e
 	// Retry on ENXIO (no reader) until child process opens the pipe.
 	var w *os.File
 	var err error
-	maxRetries := 50 // 50 * 100ms = 5 seconds
+	maxRetries := 300 // 300 * 100ms = 30 seconds
 	for i := 0; i < maxRetries; i++ {
 		w, err = os.OpenFile(stdinPipe, os.O_WRONLY|syscall.O_NONBLOCK, 0)
 		if err == nil {
@@ -1118,21 +1214,32 @@ func isBrokenPipeError(err error) bool {
 	return false
 }
 
-// isTerminal checks if the given file descriptor is a terminal (TTY)
-func isTerminal(fd uintptr) bool {
-	var termios syscall.Termios
-	_, _, err := syscall.Syscall6(syscall.SYS_IOCTL, fd, syscall.TIOCGETA, uintptr(unsafe.Pointer(&termios)), 0, 0, 0)
-	return err == 0
+// getTTYPath returns the path to the current TTY device (e.g., /dev/ttys001).
+// Returns empty string if stdin is not a terminal.
+func getTTYPath() string {
+	if !isTerminal(int(os.Stdin.Fd())) {
+		return ""
+	}
+	// Run the tty command to get the terminal device path.
+	// Must inherit stdin so tty can read the terminal device.
+	cmd := exec.Command("tty")
+	cmd.Stdin = os.Stdin
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // shouldAutoEnableStdin determines if stdin forwarding should be automatically enabled.
 // Returns true for:
-//   - TTY (interactive terminal)
+//   - TTY (interactive terminal) when we're in the foreground process group
 //   - Pipe (piped input like echo 'foo' | app)
 //   - Regular file (redirected from file like app < input.txt)
 //
 // Returns false for:
 //   - /dev/null or similar device files (daemon/background mode)
+//   - TTY when not in foreground process group (would trigger SIGTTIN)
 //   - Unknown/error cases (safe default)
 func shouldAutoEnableStdin() bool {
 	stat, err := os.Stdin.Stat()
@@ -1143,7 +1250,13 @@ func shouldAutoEnableStdin() bool {
 	mode := stat.Mode()
 
 	// TTY - interactive terminal
-	if isTerminal(os.Stdin.Fd()) {
+	// But only if we're in the foreground process group, otherwise reading
+	// from TTY will trigger SIGTTIN and stop the process (e.g., when running in a script)
+	if isTerminal(int(os.Stdin.Fd())) {
+		// Check if we're in the foreground process group
+		if !isInForegroundProcessGroup() {
+			return false
+		}
 		return true
 	}
 
@@ -1165,6 +1278,23 @@ func shouldAutoEnableStdin() bool {
 
 	// Socket, symlink, or other special file - don't enable
 	return false
+}
+
+// isTerminal returns whether fd is a terminal.
+func isTerminal(fd int) bool {
+	_, err := unix.IoctlGetTermios(fd, unix.TIOCGETA)
+	return err == nil
+}
+
+// isInForegroundProcessGroup checks if we're in the terminal's foreground process group.
+// If not, reading from the TTY would trigger SIGTTIN and stop the process.
+func isInForegroundProcessGroup() bool {
+	fd := int(os.Stdin.Fd())
+	fpgrp, err := unix.IoctlGetInt(fd, unix.TIOCGPGRP)
+	if err != nil {
+		return false
+	}
+	return unix.Getpgrp() == fpgrp
 }
 
 // createIOLogFile creates a log file for I/O debugging in the specified directory.

@@ -100,15 +100,15 @@ func TestServicesLauncherV1_SignalInterruption(t *testing.T) {
 	t.Logf("V1 successfully handled I/O during signal scenario: captured %d bytes", len(output))
 }
 
-// TestServicesLauncherV2_SignalInterruption tests that V2 handles SIGINT correctly
+// TestServicesLauncher_SignalInterruption tests that V2 handles SIGINT correctly
 // during I/O forwarding without losing output or deadlocking.
-func TestServicesLauncherV2_SignalInterruption(t *testing.T) {
+func TestServicesLauncher_SignalInterruption(t *testing.T) {
 	t.Skip("Skipping signal interruption test due to environment polling flakiness")
 	// Disable FIFO usage to force polling behavior for this test
 	os.Setenv("MACGO_USE_FIFO", "0")
 	defer os.Unsetenv("MACGO_USE_FIFO")
 
-	launcher := &ServicesLauncherV2{
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -409,11 +409,11 @@ func TestServicesLauncher_NoOutputLossDuringSignal(t *testing.T) {
 		lineCount, len(actualOutput))
 }
 
-// TestServicesLauncherV2_SignalInterruptionWithStderr tests that both stdout
+// TestServicesLauncher_SignalInterruptionWithStderr tests that both stdout
 // and stderr forwarding handle interruption correctly.
-func TestServicesLauncherV2_SignalInterruptionWithStderr(t *testing.T) {
+func TestServicesLauncher_SignalInterruptionWithStderr(t *testing.T) {
 	t.Skip("Skipping signal interruption test due to environment polling flakiness")
-	launcher := &ServicesLauncherV2{
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 

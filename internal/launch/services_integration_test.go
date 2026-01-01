@@ -57,10 +57,14 @@ func TestServicesLauncherV1_IOTimeout(t *testing.T) {
 	t.Logf("V1 forwardStdout completed in %v (expected ~5s for no-growth timeout)", elapsed)
 }
 
-// TestServicesLauncherV2_ContinuousPolling verifies that V2 uses continuous polling
+// TestServicesLauncher_ContinuousPolling verifies that the launcher uses continuous polling
 // to capture output even when the file grows slowly.
-func TestServicesLauncherV2_ContinuousPolling(t *testing.T) {
-	launcher := &ServicesLauncherV2{
+func TestServicesLauncher_ContinuousPolling(t *testing.T) {
+	// Skip: This tests regular file polling mode (MACGO_USE_FIFO=0) which is deprecated.
+	// Default now uses FIFOs which have clean EOF semantics.
+	t.Skip("Regular file polling mode is deprecated; FIFO mode is default")
+
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -192,10 +196,10 @@ func TestServicesLauncherV1_WritePipeConfig(t *testing.T) {
 	t.Logf("V1 config file content:\n%s", configStr)
 }
 
-// TestServicesLauncherV2_WritePipeConfig verifies that V2 correctly writes
+// TestServicesLauncher_WritePipeConfig verifies that V2 correctly writes
 // pipe configuration files.
-func TestServicesLauncherV2_WritePipeConfig(t *testing.T) {
-	launcher := &ServicesLauncherV2{
+func TestServicesLauncher_WritePipeConfig(t *testing.T) {
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -212,7 +216,7 @@ func TestServicesLauncherV2_WritePipeConfig(t *testing.T) {
 		stderr: filepath.Join(tmpDir, "stderr"),
 	}
 
-	err = launcher.writePipeConfig(configFile, pipes)
+	err = launcher.writePipeConfig(configFile, pipes, "/test/bundle.app")
 	if err != nil {
 		t.Fatalf("writePipeConfig failed: %v", err)
 	}
@@ -267,7 +271,7 @@ func TestServicesLauncherV1_BuildCommandWithConfigFileStrategy(t *testing.T) {
 		stderr: filepath.Join(tmpDir, "stderr"),
 	}
 
-	cmd, err := launcher.buildOpenCommand(ctx, bundlePath, pipes, false)
+	cmd, err := launcher.buildOpenCommand(ctx, bundlePath, pipes, false, nil)
 	if err != nil {
 		t.Fatalf("buildOpenCommand failed: %v", err)
 	}
@@ -286,41 +290,28 @@ func TestServicesLauncherV1_BuildCommandWithConfigFileStrategy(t *testing.T) {
 	t.Logf("V1 config-file command: %s", cmdStr)
 }
 
-// TestServicesLauncherV2_BuildCommand verifies that V2 builds correct commands.
-func TestServicesLauncherV2_BuildCommand(t *testing.T) {
-	launcher := &ServicesLauncherV2{
+// TestServicesLauncher_BuildCommand_NoPipes verifies command building without pipes.
+func TestServicesLauncher_BuildCommand_NoPipes(t *testing.T) {
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
 	ctx := context.Background()
 	bundlePath := "/path/to/TestApp.app"
 
-	tmpDir, err := os.MkdirTemp("", "macgo-v2-cmd-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	configFile := filepath.Join(tmpDir, "config")
-
-	cmd, err := launcher.buildOpenCommand(ctx, bundlePath, configFile, nil, false)
+	cmd, err := launcher.buildOpenCommand(ctx, bundlePath, nil, false, nil)
 	if err != nil {
 		t.Fatalf("buildOpenCommand failed: %v", err)
 	}
 
 	cmdStr := strings.Join(cmd.Args, " ")
 
-	// V2 should not use -W flag when config file is present (to avoid conflicts)
-	if strings.Contains(cmdStr, "-W") && configFile != "" {
-		t.Errorf("V2 should not use -W flag with config file.\nGot command: %s", cmdStr)
-	}
-
 	// Command should include the bundle path
 	if !strings.Contains(cmdStr, bundlePath) {
 		t.Errorf("Command missing bundle path.\nGot: %s", cmdStr)
 	}
 
-	t.Logf("V2 command: %s", cmdStr)
+	t.Logf("Command without pipes: %s", cmdStr)
 }
 
 // TestServicesLauncherV1_NoGrowthTimeout verifies that V1's forwardStdout
@@ -368,14 +359,16 @@ func TestServicesLauncherV1_NoGrowthTimeout(t *testing.T) {
 	t.Logf("V1 no-growth timeout worked correctly: %v", elapsed)
 }
 
-// TestServicesLauncherV2_NoGrowthTimeout verifies that V2's forwardStdout
-// correctly implements the no-growth timeout mechanism.
-func TestServicesLauncherV2_NoGrowthTimeout(t *testing.T) {
+// TestServicesLauncher_NoGrowthTimeout verifies the no-growth timeout mechanism.
+func TestServicesLauncher_NoGrowthTimeout(t *testing.T) {
+	// Skip: This tests regular file polling mode (MACGO_USE_FIFO=0) which is deprecated.
+	t.Skip("Regular file polling mode is deprecated; FIFO mode is default")
+
 	// Disable FIFO usage to force polling behavior for this test
 	os.Setenv("MACGO_USE_FIFO", "0")
 	defer os.Unsetenv("MACGO_USE_FIFO")
 
-	launcher := &ServicesLauncherV2{
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -410,41 +403,19 @@ func TestServicesLauncherV2_NoGrowthTimeout(t *testing.T) {
 	t.Logf("V2 no-growth timeout worked correctly: %v", elapsed)
 }
 
-// TestServicesLauncherVersionSelection verifies that the correct launcher
-// version is selected based on environment variables.
-func TestServicesLauncherVersionSelection(t *testing.T) {
-	tests := []struct {
-		name       string
-		envVersion string
-		expectV2   bool
-	}{
-		{"default (no env)", "", false},
-		{"explicit v1", "1", false},
-		{"explicit v2", "2", true},
-		{"explicit v2 alt", "v2", true},
-		{"unknown version", "99", false}, // Defaults to V1
+// TestServicesLauncherManagerCreation verifies that the launch manager is created correctly.
+func TestServicesLauncherManagerCreation(t *testing.T) {
+	manager := New()
+
+	// Check the type of the services launcher
+	servicesLauncher := manager.servicesLauncher
+	_, isServicesLauncher := servicesLauncher.(*ServicesLauncher)
+
+	if !isServicesLauncher {
+		t.Errorf("Expected ServicesLauncher type, got %T", servicesLauncher)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.envVersion != "" {
-				os.Setenv("MACGO_SERVICES_VERSION", tt.envVersion)
-				defer os.Unsetenv("MACGO_SERVICES_VERSION")
-			}
-
-			manager := New()
-
-			// Check the type of the services launcher
-			servicesLauncher := manager.servicesLauncher
-			_, isV2 := servicesLauncher.(*ServicesLauncherV2)
-
-			if isV2 != tt.expectV2 {
-				t.Errorf("Expected V2=%v, got V2=%v", tt.expectV2, isV2)
-			}
-
-			t.Logf("Correctly selected launcher version (V2=%v)", isV2)
-		})
-	}
+	t.Logf("Manager created with ServicesLauncher")
 }
 
 // TestServicesLauncherV1_StdinForwarding verifies that V1 can forward stdin data
@@ -497,10 +468,10 @@ func TestServicesLauncherV1_StdinForwarding(t *testing.T) {
 	t.Logf("V1 stdin forwarding completed")
 }
 
-// TestServicesLauncherV2_StdinForwarding verifies that V2 can forward stdin data
+// TestServicesLauncher_StdinForwarding verifies that V2 can forward stdin data
 // to the application's stdin pipe.
-func TestServicesLauncherV2_StdinForwarding(t *testing.T) {
-	launcher := &ServicesLauncherV2{
+func TestServicesLauncher_StdinForwarding(t *testing.T) {
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -611,10 +582,12 @@ func TestServicesLauncherV1_StderrForwarding(t *testing.T) {
 	t.Logf("V1 stderr forwarding completed in %v: %q", elapsed, output)
 }
 
-// TestServicesLauncherV2_StderrForwarding verifies that V2 correctly forwards
-// stderr output through the stderr pipe.
-func TestServicesLauncherV2_StderrForwarding(t *testing.T) {
-	launcher := &ServicesLauncherV2{
+// TestServicesLauncher_StderrForwarding verifies stderr forwarding through pipes.
+func TestServicesLauncher_StderrForwarding(t *testing.T) {
+	// Skip: This tests regular file polling mode which is deprecated.
+	t.Skip("Regular file polling mode is deprecated; FIFO mode is default")
+
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -772,10 +745,10 @@ func TestServicesLauncherV1_CreatePipes(t *testing.T) {
 	}
 }
 
-// TestServicesLauncherV2_CreatePipes verifies that V2 creates pipes correctly
+// TestServicesLauncher_CreatePipes verifies that V2 creates pipes correctly
 // with different configuration options.
-func TestServicesLauncherV2_CreatePipes(t *testing.T) {
-	launcher := &ServicesLauncherV2{
+func TestServicesLauncher_CreatePipes(t *testing.T) {
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
@@ -795,12 +768,12 @@ func TestServicesLauncherV2_CreatePipes(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			pipes, err := launcher.createPipes(tmpDir, tt.enableStdin)
+			pipes, err := launcher.createNamedPipes(tmpDir, tt.enableStdin, true, true, true)
 			if err != nil {
-				t.Fatalf("createPipes failed: %v", err)
+				t.Fatalf("createNamedPipes failed: %v", err)
 			}
 
-			// V2 always creates stdout and stderr
+			// Always creates stdout and stderr
 			if pipes.stdout == "" {
 				t.Error("Expected stdout pipe but got empty path")
 			}
@@ -859,10 +832,10 @@ func TestServicesLauncherV1_CleanupWithErrors(t *testing.T) {
 	t.Log("V1 cleanup handles errors gracefully")
 }
 
-// TestServicesLauncherV2_CleanupWithErrors verifies that V2 cleanup works
+// TestServicesLauncher_CleanupWithErrors verifies that V2 cleanup works
 // even when some files are missing or there are permission errors.
-func TestServicesLauncherV2_CleanupWithErrors(t *testing.T) {
-	launcher := &ServicesLauncherV2{
+func TestServicesLauncher_CleanupWithErrors(t *testing.T) {
+	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 

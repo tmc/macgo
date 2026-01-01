@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -42,13 +43,28 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		}
 	}
 
+	// Check for MACGO_*_PIPE env vars (restored for V2 env-flags support)
+	if stdin := os.Getenv("MACGO_STDIN_PIPE"); stdin != "" {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: detected pipes via environment\n")
+		}
+		if err := setupPipeRedirection(cfg.Debug); err != nil {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: failed to setup pipe redirection: %v\n", err)
+			}
+		} else {
+			// Successfully set up pipes via env, register exit handler and return
+			registerExitHandler(cfg.Debug)
+			return nil
+		}
+	}
+
 	// Check for V2 launcher config file
 	// Since `open --args` doesn't reliably pass arguments to .app bundles,
 	// we look for a config file in a well-known location based on parent PID
 	configFile := findPipeConfig(cfg.Debug)
 
-	// NOTE: We no longer check for MACGO_*_PIPE env vars because they can be inherited
-	// from parent processes. The config file mechanism with bundle path matching is more reliable.
+	// Note: We check env vars first now to support open --env
 
 	// If we found a matching config file, we're in the relaunched app
 	if configFile != "" {
@@ -65,6 +81,12 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 			if err := loadPipeConfig(configFile); err != nil {
 				if cfg.Debug {
 					fmt.Fprintf(os.Stderr, "macgo: failed to load pipe config: %v\n", err)
+				}
+			}
+			// Write our PID so parent can forward signals to us
+			if err := writeChildPID(configFile, cfg.Debug); err != nil {
+				if cfg.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: failed to write child PID: %v\n", err)
 				}
 			}
 		}
@@ -155,6 +177,7 @@ func createSimpleBundle(execPath string, cfg *Config) (*bundle.Bundle, error) {
 		cfg.AutoSign,
 		cfg.AdHocSign,
 		cfg.Info,
+		bundle.UIMode(cfg.UIMode),
 	)
 }
 
@@ -396,25 +419,78 @@ func setupPipeRedirection(debug bool) error {
 	return nil
 }
 
-// registerExitHandler sets up signal handlers to write the done file on termination.
-// This catches SIGINT, SIGTERM, and SIGQUIT to ensure cleanup happens even when
-// the process is killed externally.
+// registerExitHandler sets up signal handlers for cleanup and SIGQUIT stack dumps.
+//
+// This function is called in the child process (the app running inside the bundle).
+// It handles the following signals:
+//
+//   - SIGINT, SIGTERM, SIGHUP: Write done file (if configured), exit with 128+signal
+//   - SIGQUIT: Dump all goroutine stacks to stderr, then exit with 128+signal
+//   - SIGWINCH: Log receipt (debug mode only), do not exit
+//
+// The parent process forwards signals to us since we have PPID=1 (adopted by launchd)
+// and are not in the terminal's foreground process group.
 func registerExitHandler(debug bool) {
 	doneFile := os.Getenv("MACGO_DONE_FILE")
-	if doneFile == "" {
-		return
-	}
 
+	// Always register signal handlers for stack dumps and cleanup
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 	go func() {
 		sig := <-c
 		if debug {
-			fmt.Fprintf(os.Stderr, "macgo: received signal %v, writing done file\n", sig)
+			fmt.Fprintf(os.Stderr, "macgo: received signal %v\n", sig)
 		}
-		writeDoneFile()
-		os.Exit(1)
+		// For SIGQUIT, dump all goroutine stacks (Go's default behavior)
+		if sig == syscall.SIGQUIT {
+			dumpGoroutineStacks()
+		}
+		// Convert signal to exit code (128 + signal number)
+		exitCode := 128 + int(sig.(syscall.Signal))
+		// Write done file if configured (non-FIFO mode)
+		if doneFile != "" {
+			writeDoneFile()
+		}
+		os.Exit(exitCode)
 	}()
+
+	// Handle SIGWINCH (terminal resize) - log but don't exit
+	// This helps with debugging signal forwarding from parent to child
+	winchChan := make(chan os.Signal, 1)
+	signal.Notify(winchChan, syscall.SIGWINCH)
+	go func() {
+		for range winchChan {
+			if debug {
+				fmt.Fprintf(os.Stderr, "macgo: child received SIGWINCH (pid=%d)\n", os.Getpid())
+			}
+		}
+	}()
+}
+
+// dumpGoroutineStacks prints stack traces for all goroutines to stderr.
+// This mimics Go's default SIGQUIT behavior.
+func dumpGoroutineStacks() {
+	buf := make([]byte, 64*1024*1024) // 64MB buffer
+	n := runtime.Stack(buf, true)     // true = all goroutines
+	fmt.Fprintf(os.Stderr, "\n*** goroutine dump ***\n%s\n", buf[:n])
+}
+
+// writeChildPID writes this process's PID to a file in the pipe directory.
+// This allows the parent process to forward signals to us.
+func writeChildPID(configFile string, debug bool) error {
+	// Derive PID file path from config file path (same directory)
+	pipeDir := filepath.Dir(configFile)
+	pidFile := filepath.Join(pipeDir, "child.pid")
+
+	content := fmt.Sprintf("%d\n", os.Getpid())
+	if err := os.WriteFile(pidFile, []byte(content), 0600); err != nil {
+		return fmt.Errorf("write PID file: %w", err)
+	}
+
+	if debug {
+		fmt.Fprintf(os.Stderr, "macgo: wrote child PID %d to %s\n", os.Getpid(), pidFile)
+	}
+	return nil
 }
 
 // writeDoneFile writes the done/sentinel file to signal that the child has exited.
