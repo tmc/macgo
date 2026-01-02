@@ -432,14 +432,15 @@ func TestE2E_BundleStructure(t *testing.T) {
 		[]string{"camera"},
 		[]string{},
 		[]string{},
-		true,  // debug
-		nil,   // keepBundle
-		"",    // codeSignIdentity
-		"",    // codeSigningIdentifier
-		false, // autoSign
-		true,  // adHocSign
-		nil,   // customInfo
-		"",    // uiMode (default: background)
+		true,               // debug
+		nil,                // keepBundle
+		"",                 // codeSignIdentity
+		"",                 // codeSigningIdentifier
+		false,              // autoSign
+		true,               // adHocSign
+		nil,                // customInfo
+		bundle.UIModeBackground,    // uiMode (default: background)
+		false,              // devMode
 	)
 
 	if err != nil {
@@ -701,14 +702,15 @@ func BenchmarkE2E_BundleCreation(b *testing.B) {
 			[]string{"camera"},
 			[]string{},
 			[]string{},
-			false, // debug
-			nil,   // keepBundle (will be cleaned up)
-			"",    // codeSignIdentity
-			"",    // codeSigningIdentifier
-			false, // autoSign
-			true,  // adHocSign
-			nil,   // customInfo
-			"",    // uiMode (default: background)
+			false,              // debug
+			nil,                // keepBundle (will be cleaned up)
+			"",                 // codeSignIdentity
+			"",                 // codeSigningIdentifier
+			false,              // autoSign
+			true,               // adHocSign
+			nil,                // customInfo
+			bundle.UIModeBackground,    // uiMode (default: background)
+			false,              // devMode
 		)
 		if err != nil {
 			b.Fatalf("Bundle creation failed: %v", err)

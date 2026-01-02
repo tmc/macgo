@@ -120,6 +120,23 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		if cfg.Debug {
 			fmt.Fprintf(os.Stderr, "macgo: already in app bundle\n")
 		}
+		// In DevMode, exec the development binary instead of running bundled code
+		if cfg.DevMode {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: dev mode active in bundle - will exec source binary\n")
+			}
+			if err := execDevTarget(cfg); err != nil {
+				if cfg.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: dev mode exec failed: %v\n", err)
+				}
+				// Fall through to normal execution if exec fails
+			}
+			// If execDevTarget returns without error, it means no target was found
+			// Continue with normal bundled execution
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: dev mode - no target found, running bundled binary\n")
+			}
+		}
 		return nil
 	}
 
@@ -149,8 +166,79 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		fmt.Fprintf(os.Stderr, "macgo: permissions requested: %v\n", cfg.Permissions)
 	}
 
+	// In DevMode, store the source path in env for mismatch detection
+	if cfg.DevMode {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: dev mode enabled - source path: %s\n", execPath)
+		}
+		os.Setenv("MACGO_DEV_SOURCE", execPath)
+	}
+
 	// Relaunch in bundle
 	return relaunchInBundle(ctx, bundlePath, execPath, cfg)
+}
+
+// execDevTarget execs the development source binary if DevMode is enabled.
+// This allows the signed bundle to exec the rebuilt source binary,
+// preserving TCC permissions while allowing rapid iteration.
+//
+// The target path is read from .dev_target in the bundle's Contents directory.
+// This file is written at bundle creation time and contains the path to the
+// binary that created the bundle. This prevents arbitrary exec attacks.
+//
+// If exec succeeds, this function never returns.
+// If no target found, returns nil.
+// If exec fails, returns an error.
+func execDevTarget(cfg *Config) error {
+	execPath, err := os.Executable()
+	if err != nil {
+		return nil // Can't determine bundle path, skip
+	}
+	// execPath is like /path/to/App.app/Contents/MacOS/binary
+	// We want /path/to/App.app/Contents/.dev_target
+	contentsDir := filepath.Dir(filepath.Dir(execPath))
+	targetFile := filepath.Join(contentsDir, ".dev_target")
+	data, err := os.ReadFile(targetFile)
+	if err != nil {
+		return nil // No stored target, skip
+	}
+	target := strings.TrimSpace(string(data))
+
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: .dev_target contains: %q\n", target)
+	}
+
+	if target == "" {
+		return nil // No target found
+	}
+
+	// Check for mismatch between stored target and current source
+	// MACGO_DEV_SOURCE is set by the source binary before relaunch
+	if source := os.Getenv("MACGO_DEV_SOURCE"); source != "" && source != target {
+		fmt.Fprintf(os.Stderr, "macgo: warning: dev mode source mismatch\n")
+		fmt.Fprintf(os.Stderr, "  current source: %s\n", source)
+		fmt.Fprintf(os.Stderr, "  bundle target:  %s\n", target)
+		fmt.Fprintf(os.Stderr, "  (bundle was created from a different path)\n")
+	}
+
+	// Verify target exists
+	if _, err := os.Stat(target); err != nil {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: dev target not found: %s\n", target)
+		}
+		return nil // Target doesn't exist, skip
+	}
+
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: dev mode - exec'ing target: %s\n", target)
+	}
+
+	// Set MACGO_NO_RELAUNCH to prevent the target from creating another bundle
+	os.Setenv("MACGO_NO_RELAUNCH", "1")
+
+	// Exec the target - this replaces the current process
+	// The TCC permissions from the signed bundle apply to the exec'd process
+	return syscall.Exec(target, os.Args, os.Environ())
 }
 
 // createSimpleBundle creates a minimal app bundle with the given configuration.
@@ -178,6 +266,7 @@ func createSimpleBundle(execPath string, cfg *Config) (*bundle.Bundle, error) {
 		cfg.AdHocSign,
 		cfg.Info,
 		bundle.UIMode(cfg.UIMode),
+		cfg.DevMode,
 	)
 }
 

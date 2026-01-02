@@ -105,6 +105,7 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 
 	// NOTE: open-flags and env-vars strategies were removed as they don't work with LaunchServices.
 	// Only config-file strategy is supported, which doesn't add I/O flags to the open command.
+	// The -n flag is enabled by default to prevent reusing stale processes.
 	tests := []struct {
 		name     string
 		args     []string
@@ -115,6 +116,7 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 			args: []string{"program"},
 			wantArgs: []string{
 				"open",
+				"-n", // new instance flag (default on)
 				bundlePath,
 			},
 		},
@@ -123,6 +125,7 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 			args: []string{"program", "arg1", "arg2", "--flag"},
 			wantArgs: []string{
 				"open",
+				"-n", // new instance flag (default on)
 				bundlePath,
 				"--args",
 				"arg1", "arg2", "--flag",

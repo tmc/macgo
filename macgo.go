@@ -149,6 +149,11 @@ type Config struct {
 	// UIMode controls how the app appears in the UI.
 	// Default (UIModeBackground): LSBackgroundOnly=true for CLI tools.
 	UIMode UIMode
+
+	// DevMode creates a stable wrapper bundle that exec's the original binary.
+	// This preserves TCC permissions across rebuilds since only the wrapper is signed.
+	// Enable via MACGO_DEV_MODE=1 for development workflows where you rebuild frequently.
+	DevMode bool
 }
 
 // FromEnv loads configuration from environment variables.
@@ -176,6 +181,7 @@ type Config struct {
 //	MACGO_FORCE_DIRECT=1    - Force direct execution
 //	MACGO_TTY_PASSTHROUGH=1 - Pass TTY device to child (experimental; default: pipe-based I/O)
 //	MACGO_OPEN_NEW_INSTANCE=0 - Disable -n flag (new instance) for open command (enabled by default)
+//	MACGO_DEV_MODE=1        - Dev mode: wrapper exec's original binary, preserves TCC across rebuilds
 func (c *Config) FromEnv() *Config {
 	if name := os.Getenv("MACGO_APP_NAME"); name != "" {
 		c.AppName = name
@@ -230,11 +236,17 @@ func (c *Config) FromEnv() *Config {
 	}
 
 	// Parse launch preferences from environment
+	// TODO: Deprecate ForceLaunchServices
 	if os.Getenv("MACGO_FORCE_LAUNCH_SERVICES") == "1" {
 		c.ForceLaunchServices = true
 	}
 	if os.Getenv("MACGO_FORCE_DIRECT") == "1" {
 		c.ForceDirectExecution = true
+	}
+
+	// Dev mode: wrapper exec's original binary, preserves TCC across rebuilds
+	if os.Getenv("MACGO_DEV_MODE") == "1" {
+		c.DevMode = true
 	}
 
 	return c
@@ -316,6 +328,14 @@ func (c *Config) WithUsageDescription(key, description string) *Config {
 // Options: UIModeBackground (default), UIModeAccessory, UIModeRegular
 func (c *Config) WithUIMode(mode UIMode) *Config {
 	c.UIMode = mode
+	return c
+}
+
+// WithDevMode enables development mode where a stable wrapper exec's the original binary.
+// This preserves TCC permissions across rebuilds since the wrapper's signature stays stable.
+// Use this when actively developing and rebuilding frequently.
+func (c *Config) WithDevMode() *Config {
+	c.DevMode = true
 	return c
 }
 

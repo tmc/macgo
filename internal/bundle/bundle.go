@@ -49,6 +49,9 @@ type Bundle struct {
 
 	// version is the application version
 	version string
+
+	// reused indicates the bundle was reused from a previous run (no signing needed)
+	reused bool
 }
 
 // Config holds configuration options for bundle creation and signing.
@@ -96,6 +99,11 @@ type Config struct {
 	// UIMode controls how the app appears in the UI.
 	// Default (empty or UIModeBackground): LSBackgroundOnly=true for CLI tools.
 	UIMode UIMode
+
+	// DevMode creates a stable wrapper bundle that exec's the original binary.
+	// This preserves TCC permissions across rebuilds since only the wrapper is signed,
+	// not the development binary. Enable via MACGO_DEV_MODE=1 for development workflows.
+	DevMode bool
 }
 
 // shouldKeepBundle returns the effective KeepBundle value.
@@ -171,6 +179,7 @@ func (b *Bundle) Create() error {
 				if b.Config.Debug {
 					fmt.Fprintf(os.Stderr, "macgo: reusing existing bundle at %s (binary unchanged)\n", bundleDir)
 				}
+				b.reused = true
 				return nil
 			} else {
 				if b.Config.Debug {
@@ -204,14 +213,43 @@ func (b *Bundle) Create() error {
 		return fmt.Errorf("failed to create bundle directories: %w", err)
 	}
 
-	// Copy the executable directly
 	execName := filepath.Base(b.appName)
 	destExec := filepath.Join(macosDir, execName)
-	if err := system.CopyFile(b.execPath, destExec); err != nil {
-		return fmt.Errorf("failed to copy executable: %w", err)
-	}
-	if err := os.Chmod(destExec, 0755); err != nil {
-		return fmt.Errorf("failed to set executable permissions: %w", err)
+
+	if b.Config.DevMode {
+		// DevMode: Copy the binary and store the dev target path.
+		// At runtime, the bundled binary will exec the dev target.
+		// This preserves TCC permissions since the bundle signature stays stable.
+		if err := system.CopyFile(b.execPath, destExec); err != nil {
+			return fmt.Errorf("failed to copy executable: %w", err)
+		}
+		if err := os.Chmod(destExec, 0755); err != nil {
+			return fmt.Errorf("failed to set executable permissions: %w", err)
+		}
+		// Store the target binary path - runtime will exec this
+		if err := b.storeDevModeTarget(contentsDir); err != nil {
+			return fmt.Errorf("failed to store dev target: %w", err)
+		}
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: dev mode enabled - bundle will exec %s at runtime\n", b.execPath)
+		}
+	} else {
+		// Normal mode: Copy the executable directly
+		if err := system.CopyFile(b.execPath, destExec); err != nil {
+			return fmt.Errorf("failed to copy executable: %w", err)
+		}
+		if err := os.Chmod(destExec, 0755); err != nil {
+			return fmt.Errorf("failed to set executable permissions: %w", err)
+		}
+
+		// Store the original binary's hash for future up-to-date checks.
+		// This is done BEFORE code signing since signing modifies the binary.
+		if err := b.storeSourceHash(contentsDir); err != nil {
+			if b.Config.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: warning: failed to store source hash: %v\n", err)
+			}
+			// Non-fatal - bundle will just be recreated on next run
+		}
 	}
 
 	// Create Info.plist path
@@ -349,9 +387,19 @@ func (b *Bundle) fixOwner(path string) error {
 
 // Sign performs code signing on the bundle.
 // This method coordinates the signing process and delegates to signing.go.
+// If the bundle was reused (not recreated), signing is skipped since the
+// existing signature is still valid.
 func (b *Bundle) Sign() error {
 	if b.Path == "" {
 		return fmt.Errorf("bundle not created - call Create() first")
+	}
+
+	// Skip signing if bundle was reused - existing signature is still valid
+	if b.reused {
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: skipping code signing (bundle reused)\n")
+		}
+		return nil
 	}
 
 	// Code sign the bundle if identity is provided, auto-detect, or ad-hoc
@@ -444,7 +492,7 @@ func (b *Bundle) ExecutablePath() string {
 func Create(execPath string, appName, bundleID, version string, permissions []string,
 	custom []string, appGroups []string, debug bool, keepBundle *bool,
 	codeSignIdentity, codeSigningIdentifier string, autoSign, adHocSign bool,
-	info map[string]interface{}, uiMode UIMode) (*Bundle, error) {
+	info map[string]interface{}, uiMode UIMode, devMode bool) (*Bundle, error) {
 
 	config := &Config{
 		AppName:               appName,
@@ -461,6 +509,7 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 		AdHocSign:             adHocSign,
 		Info:                  info,
 		UIMode:                uiMode,
+		DevMode:               devMode,
 	}
 
 	bundle, err := New(execPath, config)
@@ -479,42 +528,115 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 	return bundle, nil
 }
 
-// isBundleUpToDate checks if the bundle contains the same binary as the original executable
-// by comparing SHA256 hashes. Returns true if the bundle is up to date, false otherwise.
+// sourceHashFile is the name of the file storing the original binary's SHA256 hash.
+// This hash is captured BEFORE code signing so we can accurately detect source changes.
+const sourceHashFile = ".source_hash"
+
+// isBundleUpToDate checks if the bundle was created from the current source binary.
+// For normal bundles, it compares the stored hash against the current source binary's hash.
+// For dev mode bundles, it only checks that the target path is the same (binary can change).
 func (b *Bundle) isBundleUpToDate() bool {
 	if b.Path == "" {
 		return false
 	}
 
-	// Get the executable inside the bundle
-	execName := filepath.Base(b.appName)
-	bundleExecPath := filepath.Join(b.Path, "Contents", "MacOS", execName)
-
-	// Check if bundle executable exists
-	if _, err := os.Stat(bundleExecPath); err != nil {
-		if b.Config.Debug {
-			fmt.Fprintf(os.Stderr, "macgo: bundle executable not found: %v\n", err)
-		}
-		return false
+	// Check if this is a dev mode bundle first
+	targetPath := filepath.Join(b.Path, "Contents", devModeTargetFile)
+	if _, err := os.Stat(targetPath); err == nil {
+		// This is a dev mode bundle - use dev mode check
+		return b.isDevModeBundleUpToDate()
 	}
 
-	// Calculate hash of original executable
-	originalHash, err := system.CalculateFileSHA256(b.execPath)
+	// Normal bundle - check source hash
+	hashPath := filepath.Join(b.Path, "Contents", sourceHashFile)
+	storedHashBytes, err := os.ReadFile(hashPath)
 	if err != nil {
 		if b.Config.Debug {
-			fmt.Fprintf(os.Stderr, "macgo: failed to calculate original binary hash: %v\n", err)
+			fmt.Fprintf(os.Stderr, "macgo: no stored hash found: %v\n", err)
 		}
 		return false
 	}
+	storedHash := strings.TrimSpace(string(storedHashBytes))
 
-	// Calculate hash of bundle executable
-	bundleHash, err := system.CalculateFileSHA256(bundleExecPath)
+	// Calculate hash of current source executable
+	currentHash, err := system.CalculateFileSHA256(b.execPath)
 	if err != nil {
 		if b.Config.Debug {
-			fmt.Fprintf(os.Stderr, "macgo: failed to calculate bundle binary hash: %v\n", err)
+			fmt.Fprintf(os.Stderr, "macgo: failed to calculate source binary hash: %v\n", err)
 		}
 		return false
 	}
 
-	return originalHash == bundleHash
+	if b.Config.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: comparing hashes - stored=%s current=%s\n", storedHash[:16]+"...", currentHash[:16]+"...")
+	}
+
+	return storedHash == currentHash
+}
+
+// storeSourceHash saves the source binary's SHA256 hash to a metadata file.
+// This must be called BEFORE code signing since signing modifies the binary.
+func (b *Bundle) storeSourceHash(contentsDir string) error {
+	hash, err := system.CalculateFileSHA256(b.execPath)
+	if err != nil {
+		return fmt.Errorf("calculate hash: %w", err)
+	}
+
+	hashPath := filepath.Join(contentsDir, sourceHashFile)
+	if err := os.WriteFile(hashPath, []byte(hash+"\n"), 0644); err != nil {
+		return fmt.Errorf("write hash file: %w", err)
+	}
+
+	return nil
+}
+
+// devModeTargetFile is the name of the file storing the dev mode target binary path.
+const devModeTargetFile = ".dev_target"
+
+// storeDevModeTarget saves the target binary path for dev mode bundles.
+// This is used to detect if the target path has changed (requiring bundle recreation).
+func (b *Bundle) storeDevModeTarget(contentsDir string) error {
+	targetPath := filepath.Join(contentsDir, devModeTargetFile)
+	if err := os.WriteFile(targetPath, []byte(b.execPath+"\n"), 0644); err != nil {
+		return fmt.Errorf("write target file: %w", err)
+	}
+	return nil
+}
+
+// isDevModeBundleUpToDate checks if a dev mode bundle is still valid.
+// It verifies the target binary path hasn't changed (the binary itself can change).
+func (b *Bundle) isDevModeBundleUpToDate() bool {
+	if b.Path == "" {
+		return false
+	}
+
+	// Check if this is a dev mode bundle by looking for the target file
+	targetPath := filepath.Join(b.Path, "Contents", devModeTargetFile)
+	storedTargetBytes, err := os.ReadFile(targetPath)
+	if err != nil {
+		// Not a dev mode bundle or file missing
+		return false
+	}
+	storedTarget := strings.TrimSpace(string(storedTargetBytes))
+
+	// Check if the target path is the same
+	if storedTarget != b.execPath {
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: dev mode target changed - stored=%s current=%s\n", storedTarget, b.execPath)
+		}
+		return false
+	}
+
+	// Verify the target binary still exists
+	if _, err := os.Stat(b.execPath); err != nil {
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: dev mode target binary not found: %v\n", err)
+		}
+		return false
+	}
+
+	if b.Config.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: dev mode bundle up-to-date (target: %s)\n", b.execPath)
+	}
+	return true
 }
