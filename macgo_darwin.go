@@ -259,7 +259,7 @@ func createSimpleBundle(execPath string, cfg *Config) (*bundle.Bundle, error) {
 		cfg.Custom,
 		cfg.AppGroups,
 		cfg.Debug,
-		cfg.KeepBundle,
+		cfg.CleanupBundle,
 		cfg.CodeSignIdentity,
 		cfg.CodeSigningIdentifier,
 		cfg.AutoSign,
@@ -292,7 +292,6 @@ func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Con
 		BundleID:             cfg.BundleID,
 		Permissions:          permissions,
 		Debug:                cfg.Debug,
-		ForceLaunchServices:  cfg.ForceLaunchServices,
 		ForceDirectExecution: cfg.ForceDirectExecution,
 		Background:           cfg.UIMode == "" || cfg.UIMode == UIModeBackground,
 	}

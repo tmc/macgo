@@ -85,13 +85,12 @@ func TestE2E_BundleCreationAndReuse(t *testing.T) {
 	defer os.Unsetenv("MACGO_NO_RELAUNCH")
 
 	// Enable bundle keeping
-	keepBundle := true
 	cfg := &macgo.Config{
-		AppName:     "E2ETestBundleReuse",
-		BundleID:    "com.test.e2e.reuse",
-		Permissions: []macgo.Permission{macgo.Camera},
-		KeepBundle:  &keepBundle,
-		Debug:       true,
+		AppName:       "E2ETestBundleReuse",
+		BundleID:      "com.test.e2e.reuse",
+		Permissions:   []macgo.Permission{macgo.Camera},
+		CleanupBundle: false,
+		Debug:         true,
 	}
 
 	// First run - creates bundle
@@ -432,15 +431,15 @@ func TestE2E_BundleStructure(t *testing.T) {
 		[]string{"camera"},
 		[]string{},
 		[]string{},
-		true,               // debug
-		nil,                // keepBundle
-		"",                 // codeSignIdentity
-		"",                 // codeSigningIdentifier
-		false,              // autoSign
-		true,               // adHocSign
-		nil,                // customInfo
-		bundle.UIModeBackground,    // uiMode (default: background)
-		false,              // devMode
+		true,                    // debug
+		false,                   // cleanupBundle (nil -> false in old, now explicit false to keep)
+		"",                      // codeSignIdentity
+		"",                      // codeSigningIdentifier
+		false,                   // autoSign
+		true,                    // adHocSign
+		nil,                     // customInfo
+		bundle.UIModeBackground, // uiMode (default: background)
+		false,                   // devMode
 	)
 
 	if err != nil {
@@ -507,15 +506,6 @@ func TestE2E_LaunchStrategySelection(t *testing.T) {
 				Permissions:          []macgo.Permission{macgo.Camera},
 				ForceDirectExecution: true,
 				Debug:                true,
-			},
-		},
-		{
-			name: "force_launch_services",
-			config: &macgo.Config{
-				AppName:             "E2ETestLaunchServices",
-				Permissions:         []macgo.Permission{macgo.Camera},
-				ForceLaunchServices: true,
-				Debug:               true,
 			},
 		},
 		{
@@ -702,15 +692,15 @@ func BenchmarkE2E_BundleCreation(b *testing.B) {
 			[]string{"camera"},
 			[]string{},
 			[]string{},
-			false,              // debug
-			nil,                // keepBundle (will be cleaned up)
-			"",                 // codeSignIdentity
-			"",                 // codeSigningIdentifier
-			false,              // autoSign
-			true,               // adHocSign
-			nil,                // customInfo
-			bundle.UIModeBackground,    // uiMode (default: background)
-			false,              // devMode
+			false,                   // debug
+			true,                    // cleanupBundle (will be cleaned up)
+			"",                      // codeSignIdentity
+			"",                      // codeSigningIdentifier
+			false,                   // autoSign
+			true,                    // adHocSign
+			nil,                     // customInfo
+			bundle.UIModeBackground, // uiMode (default: background)
+			false,                   // devMode
 		)
 		if err != nil {
 			b.Fatalf("Bundle creation failed: %v", err)

@@ -205,34 +205,34 @@ func TestBundle_Getters(t *testing.T) {
 	}
 }
 
-func TestConfig_shouldKeepBundle(t *testing.T) {
+func TestConfig_shouldCleanupBundle(t *testing.T) {
 	tests := []struct {
 		name     string
 		config   *Config
 		expected bool
 	}{
 		{
-			name:     "nil pointer defaults to true",
-			config:   &Config{KeepBundle: nil},
+			name:     "default is false (keep)",
+			config:   &Config{CleanupBundle: false},
+			expected: false,
+		},
+		{
+			name:     "explicit true (cleanup)",
+			config:   &Config{CleanupBundle: true},
 			expected: true,
 		},
 		{
-			name:     "explicit true",
-			config:   &Config{KeepBundle: &[]bool{true}[0]},
-			expected: true,
-		},
-		{
-			name:     "explicit false",
-			config:   &Config{KeepBundle: &[]bool{false}[0]},
+			name:     "explicit false (keep)",
+			config:   &Config{CleanupBundle: false},
 			expected: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.config.shouldKeepBundle()
+			result := tt.config.shouldCleanupBundle()
 			if result != tt.expected {
-				t.Errorf("shouldKeepBundle() = %v, want %v", result, tt.expected)
+				t.Errorf("shouldCleanupBundle() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

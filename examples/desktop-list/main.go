@@ -48,13 +48,12 @@ func main() {
 	fmt.Println()
 
 	// Configure macgo with optional code signing
-	keepBundle := false
 	cfg := &macgo.Config{
-		Permissions: []macgo.Permission{macgo.Sandbox, macgo.Files},
-		Debug:       *debug,
-		AutoSign:    *autoSign,
-		AdHocSign:   *adHocSign,
-		KeepBundle:  &keepBundle,
+		Permissions:   []macgo.Permission{macgo.Sandbox, macgo.Files},
+		Debug:         *debug,
+		AutoSign:      *autoSign,
+		AdHocSign:     *adHocSign,
+		CleanupBundle: false,
 	}
 
 	if *signIdentity != "" {

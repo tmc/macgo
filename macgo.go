@@ -31,7 +31,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -109,9 +108,9 @@ type Config struct {
 	// Debug enables debug logging.
 	Debug bool
 
-	// KeepBundle prevents cleanup of temporary bundles. Use a pointer to distinguish
-	// between explicitly set false and default (which is true).
-	KeepBundle *bool
+	// CleanupBundle enables cleanup of the app bundle after execution.
+	// Defaults to false (bundle is kept for reuse).
+	CleanupBundle bool
 
 	// CodeSignIdentity is the signing identity to use for code signing.
 	// If empty and AutoSign is false, the app bundle will not be signed.
@@ -137,10 +136,6 @@ type Config struct {
 	// proper TCC dialogs. Use this for CLI commands that need terminal output.
 	// Note: LaunchServices is used by default to ensure TCC compatibility.
 	ForceDirectExecution bool
-
-	// ForceLaunchServices is deprecated and currently a no-op as LaunchServices
-	// is the default strategy. Use ForceDirectExecution=true to opt out.
-	ForceLaunchServices bool
 
 	// Info allows specifying custom Info.plist keys.
 	// This is useful for UsageDescriptions (e.g. NSAccessibilityUsageDescription).
@@ -195,9 +190,8 @@ func (c *Config) FromEnv() *Config {
 		c.Debug = true
 	}
 
-	if os.Getenv("MACGO_KEEP_BUNDLE") == "1" {
-		keepBundle := true
-		c.KeepBundle = &keepBundle
+	if os.Getenv("MACGO_KEEP_BUNDLE") == "0" {
+		c.CleanupBundle = true
 	}
 
 	if identity := os.Getenv("MACGO_CODE_SIGN_IDENTITY"); identity != "" {
@@ -236,10 +230,6 @@ func (c *Config) FromEnv() *Config {
 	}
 
 	// Parse launch preferences from environment
-	// TODO: Deprecate ForceLaunchServices
-	if os.Getenv("MACGO_FORCE_LAUNCH_SERVICES") == "1" {
-		c.ForceLaunchServices = true
-	}
 	if os.Getenv("MACGO_FORCE_DIRECT") == "1" {
 		c.ForceDirectExecution = true
 	}
@@ -410,23 +400,7 @@ func StartContext(ctx context.Context, cfg *Config) error {
 		cfg = &Config{}
 	}
 
-	// Emit deprecation warning for ForceLaunchServices
-	if cfg.ForceLaunchServices {
-		fmt.Fprintln(os.Stderr, "macgo: warning: ForceLaunchServices is deprecated (LaunchServices is now default)")
-	}
-
 	return startDarwin(ctx, cfg)
-}
-func StartDefault() error {
-	cfg := NewConfig().FromEnv()
-	if cfg.AppName == "" {
-		cfg.AppName = filepath.Base(os.Args[0])
-	}
-	if cfg.BundleID == "" {
-		// Simple bundle ID based on app name
-		cfg.BundleID = "com.example." + strings.ReplaceAll(strings.ToLower(cfg.AppName), " ", "-")
-	}
-	return Start(cfg)
 }
 
 // Request is a convenience function for requesting specific permissions.

@@ -105,9 +105,9 @@ func TestBundle_SHA256_Integration(t *testing.T) {
 	}
 
 	config := &Config{
-		AppName:    "TestApp",
-		Debug:      true,
-		KeepBundle: &[]bool{true}[0], // Explicit true to test reuse logic
+		AppName:       "TestApp",
+		Debug:         true,
+		CleanupBundle: false, // Explicitly keep bundle for reuse logic
 	}
 
 	// First creation

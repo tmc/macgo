@@ -78,8 +78,8 @@ type Config struct {
 	// Debug enables debug logging.
 	Debug bool
 
-	// KeepBundle prevents cleanup of temporary bundles.
-	KeepBundle *bool
+	// CleanupBundle enables cleanup of the app bundle after execution.
+	CleanupBundle bool
 
 	// CodeSignIdentity is the signing identity to use for code signing.
 	CodeSignIdentity string
@@ -106,13 +106,10 @@ type Config struct {
 	DevMode bool
 }
 
-// shouldKeepBundle returns the effective KeepBundle value.
-// Defaults to true to preserve bundles for inspection and reuse.
-func (c *Config) shouldKeepBundle() bool {
-	if c.KeepBundle == nil {
-		return true // Default to keeping bundles
-	}
-	return *c.KeepBundle
+// shouldCleanupBundle returns true if the bundle should be removed.
+// Defaults to false (bundle is kept for reuse).
+func (c *Config) shouldCleanupBundle() bool {
+	return c.CleanupBundle
 }
 
 // New creates a new Bundle instance for the given executable and configuration.
@@ -171,8 +168,8 @@ func (b *Bundle) Create() error {
 	bundleDir := filepath.Join(bundleBaseDir, b.appName+".app")
 	b.Path = bundleDir
 
-	// Check if bundle already exists and should be kept
-	if b.Config.shouldKeepBundle() {
+	// Check if bundle already exists and should be kept (not cleaned up)
+	if !b.Config.shouldCleanupBundle() {
 		if _, err := os.Stat(bundleDir); err == nil {
 			// Check if the original executable has changed by comparing SHA256
 			if b.isBundleUpToDate() {
@@ -490,7 +487,7 @@ func (b *Bundle) ExecutablePath() string {
 // Create is a convenience function that creates a bundle from execPath and config fields.
 // This avoids the need for complex config conversion.
 func Create(execPath string, appName, bundleID, version string, permissions []string,
-	custom []string, appGroups []string, debug bool, keepBundle *bool,
+	custom []string, appGroups []string, debug bool, cleanupBundle bool,
 	codeSignIdentity, codeSigningIdentifier string, autoSign, adHocSign bool,
 	info map[string]interface{}, uiMode UIMode, devMode bool) (*Bundle, error) {
 
@@ -502,7 +499,7 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 		Custom:                custom,
 		AppGroups:             appGroups,
 		Debug:                 debug,
-		KeepBundle:            keepBundle,
+		CleanupBundle:         cleanupBundle,
 		CodeSignIdentity:      codeSignIdentity,
 		CodeSigningIdentifier: codeSigningIdentifier,
 		AutoSign:              autoSign,

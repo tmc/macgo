@@ -59,9 +59,9 @@ func ExampleStart_comprehensive() {
 			"com.apple.security.device.capture",
 			"com.apple.security.automation.apple-events",
 		},
-		Debug:      true,
-		AutoSign:   true,
-		KeepBundle: &[]bool{true}[0],
+		Debug:         true,
+		AutoSign:      true,
+		CleanupBundle: false,
 	}
 
 	err := macgo.Start(cfg)
