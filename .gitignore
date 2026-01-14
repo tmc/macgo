@@ -1,64 +1,49 @@
-# Compiled binaries
-*.bin
-gophoto
-*.app
+.claude/
+go.work
+go.work.sum
+examples/*/.claude/
+examples/*/go.work
+examples/*/go.work.sum
 
-# Compiled Object files, Static and Dynamic libs
-*.o
-*.a
-*.so
-*.dylib
+# Binaries
+*.test
+*.out
+*.exe
+*_test
 
-# Folders
-_obj
-_test
-vendor/
-
-# Architecture specific extensions/prefixes
-*.[568vq]
-[568vq].out
-
-# Go specific
-*.cgo1.go
-*.cgo2.c
-_cgo_defun.c
-_cgo_gotypes.go
-_cgo_export.*
-_testmain.go
-
-# Editor and system files
-*.swp
-*.swo
-.DS_Store
-.vscode/
-.idea/
-*.iml
-# Compiled binaries in examples
-examples/*/*.app/
-examples/*/hello
-examples/*/io-test
-examples/*/camera-mic
-examples/*/osascript-wrapper
-examples/*/screen-capture
-examples/*/code-signing
-examples/*/desktop-list
-examples/*/getting-started
-examples/*/hello-files
-examples/*/auto-signed
-examples/*/sandboxed-file-exec
-examples/*/tee-see-see
-examples/*/screencapture-purego
-examples/*/mouse-click
-examples/*/mouse-move
-examples/*/safari-cli
-examples/*/sdef-to-cobra
-examples/*/socket-auth-server
-examples/*/tcc-helper
+# Example Binaries (specific paths to avoid ignoring directories)
+examples/env-dump/env-dump
+examples/io-tree-test/io-tree-test
+examples/lsregister-tool/lsregister-tool
+examples/stdin-test/stdin-test
+examples/signal-test/signal-test
+examples/sysprefs-manager/sysprefs-manager
+examples/list-app-windows/list-app-windows
+examples/screen-capture-mcp-server/screen-capture-mcp-server
+examples/screen-capture/screen-capture
+examples/auto-signed/auto-signed
+examples/camera-mic/camera-mic
+examples/code-signing/code-signing
+examples/desktop-list/desktop-list
+examples/getting-started/getting-started
+examples/hello-files/hello-files
+examples/hello/hello
+examples/io-test/io-test
+examples/mouse-click/mouse-click
+examples/mouse-move/mouse-move
+examples/osascript-wrapper/osascript-wrapper
+examples/press-keys/press-keys
+examples/safari-cli/safari-cli
+examples/sandboxed-file-exec/sandboxed-file-exec
+examples/screencapture-purego/screencapture-purego
+examples/sdef-to-cobra/sdef-to-cobra
+examples/sigquit-test/sigquit-test
+examples/socket-auth-server/socket-auth-server
+examples/tcc-helper/tcc-helper
+examples/tee-see-see/tee-see-see
 cmd/macgo-cleanup/macgo-cleanup
 
-# Root level binaries
-screen-capture
+examples/app-to-web/app-to-web
+examples/io-tree-test/cmd/io-tree-child/io-tree-child
+examples/io-tree-test/cmd/io-tree-parent/io-tree-parent
 
-# Beads task tracking database
-.beads/
-examples/press-keys/press-keys
