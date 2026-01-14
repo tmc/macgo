@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"strings"
 )
 
 // IOWrapper wraps IO streams to add prefixes, indentation, or styling
@@ -117,66 +116,4 @@ func (w *IOWrapper) Write(p []byte) (int, error) {
 	// Write the processed output
 	_, err := w.dest.Write(output.Bytes())
 	return len(p), err
-}
-
-// LineWriter wraps a writer to buffer and process complete lines
-type LineWriter struct {
-	w      io.Writer
-	buffer bytes.Buffer
-}
-
-// NewLineWriter creates a writer that processes complete lines
-func NewLineWriter(w io.Writer) *LineWriter {
-	return &LineWriter{w: w}
-}
-
-// Write buffers data and writes complete lines
-func (lw *LineWriter) Write(p []byte) (int, error) {
-	n := len(p)
-	lw.buffer.Write(p)
-
-	// Process complete lines
-	for {
-		line, err := lw.buffer.ReadString('\n')
-		if err != nil {
-			// If we have a partial line, put it back
-			if len(line) > 0 {
-				lw.buffer = bytes.Buffer{}
-				lw.buffer.WriteString(line)
-			}
-			break
-		}
-
-		// Write the complete line
-		if _, err := lw.w.Write([]byte(line)); err != nil {
-			return n, err
-		}
-	}
-
-	return n, nil
-}
-
-// Flush writes any remaining buffered data
-func (lw *LineWriter) Flush() error {
-	if lw.buffer.Len() > 0 {
-		remaining := lw.buffer.String()
-		if !strings.HasSuffix(remaining, "\n") {
-			remaining += "\n"
-		}
-		_, err := lw.w.Write([]byte(remaining))
-		lw.buffer.Reset()
-		return err
-	}
-	return nil
-}
-
-// Close flushes and closes the writer if it implements io.Closer
-func (lw *LineWriter) Close() error {
-	if err := lw.Flush(); err != nil {
-		return err
-	}
-	if closer, ok := lw.w.(io.Closer); ok {
-		return closer.Close()
-	}
-	return nil
 }

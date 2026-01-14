@@ -175,33 +175,6 @@ func IsAppBundle(path string) bool {
 	return DirExists(contentsPath)
 }
 
-// GetContainingBundle returns the path to the containing app bundle, if any.
-// Returns empty string if not in an app bundle.
-func GetContainingBundle(execPath string) string {
-	if execPath == "" {
-		return ""
-	}
-
-	// Look for .app in the path
-	if !strings.Contains(execPath, ".app/") {
-		return ""
-	}
-
-	// Split the path and find the .app directory
-	parts := strings.Split(execPath, "/")
-	for i, part := range parts {
-		if strings.HasSuffix(part, ".app") {
-			// Reconstruct path up to and including the .app directory
-			bundlePath := strings.Join(parts[:i+1], "/")
-			if IsAppBundle(bundlePath) {
-				return bundlePath
-			}
-		}
-	}
-
-	return ""
-}
-
 // GetBundleID extracts the bundle identifier from an app bundle's Info.plist
 func GetBundleID(bundlePath string) string {
 	if bundlePath == "" || !strings.HasSuffix(bundlePath, ".app") {
