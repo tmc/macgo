@@ -146,19 +146,6 @@ cfg := macgo.NewConfig().
 err := macgo.Start(cfg)
 ```
 
-### Using Auto Packages
-```go
-import (
-    _ "github.com/tmc/macgo/auto/media"   // Camera + Microphone
-    _ "github.com/tmc/macgo/auto/adhoc"   // Ad-hoc signing
-    "github.com/tmc/macgo"
-)
-
-func main() {
-    // Permissions and signing pre-configured
-    macgo.Request()
-}
-```
 
 ## Troubleshooting
 

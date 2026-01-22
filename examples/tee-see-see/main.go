@@ -63,9 +63,8 @@ func init() {
 			"com.apple.security.files.bookmarks.app-scope",
 			"com.apple.security.system-data",
 		},
-		ForceLaunchServices: true, // Use 'open' command to properly register with TCC
-		Debug:               os.Getenv("MACGO_DEBUG") == "1",
-		AdHocSign:           true, // Enable ad-hoc code signing
+		Debug:     os.Getenv("MACGO_DEBUG") == "1",
+		AdHocSign: true, // Enable ad-hoc code signing
 	}
 	// Force direct execution if running as root to ensure environment propagation
 	if os.Geteuid() == 0 {
@@ -76,7 +75,7 @@ func init() {
 }
 
 func main() {
-	defer macgo.Cleanup()
+
 	// Define command-line flags
 	var (
 		useSystem  = flag.Bool("system", false, "Use system TCC database instead of user database")
@@ -212,15 +211,14 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	defer f.Close()
+
 	// copy to tmp:
 	tf, err := os.CreateTemp("", "tcc.db")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating temp file: %v\n", err)
 		os.Exit(1)
 	}
-	defer os.Remove(tf.Name())
-	defer tf.Close()
+
 	_, err = io.Copy(tf, f)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error copying TCC.db: %v\n", err)

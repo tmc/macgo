@@ -66,7 +66,7 @@ func moveMouse(x, y int) {
 func smoothMove(targetX, targetY int, showVisual bool) error {
 	if showVisual {
 		C.initVisualIndicators()
-		defer C.cleanupVisualIndicators()
+
 	}
 	// Get current mouse position
 	startX, startY := getCurrentPosition()

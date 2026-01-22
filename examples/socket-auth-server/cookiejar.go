@@ -44,7 +44,7 @@ func (j *CookieJar) GenerateCookie() (string, error) {
 	cookie := hex.EncodeToString(bytes)
 
 	j.mu.Lock()
-	defer j.mu.Unlock()
+	
 
 	j.cookies[cookie] = &CookieEntry{
 		Cookie:    cookie,
@@ -59,7 +59,7 @@ func (j *CookieJar) GenerateCookie() (string, error) {
 // This follows iTerm2's pattern where cookies can only be used once.
 func (j *CookieJar) ConsumeCookie(cookie string) bool {
 	j.mu.Lock()
-	defer j.mu.Unlock()
+	
 
 	entry, exists := j.cookies[cookie]
 	if !exists {
@@ -81,7 +81,7 @@ func (j *CookieJar) ConsumeCookie(cookie string) bool {
 // AddCookie explicitly adds a cookie to the jar (for testing or external generation)
 func (j *CookieJar) AddCookie(cookie string) {
 	j.mu.Lock()
-	defer j.mu.Unlock()
+	
 
 	j.cookies[cookie] = &CookieEntry{
 		Cookie:    cookie,
@@ -92,7 +92,7 @@ func (j *CookieJar) AddCookie(cookie string) {
 // RemoveCookie removes a cookie from the jar
 func (j *CookieJar) RemoveCookie(cookie string) {
 	j.mu.Lock()
-	defer j.mu.Unlock()
+	
 
 	delete(j.cookies, cookie)
 }
@@ -100,7 +100,7 @@ func (j *CookieJar) RemoveCookie(cookie string) {
 // ListCookies returns all cookies (for debugging)
 func (j *CookieJar) ListCookies() []CookieEntry {
 	j.mu.RLock()
-	defer j.mu.RUnlock()
+	
 
 	entries := make([]CookieEntry, 0, len(j.cookies))
 	for _, entry := range j.cookies {
@@ -112,7 +112,7 @@ func (j *CookieJar) ListCookies() []CookieEntry {
 // CleanExpired removes cookies older than the specified duration
 func (j *CookieJar) CleanExpired(maxAge time.Duration) int {
 	j.mu.Lock()
-	defer j.mu.Unlock()
+	
 
 	count := 0
 	cutoff := time.Now().Add(-maxAge)

@@ -23,7 +23,6 @@ func main() {
 		BundleID: "com.example.sandboxed-file-exec",
 
 		// Enable app sandbox and user-selected file access
-		// This replaces v1's EntAppSandbox + EntUserSelectedReadOnly
 		Permissions: []macgo.Permission{
 			macgo.Sandbox, // App sandbox isolation
 			macgo.Files,   // User-selected file access
@@ -115,13 +114,6 @@ func main() {
 	fmt.Println("--------------------------")
 	fmt.Println("• v1: Uses magic import '_ \"github.com/tmc/macgo/auto/sandbox\"'")
 	fmt.Println("• v2: Explicit config with 'macgo.Files' permission")
-	fmt.Println()
-	fmt.Println("• v1: Global state modified at import time")
-	fmt.Println("• v2: Configuration passed explicitly to Start()")
-	fmt.Println()
-	fmt.Println("• v1: Need to know multiple entitlement constants")
-	fmt.Println("• v2: Single 'Files' permission for sandboxed file access")
-
 	fmt.Println("\nPress Enter to exit...")
 	_, _ = fmt.Scanln()
 }

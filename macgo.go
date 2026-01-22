@@ -4,26 +4,58 @@
 // files, etc.) by automatically creating app bundles with proper entitlements and handling
 // the relaunch process when necessary.
 //
-// This is a simplified API designed following Go's design principles:
-// - Simple API surface with sensible defaults
-// - Explicit configuration over magic behavior
-// - No global state or init() side effects
-// - Focus on the common case (95% of users)
+// # Usage
 //
-// Basic usage:
+// To correctly use macgo, you must call macgo.Start() or macgo.Request() at the very beginning
+// of your main() function, before any other logic or background goroutines are started.
 //
-//	err := macgo.Request(macgo.Camera, macgo.Microphone)
-//	if err != nil {
-//		log.Fatal(err)
+// 1. Basic Usage (One-Liner)
+//
+//	func main() {
+//	    // Request permissions immediately.
+//	    // If the app is not in a bundle, this will create one and relaunch the app.
+//	    if err := macgo.Request(macgo.Camera, macgo.Microphone); err != nil {
+//	        log.Fatal(err)
+//	    }
+//
+//	    // Your application logic starts here...
 //	}
 //
-// Advanced configuration:
+// 2. Advanced Usage (Configuration)
 //
-//	cfg := macgo.NewConfig().
-//		WithAppName("MyApp").
-//		WithPermissions(macgo.Camera, macgo.Files).
-//		WithDebug()
-//	err := macgo.Start(cfg)
+//	func main() {
+//	    cfg := &macgo.Config{
+//	        AppName:     "MyApp",
+//	        Permissions: []macgo.Permission{macgo.Camera, macgo.Files},
+//	        Debug:       true, // Enable debug logging to stderr
+//	    }
+//
+//	    // Initialize macgo. This logic handles the process lifecycle.
+//	    // If a relaunch is needed, Start will exit the current process.
+//	    if err := macgo.Start(cfg); err != nil {
+//	        log.Fatal(err)
+//	    }
+//
+//	    // Your application logic starts here...
+//	}
+//
+// # How it Works
+//
+// When macgo.Start() is called:
+//
+//  1. It checks if the program is running inside a valid macOS App Bundle.
+//  2. If NOT, it creates a temporary App Bundle in /tmp with the requested entitlements.
+//  3. It relaunches the current executable *inside* that bundle using `open`.
+//  4. It transparently forwards stdin/stdout/stderr from the bundled process to your terminal.
+//  5. The original process exits.
+//  6. If ALREADY inside a bundle (the relaunched process), Start() simply returns nil,
+//     allowing your main() function to proceed with the requested permissions.
+//
+// # Important Notes
+//
+//   - macgo.Start() MUST be called early in main().
+//   - Do not rely on init() functions for logic that depends on permissions, as they run before main.
+//   - macgo preserves exit codes and terminal I/O.
 package macgo
 
 import (
@@ -369,8 +401,11 @@ func (c *Config) Validate() error {
 
 // Start initializes macgo with the given configuration.
 // Creates an app bundle if needed and handles permission requests.
-// On non-macOS platforms, this is a no-op that returns nil.
+// On non-macOS platforms, this is a no-op that returns a no-op function and nil error.
 func Start(cfg *Config) error {
+	if cfg == nil {
+		cfg = &Config{}
+	}
 	if cfg.Debug {
 		fmt.Fprintf(os.Stderr, "macgo: Start called (PID: %d)\n", os.Getpid())
 	}
@@ -421,24 +456,6 @@ func Auto() error {
 	return Start(new(Config).FromEnv())
 }
 
-// OpenSystemPreferences attempts to open macOS Privacy & Security settings.
-// Tries to open Full Disk Access directly, falls back to general Privacy pane.
-// Useful when your app needs Full Disk Access or other manual permission grants.
-func OpenSystemPreferences() error {
-	if runtime.GOOS != "darwin" {
-		return fmt.Errorf("system preferences only available on macOS")
-	}
-
-	// Try opening the Full Disk Access pane directly
-	cmd := exec.Command("open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
-	if err := cmd.Run(); err != nil {
-		// Fallback to general Privacy & Security
-		cmd = exec.Command("open", "x-apple.systempreferences:com.apple.preference.security")
-		return cmd.Run()
-	}
-	return nil
-}
-
 // LaunchAppBundle launches an app bundle using the open command.
 // This ensures proper registration with TCC for permission dialogs.
 func LaunchAppBundle(bundlePath string) error {
@@ -450,35 +467,11 @@ func LaunchAppBundle(bundlePath string) error {
 	return cmd.Run()
 }
 
-// ShowFullDiskAccessInstructions provides instructions for granting Full Disk Access.
-// Optionally opens System Preferences if openSettings is true.
-// The programPath parameter is provided for future use in displaying specific instructions.
-func ShowFullDiskAccessInstructions(programPath string, openSettings bool) {
-	if openSettings {
-		// Open System Settings
-		_ = OpenSystemPreferences()
-	}
-
-	// The programPath parameter is available for future enhancements
-	// to provide program-specific instructions
-	_ = programPath // Acknowledge the parameter is intentionally unused for now
-}
-
 // Cleanup should be called when the macgo-wrapped application exits.
 // It writes the sentinel file that signals to the parent process that the
 // child has finished, enabling proper I/O forwarding completion.
 //
-// Usage: Add "defer macgo.Cleanup()" at the start of main() after calling macgo.Start().
-//
-// Example:
-//
-//	func main() {
-//	    if err := macgo.Start(cfg); err != nil {
-//	        log.Fatal(err)
-//	    }
-//	    defer macgo.Cleanup()
-//	    // ... rest of application
-//	}
+// Deprecated: Use the cleanup function returned by Start() instead.
 func Cleanup() {
 	if runtime.GOOS != "darwin" {
 		return

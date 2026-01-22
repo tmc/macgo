@@ -32,7 +32,6 @@ var (
 
 func main() {
 	// Ensure macgo cleanup happens on normal exit (writes done file for parent)
-	defer macgo.Cleanup()
 
 	flag.Parse()
 

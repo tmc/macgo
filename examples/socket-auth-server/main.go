@@ -50,7 +50,7 @@ func runClient(addr, cookie string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	
 
 	log.Printf("connected and authenticated")
 

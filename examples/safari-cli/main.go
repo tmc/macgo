@@ -238,7 +238,7 @@ func makeTestCommand() *cobra.Command {
 		Use:   "test",
 		Short: "Run test commands to verify functionality",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("Testing Safari automation...\n")
+			fmt.Println("Testing Safari automation...")
 
 			fmt.Println("1. Opening test page...")
 			openURL("https://example.com")

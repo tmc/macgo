@@ -131,7 +131,7 @@ func getAXTree(pid int32) (*AXNode, error) {
 	if appElem == 0 {
 		return nil, fmt.Errorf("failed to create AX application")
 	}
-	defer cfRelease(uintptr(appElem))
+	
 
 	return buildAXTree(appElem, 0)
 }
@@ -215,7 +215,7 @@ func buildAXTree(element AXUIElementRef, depth int) (*AXNode, error) {
 
 func getAttribute(element AXUIElementRef, attrName string) uintptr {
 	cfAttr := createCFString(attrName)
-	defer cfRelease(cfAttr)
+	
 
 	var result uintptr
 	err := axUIElementCopyAttributeValue(element, cfAttr, &result)

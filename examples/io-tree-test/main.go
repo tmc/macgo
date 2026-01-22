@@ -25,7 +25,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "macgo start error: %v\n", err)
 		os.Exit(1)
 	}
-	defer macgo.Cleanup()
 
 	var (
 		depth    = flag.Int("depth", 0, "Current recursion depth")

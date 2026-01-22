@@ -99,7 +99,7 @@ func clickMouse(x, y int) {
 func smoothMove(targetX, targetY int, showVisual bool) error {
 	if showVisual {
 		C.initVisualIndicators()
-		defer C.cleanupVisualIndicators()
+
 	}
 
 	startX, startY := getCurrentPosition()

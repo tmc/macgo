@@ -192,7 +192,7 @@ func main() {
 	// Create autorelease pool
 	pool := objc.ID(classNSAutoreleasePool).Send(selAlloc)
 	pool.Send(selInit)
-	defer pool.Send(selDrain)
+	
 
 	// Get shared application
 	app := objc.ID(classNSApplication).Send(selSharedApplication)

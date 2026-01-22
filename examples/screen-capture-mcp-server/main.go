@@ -43,7 +43,7 @@ func main() {
 	if err := macgo.Start(cfg); err != nil {
 		log.Fatalf("macgo start failed: %v", err)
 	}
-	defer macgo.Cleanup()
+	
 
 	// 2. Initialize MCP Server
 	server := mcp.NewServer(&mcp.Implementation{
@@ -108,7 +108,7 @@ func main() {
 		Description: "Capture a screenshot and return as base64 png",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args CaptureScreenArgs) (*mcp.CallToolResult, any, error) {
 		tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("capture_%d.png", time.Now().UnixNano()))
-		defer os.Remove(tmpFile)
+		
 
 		// Build screencapture command
 		// -x: muted (no sound)
@@ -194,7 +194,7 @@ func main() {
 
 	// Goroutine to frame output
 	go func() {
-		defer realStdout.Close()
+		
 		dec := json.NewDecoder(r)
 		for {
 			var v json.RawMessage

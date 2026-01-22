@@ -224,7 +224,7 @@ func isSystemUIWindow(w WindowInfo) bool {
 
 func outputTable(windows []WindowInfo) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	
 
 	fmt.Fprintln(w, "WINDOW_ID\tDISP\tPID\tOWNER\tWxH")
 	for _, win := range windows {
@@ -263,7 +263,7 @@ func outputGrouped(windows []WindowInfo) {
 
 	// Output grouped by application
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	
 
 	for _, appName := range appNames {
 		wins := appWindows[appName]

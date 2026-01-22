@@ -70,10 +70,10 @@ func main() {
 	cfg := macgo.NewConfig().WithAppName("AppToWeb")
 	cfg.BundleID = "com.tmc.macgo.examples.apptoweb"
 
-	if err := macgo.Start(cfg); err != nil {
+	if err := macgo.Start(cfg) {
 		log.Fatal(err)
 	}
-	defer macgo.Cleanup()
+	
 
 	// Initialize NSApplication to ensure WindowServer connection
 	// Use appkit bindings for type safety
@@ -141,7 +141,7 @@ func main() {
 		addr := fmt.Sprintf(":%d", *port)
 		fmt.Printf("Serving at http://localhost%s\n", addr)
 
-		if err := http.ListenAndServe(addr, nil); err != nil {
+		if err := http.ListenAndServe(addr, nil) {
 			log.Fatal(err)
 		}
 	})
@@ -179,14 +179,14 @@ func startWindowFrameUpdater() {
 
 func getWindowList() ([]Window, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	
 
 	var result []Window
 	var resultErr error
 	done := make(chan struct{})
 
 	handler := func(content screencapturekit.ShareableContent, err error) {
-		defer close(done)
+		
 		if err != nil {
 			resultErr = err
 			return
@@ -245,7 +245,7 @@ var (
 
 func broadcastAX(tree *AXNode) {
 	listenersMu.Lock()
-	defer listenersMu.Unlock()
+	
 	for ch := range listeners {
 		select {
 		case ch <- tree:
@@ -300,7 +300,7 @@ func serveAccessibilitySSE_Real(w http.ResponseWriter, r *http.Request) {
 	listeners[ch] = struct{}{}
 	listenersMu.Unlock()
 
-	defer func() {
+	
 		listenersMu.Lock()
 		delete(listeners, ch)
 		listenersMu.Unlock()
@@ -362,7 +362,7 @@ func serveStream(w http.ResponseWriter, r *http.Request) {
 
 func captureWindowImage(scWindow screencapturekit.Window) ([]byte, int, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	
 
 	var imgKilled bool
 	var imgData []byte
@@ -472,7 +472,7 @@ func handleClick(w http.ResponseWriter, r *http.Request) {
 		Height int `json:"height"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&payload) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -530,7 +530,7 @@ func handleClick(w http.ResponseWriter, r *http.Request) {
 	)
 
 	mouseDown := coregraphics.CGEventCreateMouseEvent(0, coregraphics.EventType(kCGEventLeftMouseDown), point, coregraphics.MouseButton(kCGMouseButtonLeft))
-	defer cfRelease(uintptr(mouseDown))
+	
 
 	// Fallback to standard Session Event Tap for reliability.
 	// PID posting requires perfect ABI and Perms.
@@ -544,7 +544,7 @@ func handleClick(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(10 * time.Millisecond)
 
 	mouseUp := coregraphics.CGEventCreateMouseEvent(0, coregraphics.EventType(kCGEventLeftMouseUp), point, coregraphics.MouseButton(kCGMouseButtonLeft))
-	defer cfRelease(uintptr(mouseUp))
+	
 
 	if *verbose {
 		fmt.Println("Posting MouseUp")
@@ -553,7 +553,7 @@ func handleClick(w http.ResponseWriter, r *http.Request) {
 
 	// Restore previous location
 	mouseRestore := coregraphics.CGEventCreateMouseEvent(0, coregraphics.EventType(kCGEventMouseMoved), currentLoc, 0)
-	defer cfRelease(uintptr(mouseRestore))
+	
 
 	if *verbose {
 		fmt.Printf("Restoring mouse to %.0f,%.0f\n", currentLoc.X, currentLoc.Y)
@@ -630,22 +630,22 @@ func serveElementImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("failed to slice: rect=%+v on img %dx%d", rect, imgW, imgH), 500)
 		return
 	}
-	defer cfRelease(uintptr(subImg))
+	
 
 	// Convert to JPEG
 	data := corefoundation.CFDataCreateMutable(0, 0)
-	defer cfRelease(uintptr(data))
+	
 
 	jpegBytePtr, _ := syscall.BytePtrFromString("public.jpeg")
 	jpegTypeCF := corefoundation.CFStringCreateWithCString(0, unsafe.Pointer(jpegBytePtr), 0x08000100)
-	defer cfRelease(uintptr(jpegTypeCF))
+	
 
 	dest := imageio.CGImageDestinationCreateWithData(uintptr(data), uintptr(jpegTypeCF), 1, 0)
 	if dest == 0 {
 		http.Error(w, "failed to create dest", 500)
 		return
 	}
-	defer cfRelease(uintptr(dest))
+	
 
 	imageio.CGImageDestinationAddImage(dest, imageio.ImageRef(subImg), 0)
 	if imageio.CGImageDestinationFinalize(dest) {

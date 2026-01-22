@@ -202,31 +202,6 @@ func TestHelperFunctions(t *testing.T) {
 	}
 }
 
-// Test auto packages functionality
-func TestAutoPackages(t *testing.T) {
-	_ = os.Setenv("MACGO_NO_RELAUNCH", "1")
-	defer func() { _ = os.Unsetenv("MACGO_NO_RELAUNCH") }()
-
-	// These would normally be imported as:
-	// import _ "github.com/tmc/macgo/auto/camera"
-	// import _ "github.com/tmc/macgo/auto/files"
-	// But we'll test the functionality directly
-
-	t.Run("camera_auto", func(t *testing.T) {
-		err := macgo.Request(macgo.Camera)
-		if err != nil {
-			t.Logf("Camera request: %v", err) // This is expected in test environment
-		}
-	})
-
-	t.Run("files_auto", func(t *testing.T) {
-		err := macgo.Request(macgo.Files)
-		if err != nil {
-			t.Logf("Files request: %v", err) // This is expected in test environment
-		}
-	})
-}
-
 // Test error handling
 func TestErrorHandling(t *testing.T) {
 	// Disable relaunch to prevent os.Exit() during test

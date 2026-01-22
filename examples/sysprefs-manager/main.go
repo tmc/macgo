@@ -45,10 +45,8 @@ func main() {
 		FromEnv()
 
 	if err := macgo.Start(cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "macgo start failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer macgo.Cleanup()
 
 	// Initialize OSA bridge with embedded scripts
 	osa.SetScriptsFS(embeddedScripts)

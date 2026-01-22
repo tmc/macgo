@@ -617,7 +617,8 @@ func TestE2E_ConcurrentStarts(t *testing.T) {
 				Permissions: []macgo.Permission{macgo.Camera},
 				Debug:       false, // Disable debug to reduce output noise
 			}
-			done <- macgo.Start(cfg)
+			err := macgo.Start(cfg)
+			done <- err
 		}(i)
 	}
 
@@ -798,7 +799,7 @@ import (
 )
 
 func main() {
-	if err := macgo.Request(macgo.Camera); err != nil {
+	if _, err := macgo.Request(macgo.Camera); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}

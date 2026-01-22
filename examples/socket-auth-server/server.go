@@ -49,7 +49,7 @@ func NewServer() *Server {
 // serve handles a single connection.
 // It reads the cookie from the first line, validates it, then serves RPC.
 func (s *Server) serve(conn net.Conn) {
-	defer conn.Close()
+	
 
 	// Read cookie line: "COOKIE <cookie>"
 	br := bufio.NewReader(conn)

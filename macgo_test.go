@@ -116,10 +116,6 @@ func TestStartOnNonDarwin(t *testing.T) {
 		t.Errorf("Request should be no-op on non-darwin, got error: %v", err)
 	}
 
-	err = Auto()
-	if err != nil {
-		t.Errorf("Auto should be no-op on non-darwin, got error: %v", err)
-	}
 }
 
 func TestPermissionConstants(t *testing.T) {

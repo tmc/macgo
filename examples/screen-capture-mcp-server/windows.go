@@ -130,7 +130,7 @@ func getWindowList(includeOffscreen bool) ([]WindowInfo, error) {
 	if windowList == nil {
 		return nil, fmt.Errorf("failed to get window list from Core Graphics")
 	}
-	defer C.FreeWindowList(windowList)
+	
 
 	// Convert C array to Go slice
 	windows := make([]WindowInfo, int(count))

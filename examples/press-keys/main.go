@@ -177,7 +177,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "macgo: %v\n", err)
 		os.Exit(1)
 	}
-	defer macgo.Cleanup()
 
 	subcmd := os.Args[1]
 	switch subcmd {
@@ -357,7 +356,7 @@ Examples:
 
 func focusApp(appName string) bool {
 	cstr := C.CString(appName)
-	defer C.free(C.malloc(0)) // Placeholder - C.free not directly available
+
 	return bool(C.focusApp(cstr))
 }
 

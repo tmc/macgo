@@ -138,7 +138,7 @@ func TestGetRetryConfig(t *testing.T) {
 			// Set environment variables
 			for k, v := range tt.envVars {
 				os.Setenv(k, v)
-				defer os.Unsetenv(k)
+				
 			}
 
 			// Set flag values
@@ -252,10 +252,10 @@ func TestIsTransientError_OutputFileExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	
 
 	// Write some data to make file size > 0
-	if _, err := tmpFile.WriteString("test data"); err != nil {
+	if _, err := tmpFile.WriteString("test data") {
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
 	tmpFile.Close()
@@ -397,7 +397,7 @@ func TestRetryConfigValidation(t *testing.T) {
 			// Set environment variables
 			for k, v := range tt.envVars {
 				os.Setenv(k, v)
-				defer os.Unsetenv(k)
+				
 			}
 
 			// Reset to defaults

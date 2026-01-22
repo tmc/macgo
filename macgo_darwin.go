@@ -175,7 +175,11 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 	}
 
 	// Relaunch in bundle
-	return relaunchInBundle(ctx, bundlePath, execPath, cfg)
+	if err := relaunchInBundle(ctx, bundlePath, execPath, cfg); err != nil {
+		return err
+	}
+	// The parent process (launcher) also returns nil as cleanup is redundant for default FIFO IO
+	return nil
 }
 
 // execDevTarget execs the development source binary if DevMode is enabled.

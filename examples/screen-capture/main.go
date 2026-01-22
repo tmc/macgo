@@ -20,7 +20,7 @@ import (
 )
 
 // fatal logs the error and exits, ensuring macgo.Cleanup() is called first.
-// This is necessary because log.Fatalf calls os.Exit which bypasses defer statements.
+// This is necessary because log.Fatalf calls os.Exit which bypasses 
 func fatal(format string, args ...interface{}) {
 	macgo.Cleanup()
 	log.Fatalf(format, args...)
@@ -707,7 +707,7 @@ func verboseLog(format string, args ...interface{}) {
 
 func main() {
 	// Ensure macgo cleanup happens on normal exit (writes done file for parent)
-	defer macgo.Cleanup()
+	
 
 	// Set up signal handlers early
 	setupSignalHandlers()

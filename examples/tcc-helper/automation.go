@@ -419,13 +419,13 @@ func CheckAccessibilityPermission() (bool, error) {
 	if err != nil {
 		// Check for Accessibility permission error (-25211) - this is what we expect if permission is missing
 		if strings.Contains(outputStr, "not allowed assistive access") ||
-		   strings.Contains(outputStr, "-25211") {
+			strings.Contains(outputStr, "-25211") {
 			return false, fmt.Errorf("osascript is not allowed assistive access (-25211)\n\nThe Accessibility permission is required for UI automation. To fix:\n1. Open System Settings > Privacy & Security > Accessibility\n2. Ensure tcc-helper or your terminal is in the list and checked\n3. You may need to remove and re-add the app")
 		}
 
 		// Check for Automation permission error (-1743)
 		if strings.Contains(outputStr, "Not authorized to send Apple events") ||
-		   strings.Contains(outputStr, "-1743") {
+			strings.Contains(outputStr, "-1743") {
 			return false, fmt.Errorf("Not authorized to send Apple events to System Events (-1743)\n\nThe Automation permission is required. To fix:\n1. Open System Settings > Privacy & Security > Automation\n2. Find iTerm (or your terminal) in the list\n3. Check the box next to 'System Events'")
 		}
 
