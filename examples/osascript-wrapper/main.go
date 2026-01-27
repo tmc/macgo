@@ -13,13 +13,8 @@ import (
 	"github.com/tmc/macgo"
 )
 
-func init() {
-	// Enable ServicesLauncherV2 by default (uses config file for I/O forwarding with polling)
-	// V2 enables I/O forwarding by default (can be disabled with MACGO_DISABLE_IO_FORWARDING=1)
-	if os.Getenv("MACGO_SERVICES_VERSION") == "" {
-		os.Setenv("MACGO_SERVICES_VERSION", "2")
-	}
-}
+// No init() needed - V1 with FIFOs is the default and works correctly.
+// FIFOs give clean EOF semantics when the child exits.
 
 var (
 	script     = flag.String("script", "", "name of the script to run")
@@ -36,6 +31,9 @@ var (
 )
 
 func main() {
+	// Ensure macgo cleanup happens on normal exit (writes done file for parent)
+	defer macgo.Cleanup()
+
 	flag.Parse()
 
 	if *help {

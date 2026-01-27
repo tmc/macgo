@@ -1,167 +1,117 @@
-// io-tree-test tests that a tree of macgo programs works correctly with stdin/stdout/stderr.
-// It verifies that I/O flows properly through multiple levels of macgo-wrapped programs.
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/tmc/macgo"
 )
 
-var (
-	depth      = flag.Int("depth", 0, "Current depth in the tree (0 = root)")
-	maxDepth   = flag.Int("max-depth", 2, "Maximum depth of the tree")
-	echoStdin  = flag.Bool("echo-stdin", false, "Echo stdin to stdout")
-	childCount = flag.Int("children", 1, "Number of children to spawn at each level")
-	timeout    = flag.Duration("timeout", 30*time.Second, "Timeout for the entire tree")
-)
+func main() {
+	// Force new instance to avoid attaching to zombies or existing instances during testing
+	os.Setenv("MACGO_OPEN_NEW_INSTANCE", "1")
 
-func init() {
-	// Skip macgo if MACGO_NOBUNDLE is set (for testing without bundle)
-	if os.Getenv("MACGO_NOBUNDLE") == "1" {
-		return
-	}
-
-	cfg := macgo.NewConfig().
-		WithAppName(fmt.Sprintf("IO Tree Test (depth %s)", os.Getenv("IO_TREE_DEPTH")))
-	cfg.BundleID = "com.example.io-tree-test"
-	cfg.Version = "1.0.0"
-
-	if err := macgo.Start(cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "[depth=%s] Failed to start macgo: %v\n", os.Getenv("IO_TREE_DEPTH"), err)
+	// Initialize macgo (this causes the bundle relaunch dance)
+	err := macgo.Start(&macgo.Config{
+		AppName: "io-tree-test",
+		Debug:   os.Getenv("DEBUG_TREE") == "1",
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "macgo start error: %v\n", err)
 		os.Exit(1)
 	}
-}
+	defer macgo.Cleanup()
 
-func main() {
+	var (
+		depth    = flag.Int("depth", 0, "Current recursion depth")
+		maxDepth = flag.Int("max-depth", 1, "Max recursion depth")
+		sleep    = flag.Duration("sleep", 0, "Sleep duration before exit")
+	)
 	flag.Parse()
 
-	// Set depth from environment if not set via flag
-	if envDepth := os.Getenv("IO_TREE_DEPTH"); envDepth != "" && *depth == 0 {
-		if d, err := strconv.Atoi(envDepth); err == nil {
-			*depth = d
-		}
-	}
+	prefix := fmt.Sprintf("[%d]", *depth)
+	log(prefix, "Started. PID: %d, UID: %d, Sleep: %v", os.Getpid(), os.Getuid(), *sleep)
 
-	prefix := fmt.Sprintf("[depth=%d pid=%d]", *depth, os.Getpid())
-
-	fmt.Fprintf(os.Stderr, "%s Starting\n", prefix)
-	fmt.Printf("%s STDOUT: Hello from depth %d\n", prefix, *depth)
-
-	// If we should echo stdin, do that
-	if *echoStdin {
-		fmt.Fprintf(os.Stderr, "%s Echoing stdin...\n", prefix)
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Printf("%s ECHO: %s\n", prefix, line)
-		}
-		if err := scanner.Err(); err != nil && err != io.EOF {
-			fmt.Fprintf(os.Stderr, "%s Error reading stdin: %v\n", prefix, err)
-		}
-		fmt.Fprintf(os.Stderr, "%s Done echoing stdin\n", prefix)
-		return
-	}
-
-	// If we haven't reached max depth, spawn children
-	if *depth < *maxDepth {
-		fmt.Fprintf(os.Stderr, "%s Spawning %d child(ren)...\n", prefix, *childCount)
-
-		for i := 0; i < *childCount; i++ {
-			childPrefix := fmt.Sprintf("%s child-%d:", prefix, i)
-
-			// Get our own executable path
-			execPath, err := os.Executable()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s Failed to get executable: %v\n", childPrefix, err)
-				continue
-			}
-
-			// Build child command with incremented depth
-			childDepth := *depth + 1
-			args := []string{
-				fmt.Sprintf("-depth=%d", childDepth),
-				fmt.Sprintf("-max-depth=%d", *maxDepth),
-				fmt.Sprintf("-children=%d", *childCount),
-			}
-
-			cmd := exec.Command(execPath, args...)
-			cmd.Env = append(os.Environ(), fmt.Sprintf("IO_TREE_DEPTH=%d", childDepth))
-
-			// Set up pipes
-			stdout, err := cmd.StdoutPipe()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s Failed to create stdout pipe: %v\n", childPrefix, err)
-				continue
-			}
-			stderr, err := cmd.StderrPipe()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s Failed to create stderr pipe: %v\n", childPrefix, err)
-				continue
-			}
-
-			// Start the child
-			fmt.Fprintf(os.Stderr, "%s Starting child process...\n", childPrefix)
-			if err := cmd.Start(); err != nil {
-				fmt.Fprintf(os.Stderr, "%s Failed to start: %v\n", childPrefix, err)
-				continue
-			}
-
-			// Forward child output with prefix
-			go func(prefix string, r io.Reader, w io.Writer, name string) {
-				scanner := bufio.NewScanner(r)
-				for scanner.Scan() {
-					fmt.Fprintf(w, "%s %s: %s\n", prefix, name, scanner.Text())
-				}
-			}(childPrefix, stdout, os.Stdout, "stdout")
-
-			go func(prefix string, r io.Reader, w io.Writer, name string) {
-				scanner := bufio.NewScanner(r)
-				for scanner.Scan() {
-					fmt.Fprintf(w, "%s %s: %s\n", prefix, name, scanner.Text())
-				}
-			}(childPrefix, stderr, os.Stderr, "stderr")
-
-			// Wait for child with timeout
-			done := make(chan error, 1)
-			go func() {
-				done <- cmd.Wait()
-			}()
-
-			select {
-			case err := <-done:
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "%s Child exited with error: %v\n", childPrefix, err)
-				} else {
-					fmt.Fprintf(os.Stderr, "%s Child completed successfully\n", childPrefix)
-				}
-			case <-time.After(*timeout):
-				fmt.Fprintf(os.Stderr, "%s Child timed out, killing...\n", childPrefix)
-				cmd.Process.Kill()
-			}
-		}
+	// Read from Stdin
+	inputData, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		log(prefix, "Error reading stdin: %v", err)
 	} else {
-		fmt.Fprintf(os.Stderr, "%s Reached max depth, not spawning children\n", prefix)
+		log(prefix, "Read %d bytes from stdin: %q", len(inputData), string(inputData))
 	}
 
-	// Write some final output
-	fmt.Printf("%s STDOUT: Goodbye from depth %d\n", prefix, *depth)
-	fmt.Fprintf(os.Stderr, "%s Exiting\n", prefix)
+	output := string(inputData)
+
+	// Recurse if needed
+	if *depth < *maxDepth {
+		nextDepth := *depth + 1
+		log(prefix, "Spawning child with depth %d...", nextDepth)
+
+		// We want to call the wrapper binary (not the bundled one we might be running in)
+		// Assumption: 'io-tree-test' is in PATH or we can find it.
+		// For verification, we'll try to use the one in ~/go/bin/io-tree-test
+		cmdName := "io-tree-test"
+		if p, err := exec.LookPath("io-tree-test"); err == nil {
+			cmdName = p
+		} else {
+			// Fallback to expecting it in go bin
+			home, _ := os.UserHomeDir()
+			cmdName = fmt.Sprintf("%s/go/bin/io-tree-test", home)
+		}
+
+		cmd := exec.Command(cmdName,
+			"-depth", fmt.Sprintf("%d", nextDepth),
+			"-max-depth", fmt.Sprintf("%d", *maxDepth),
+			"-sleep", sleep.String(),
+		)
+
+		// Setup pipes
+		cmd.Stdin = bytes.NewReader([]byte(output))
+		var stdoutBuf, stderrBuf bytes.Buffer
+		cmd.Stdout = &stdoutBuf
+		cmd.Stderr = &stderrBuf
+
+		// Forward specific env to debug
+		cmd.Env = os.Environ()
+		// Essential: Force LaunchServices to create a new instance, otherwise open hangs
+		// waiting for Apple Events on the existing (but non-responsive to AEs) process.
+		cmd.Env = append(cmd.Env, "MACGO_OPEN_NEW_INSTANCE=1")
+
+		if os.Getenv("DEBUG_TREE") == "1" {
+			cmd.Env = append(cmd.Env, "MACGO_DEBUG=1")
+		}
+
+		if err := cmd.Run(); err != nil {
+			log(prefix, "Child run error: %v. Stderr: %s", err, stderrBuf.String())
+			os.Exit(1)
+		}
+
+		childOut := stdoutBuf.String()
+		log(prefix, "Child stdout: %q", childOut)
+		output = fmt.Sprintf("Parent[%d]( %s )", *depth, childOut)
+	} else {
+		// Leaf node
+		log(prefix, "Leaf node, processing data...")
+		output = fmt.Sprintf("Leaf[%d]( %s )", *depth, output)
+	}
+
+	if *sleep > 0 {
+		log(prefix, "Sleeping for %v...", *sleep)
+		time.Sleep(*sleep)
+	}
+
+	// Final Output
+	fmt.Print(output)
+	// We also verify stderr propagation by logging something to stderr
+	fmt.Fprintf(os.Stderr, "%s Done\n", prefix)
 }
 
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if strings.Contains(a, e) {
-			return true
-		}
-	}
-	return false
+func log(prefix, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Fprintf(os.Stderr, "%s %s\n", prefix, msg)
 }

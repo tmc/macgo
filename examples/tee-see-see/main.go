@@ -58,7 +58,6 @@ func init() {
 		CodeSigningIdentifier: "github.com.tmc.misc.tee-see-see." + appName, // Unique signing identifier per mode
 		Permissions:           []macgo.Permission{macgo.Files},
 		Custom: []string{
-			"com.apple.security.app-sandbox",
 			"com.apple.security.files.user-selected.read-write",
 			"com.apple.security.files.downloads.read-write",
 			"com.apple.security.files.bookmarks.app-scope",
@@ -68,10 +67,16 @@ func init() {
 		Debug:               os.Getenv("MACGO_DEBUG") == "1",
 		AdHocSign:           true, // Enable ad-hoc code signing
 	}
+	// Force direct execution if running as root to ensure environment propagation
+	if os.Geteuid() == 0 {
+		cfg.ForceDirectExecution = true
+	}
+	cfg.FromEnv()
 	macgo.Start(cfg)
 }
 
 func main() {
+	defer macgo.Cleanup()
 	// Define command-line flags
 	var (
 		useSystem  = flag.Bool("system", false, "Use system TCC database instead of user database")
@@ -91,6 +96,9 @@ func main() {
 		revoke   = flag.String("revoke", "", "Revoke access: -revoke 'service:client' (uses tee-see-see-writer.app)")
 		reset    = flag.String("reset", "", "Reset client permissions: -reset 'client' (uses tee-see-see-writer.app)")
 		writeSQL = flag.String("write", "", "Execute custom SQL: -write 'UPDATE ...' (uses tee-see-see-writer.app)")
+
+		// Reset FDA flag
+		resetFDA = flag.Bool("reset-fda", false, "Reset Full Disk Access for this app (requires restart)")
 	)
 
 	// Parse flags
@@ -119,6 +127,21 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  %s -write 'DELETE FROM access WHERE client=\"old.app\"'  # Custom SQL\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nNote: Write operations require separate FDA permission for tee-see-see-writer.app\n")
 		os.Exit(0)
+	}
+
+	if *resetFDA {
+		fmt.Println("Resetting Full Disk Access for tee-see-see...")
+		// Assuming default bundle ID based on macgo config
+		bundleID := "github.com.tmc.misc.tee-see-see.tee-see-see"
+		cmd := exec.Command("tccutil", "reset", "SystemPolicyAllFiles", bundleID)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("Error resetting permissions: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Permissions reset. You will need to re-grant Full Disk Access on next run.")
+		return
 	}
 
 	// Determine which database to use
@@ -177,8 +200,11 @@ func main() {
 					break
 				}
 				if time.Since(start) > *timeout {
-					fmt.Fprintf(os.Stderr, "Timeout\n")
+					fmt.Fprintf(os.Stderr, "Timeout waiting for access. Last error: %v\n", err)
 					os.Exit(1)
+				}
+				if time.Since(start).Seconds() > 5 && int(time.Since(start).Seconds())%5 == 0 {
+					fmt.Fprintf(os.Stderr, "Still waiting... (%v)\n", err)
 				}
 			}
 		} else {
