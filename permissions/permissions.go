@@ -11,32 +11,38 @@ type Permission string
 
 // Core permissions covering 95% of use cases.
 const (
-	Camera     Permission = "camera"     // Camera access (com.apple.security.device.camera)
-	Microphone Permission = "microphone" // Microphone access (com.apple.security.device.audio-input)
-	Location   Permission = "location"   // Location services (com.apple.security.personal-information.location)
-	Files      Permission = "files"      // File system access with user selection
-	Network    Permission = "network"    // Network client/server access
-	Sandbox    Permission = "sandbox"    // App sandbox with restricted file access
+	Camera          Permission = "camera"           // Camera access (com.apple.security.device.camera)
+	Microphone      Permission = "microphone"       // Microphone access (com.apple.security.device.audio-input)
+	Location        Permission = "location"         // Location services (com.apple.security.personal-information.location)
+	ScreenRecording Permission = "screen-recording" // Screen recording/capture (requires TCC approval)
+	Files           Permission = "files"            // File system access with user selection
+	Network         Permission = "network"          // Network client/server access
+	Sandbox         Permission = "sandbox"          // App sandbox with restricted file access
 )
 
 // EntitlementMapping maps permissions to their corresponding entitlements.
 // These entitlements are added to the app bundle's entitlements.plist file
 // to declare the app's permission requirements.
+//
+// Note: ScreenRecording has no public entitlement - it's purely TCC-controlled.
+// The app must be signed and trigger the TCC prompt at runtime.
 var EntitlementMapping = map[Permission][]string{
-	Camera:     {"com.apple.security.device.camera"},
-	Microphone: {"com.apple.security.device.microphone"},
-	Location:   {"com.apple.security.personal-information.location"},
-	Files:      {"com.apple.security.files.user-selected.read-only"},
-	Network:    {"com.apple.security.network.client"},
-	Sandbox:    {"com.apple.security.app-sandbox"},
+	Camera:          {"com.apple.security.device.camera"},
+	Microphone:      {"com.apple.security.device.microphone"},
+	Location:        {"com.apple.security.personal-information.location"},
+	ScreenRecording: {}, // No entitlement needed - TCC handles this at runtime
+	Files:           {"com.apple.security.files.user-selected.read-only"},
+	Network:         {"com.apple.security.network.client"},
+	Sandbox:         {"com.apple.security.app-sandbox"},
 }
 
 // TCCServiceMapping maps permissions to their TCC service names for tccutil.
 // These are used when resetting TCC permissions via command line tools.
 var TCCServiceMapping = map[Permission]string{
-	Camera:     "Camera",
-	Microphone: "Microphone",
-	Location:   "Location",
+	Camera:          "Camera",
+	Microphone:      "Microphone",
+	Location:        "Location",
+	ScreenRecording: "ScreenCapture",
 }
 
 // PermissionDependencies defines which permissions require other permissions.
@@ -150,7 +156,7 @@ func GetEntitlements(perms []Permission) []string {
 func RequiresTCC(perms []Permission) bool {
 	for _, perm := range perms {
 		switch perm {
-		case Camera, Microphone, Location, Files:
+		case Camera, Microphone, Location, ScreenRecording, Files:
 			return true
 		}
 	}
@@ -211,12 +217,13 @@ func AllPermissions() []Permission {
 // These descriptions explain what each permission grants access to.
 func PermissionDescription(perm Permission) string {
 	descriptions := map[Permission]string{
-		Camera:     "Access to camera for photo and video capture",
-		Microphone: "Access to microphone for audio recording",
-		Location:   "Access to device location services",
-		Files:      "Access to user-selected files and folders",
-		Network:    "Network access for client connections",
-		Sandbox:    "App sandbox with restricted file system access",
+		Camera:          "Access to camera for photo and video capture",
+		Microphone:      "Access to microphone for audio recording",
+		Location:        "Access to device location services",
+		ScreenRecording: "Access to screen recording and capture",
+		Files:           "Access to user-selected files and folders",
+		Network:         "Network access for client connections",
+		Sandbox:         "App sandbox with restricted file system access",
 	}
 	if desc, exists := descriptions[perm]; exists {
 		return desc

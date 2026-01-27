@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tmc/misc/macgo/bundle"
+	"github.com/tmc/macgo/bundle"
 )
 
 // ResolutionConfig holds configuration for resolving bundle IDs.

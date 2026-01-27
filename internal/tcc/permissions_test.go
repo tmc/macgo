@@ -193,6 +193,11 @@ func TestRequiresTCC(t *testing.T) {
 			want:        true,
 		},
 		{
+			name:        "screen recording permission",
+			permissions: []Permission{ScreenRecording},
+			want:        true,
+		},
+		{
 			name:        "mixed permissions",
 			permissions: []Permission{Network, Camera, Sandbox},
 			want:        true,
@@ -229,6 +234,11 @@ func TestGetTCCServices(t *testing.T) {
 			name:        "TCC permissions",
 			permissions: []Permission{Camera, Microphone, Location},
 			want:        []string{"Camera", "Microphone", "Location"},
+		},
+		{
+			name:        "screen recording permission",
+			permissions: []Permission{ScreenRecording},
+			want:        []string{"ScreenCapture"},
 		},
 		{
 			name:        "duplicate permissions",
