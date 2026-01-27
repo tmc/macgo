@@ -89,6 +89,8 @@ MACGO_BUNDLE_ID=com.example   # Bundle identifier
 MACGO_AD_HOC_SIGN=1          # Enable ad-hoc signing
 MACGO_AUTO_SIGN=1             # Auto-detect signing identity
 MACGO_DEBUG=1                 # Debug output
+MACGO_FORCE_DIRECT=1          # Force direct execution (bypass LaunchServices)
+MACGO_FORCE_LAUNCH_SERVICES=1 # Force use of LaunchServices
 ```
 
 ## Available Permissions
@@ -153,6 +155,8 @@ See the [`examples/`](examples/) directory for complete examples:
 - [`code-signing`](examples/code-signing/) - Signing examples
 - [`sandboxed-file-exec`](examples/sandboxed-file-exec/) - Sandboxed file access
 - [`press-keys`](examples/press-keys/) - Keyboard event simulation
+- [`tee-see-see`](examples/tee-see-see/) - TCC database debugger and viewer
+- [`lsregister-tool`](examples/lsregister-tool/) - Launch Services database tool
 
 ## Requirements
 
