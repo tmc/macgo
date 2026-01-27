@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tmc/misc/macgo/bundle"
+	"github.com/tmc/macgo/bundle"
 )
 
 func TestEnvironmentPrefixes(t *testing.T) {
