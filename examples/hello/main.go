@@ -8,28 +8,36 @@ import (
 	"os"
 	"time"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
-func main() {
-	fmt.Printf("Hello from macgo! PID: %d\n", os.Getpid())
-	fmt.Println()
+func init() {
+	// Configure and start macgo - this will re-execute the program in a bundle if needed
+	cfg := macgo.NewConfig().
+		WithAppName("Hello macgo").
+		WithPermissions(macgo.Camera, macgo.Microphone)
 
-	// Simple one-line setup for camera and microphone
-	err := macgo.Request(macgo.Camera, macgo.Microphone)
-	if err != nil {
-		log.Fatalf("Failed to request permissions: %v", err)
+	// Start will re-execute the program if needed, exiting the current process
+	if err := macgo.Start(cfg); err != nil {
+		log.Fatalf("Failed to start macgo: %v", err)
 	}
+}
+
+func main() {
+	// This code only runs after macgo.Start() has ensured we're in a proper bundle
+	fmt.Printf("Hello from macgo! PID: %d (stdout)\n", os.Getpid())
+	fmt.Fprintf(os.Stderr, "Hello from macgo! PID: %d (stderr)\n", os.Getpid())
+	fmt.Println()
 
 	fmt.Println("✓ Permissions granted!")
 	fmt.Println("✓ Running with camera and microphone access")
 	fmt.Println()
 
 	fmt.Println("Key features:")
-	fmt.Println("  • No init() function magic")
+	fmt.Println("  • Automatic bundle setup via init()")
 	fmt.Println("  • Clean, simple API")
-	fmt.Println("  • One line to request permissions")
-	fmt.Println("  • Explicit configuration")
+	fmt.Println("  • Transparent re-execution")
+	fmt.Println("  • Automatic permission handling")
 	fmt.Println()
 
 	// Simple countdown

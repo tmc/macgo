@@ -8,8 +8,8 @@ import (
 	"os"
 
 	// Import the signed package for automatic code signing
-	macgo "github.com/tmc/misc/macgo"
-	signed "github.com/tmc/misc/macgo/auto/signed"
+	macgo "github.com/tmc/macgo"
+	signed "github.com/tmc/macgo/auto/signed"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 	fmt.Println()
 
 	fmt.Println("📋 How this works:")
-	fmt.Println("  1. Import: import signed \"github.com/tmc/misc/macgo/auto/signed\"")
+	fmt.Println("  1. Import: import signed \"github.com/tmc/macgo/auto/signed\"")
 	fmt.Println("  2. Use:    signed.Request(macgo.Files) instead of macgo.Request(macgo.Files)")
 	fmt.Println("  3. Result: macgo automatically detects and uses Developer ID certificates")
 	fmt.Println()

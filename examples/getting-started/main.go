@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func main() {

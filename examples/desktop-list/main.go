@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	macgo "github.com/tmc/misc/macgo"
+	"github.com/tmc/macgo"
 )
 
 func init() {

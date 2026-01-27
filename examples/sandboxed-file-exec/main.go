@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	macgo "github.com/tmc/misc/macgo"
+	"github.com/tmc/macgo"
 )
 
 func main() {
@@ -113,7 +113,7 @@ func main() {
 
 	fmt.Println("\n3. Key Differences from v1:")
 	fmt.Println("--------------------------")
-	fmt.Println("• v1: Uses magic import '_ \"github.com/tmc/misc/macgo/auto/sandbox\"'")
+	fmt.Println("• v1: Uses magic import '_ \"github.com/tmc/macgo/auto/sandbox\"'")
 	fmt.Println("• v2: Explicit config with 'macgo.Files' permission")
 	fmt.Println()
 	fmt.Println("• v1: Global state modified at import time")
