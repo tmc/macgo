@@ -152,12 +152,23 @@ See the [`examples/`](examples/) directory for complete examples:
 - [`desktop-list`](examples/desktop-list/) - File access
 - [`code-signing`](examples/code-signing/) - Signing examples
 - [`sandboxed-file-exec`](examples/sandboxed-file-exec/) - Sandboxed file access
+- [`press-keys`](examples/press-keys/) - Keyboard event simulation
 
 ## Requirements
 
-- Go 1.21 or later
-- macOS 11.0 or later
+- Go 1.21 or later (1.24+ recommended)
+- macOS 11.0 (Big Sur) or later
 - Xcode Command Line Tools (for code signing)
+
+**Version Compatibility:**
+- macOS 15 (Sequoia): ✅ Fully supported and tested
+- macOS 14 (Sonoma): ✅ Fully supported and tested
+- macOS 13 (Ventura): ✅ Fully supported and tested
+- macOS 12 (Monterey): ⚠️ Limited support (manual testing)
+- macOS 11 (Big Sur): ⚠️ Limited support (manual testing)
+
+For detailed version-specific behaviors, quirks, and testing strategies, see:
+- [**macOS Version Compatibility Guide**](MACOS_VERSION_COMPATIBILITY.md) - Comprehensive version documentation
 
 ## License
 
