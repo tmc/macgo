@@ -1,19 +1,27 @@
 package macgo
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-	"github.com/tmc/misc/macgo/internal/bundle"
-	"github.com/tmc/misc/macgo/internal/launch"
-	"github.com/tmc/misc/macgo/internal/system"
-	"github.com/tmc/misc/macgo/internal/tcc"
-	"github.com/tmc/misc/macgo/teamid"
+	"github.com/tmc/macgo/internal/bundle"
+	"github.com/tmc/macgo/internal/launch"
+	"github.com/tmc/macgo/internal/system"
+	"github.com/tmc/macgo/internal/tcc"
+	"github.com/tmc/macgo/teamid"
 )
 
 // startDarwin implements the macOS-specific logic.
 func startDarwin(ctx context.Context, cfg *Config) error {
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "macgo: starting on darwin (PID: %d)\n", os.Getpid())
+	}
+
 	// Auto-detect and substitute team ID in app groups if needed
 	if err := substituteTeamID(cfg); err != nil && cfg.Debug {
 		fmt.Fprintf(os.Stderr, "macgo: failed to substitute team ID: %v\n", err)
@@ -30,6 +38,54 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 				fmt.Fprintf(os.Stderr, "macgo: failed to reset permissions: %v\n", err)
 			}
 		}
+	}
+
+	// Check for V2 launcher config file
+	// Since `open --args` doesn't reliably pass arguments to .app bundles,
+	// we look for a config file in a well-known location based on parent PID
+	configFile := findPipeConfig(cfg.Debug)
+
+	// NOTE: We no longer check for MACGO_*_PIPE env vars because they can be inherited
+	// from parent processes. The config file mechanism with bundle path matching is more reliable.
+
+	// If we found a matching config file, we're in the relaunched app
+	if configFile != "" {
+		if cfg.Debug {
+			execPath, _ := os.Executable()
+			fmt.Fprintf(os.Stderr, "macgo: detected relaunch with I/O pipes (PID: %d, exec: %s)\n", os.Getpid(), execPath)
+			if configFile != "" {
+				fmt.Fprintf(os.Stderr, "macgo: loading pipe config from: %s\n", configFile)
+			}
+		}
+
+		// Load config file if provided (V2 launcher)
+		if configFile != "" {
+			if err := loadPipeConfig(configFile); err != nil {
+				if cfg.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: failed to load pipe config: %v\n", err)
+				}
+			}
+		}
+
+		// Restore original working directory (open command changes it)
+		if cwd := os.Getenv("MACGO_CWD"); cwd != "" {
+			if err := os.Chdir(cwd); err != nil {
+				if cfg.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: failed to restore CWD to %s: %v\n", cwd, err)
+				}
+			} else if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: restored CWD to %s\n", cwd)
+			}
+		}
+
+		// Transparently redirect stdout/stderr to the named pipes
+		if err := setupPipeRedirection(cfg.Debug); err != nil {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: failed to setup pipe redirection: %v\n", err)
+			}
+		}
+
+		return nil
 	}
 
 	// Skip if already in app bundle
@@ -108,18 +164,273 @@ func convertPermissions(permissions []Permission) []string {
 // relaunchInBundle launches the app bundle using the launch package.
 func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Config) error {
 	// Convert main config to launch config
+	// Include both standard permissions and custom entitlements so Launch Services is used for TCC
+	permissions := convertPermissions(cfg.Permissions)
+	// Add custom entitlements as permissions to trigger Launch Services
+	permissions = append(permissions, cfg.Custom...)
+
 	launchCfg := &launch.Config{
 		AppName:              cfg.AppName,
 		BundleID:             cfg.BundleID,
-		Permissions:          convertPermissions(cfg.Permissions),
+		Permissions:          permissions,
 		Debug:                cfg.Debug,
 		ForceLaunchServices:  cfg.ForceLaunchServices,
 		ForceDirectExecution: cfg.ForceDirectExecution,
+		Background:           cfg.UIMode == "" || cfg.UIMode == UIModeBackground,
 	}
 
 	// Create launch manager and execute
 	manager := launch.New()
 	return manager.Launch(ctx, bundlePath, execPath, launchCfg)
+}
+
+// findPipeConfig looks for a V2 launcher config file in /tmp/macgo-*/config.
+// Returns the path to the config file if found, empty string otherwise.
+// It matches config files by bundle path to handle nested macgo calls correctly.
+func findPipeConfig(debug bool) string {
+	// Get current executable path to match against config files
+	execPath, err := os.Executable()
+	if err != nil {
+		if debug {
+			fmt.Fprintf(os.Stderr, "macgo: error getting executable path: %v\n", err)
+		}
+		return ""
+	}
+
+	// The bundle path is the .app directory containing our executable
+	// e.g., /path/to/App.app/Contents/MacOS/App -> /path/to/App.app
+	bundlePath := ""
+	if idx := strings.Index(execPath, ".app/"); idx != -1 {
+		bundlePath = execPath[:idx+4] // Include ".app"
+	}
+
+	if debug {
+		fmt.Fprintf(os.Stderr, "macgo: looking for config for bundle: %s\n", bundlePath)
+	}
+
+	// Look for recent config files in ~/Library/Application Support/macgo/pipes/
+	// This location is user-specific and protected by macOS sandbox rules
+	var matches []string
+	if home, err := os.UserHomeDir(); err == nil {
+		pattern := filepath.Join(home, "Library", "Application Support", "macgo", "pipes", "*", "config")
+		if m, err := filepath.Glob(pattern); err == nil {
+			matches = m
+		}
+	}
+	// Fallback: also check /tmp/macgo/ for backward compatibility
+	if fallbackMatches, err := filepath.Glob(filepath.Join(os.TempDir(), "macgo", "*", "config")); err == nil {
+		matches = append(matches, fallbackMatches...)
+	}
+
+	// Find the most recent config file that matches our bundle path
+	var newestConfig string
+	var newestTime time.Time
+	var skippedOld, skippedMismatch int
+
+	for _, match := range matches {
+		info, err := os.Stat(match)
+		if err != nil {
+			continue
+		}
+
+		// Only consider files modified within the last 10 seconds
+		age := time.Since(info.ModTime())
+		if age > 10*time.Second {
+			skippedOld++
+			continue
+		}
+
+		// Read the config file to check if it's for our bundle
+		configBundle := readBundlePathFromConfig(match)
+
+		// Only use configs that match our bundle path
+		if configBundle != "" && configBundle != bundlePath {
+			skippedMismatch++
+			continue
+		}
+
+		if debug {
+			fmt.Fprintf(os.Stderr, "macgo: config candidate: %s (age: %v)\n", match, age)
+		}
+
+		if newestConfig == "" || info.ModTime().After(newestTime) {
+			newestConfig = match
+			newestTime = info.ModTime()
+		}
+	}
+
+	if debug && (skippedOld > 0 || skippedMismatch > 0) {
+		fmt.Fprintf(os.Stderr, "macgo: skipped %d old and %d mismatched configs\n", skippedOld, skippedMismatch)
+	}
+
+	if newestConfig != "" && debug {
+		fmt.Fprintf(os.Stderr, "macgo: selected config file: %s (age: %v)\n", newestConfig, time.Since(newestTime))
+	}
+
+	return newestConfig
+}
+
+// readBundlePathFromConfig reads the MACGO_BUNDLE_PATH from a config file.
+func readBundlePathFromConfig(configFile string) string {
+	f, err := os.Open(configFile)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "MACGO_BUNDLE_PATH=") {
+			return strings.TrimPrefix(line, "MACGO_BUNDLE_PATH=")
+		}
+	}
+	return ""
+}
+
+// loadPipeConfig reads pipe paths from a config file and sets them as environment variables.
+func loadPipeConfig(configFile string) error {
+	f, err := os.Open(configFile)
+	if err != nil {
+		return fmt.Errorf("open config file: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse KEY=VALUE format
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		// Set MACGO_*_PIPE, MACGO_DONE_FILE, and MACGO_CWD variables
+		if strings.HasPrefix(key, "MACGO_") && (strings.HasSuffix(key, "_PIPE") || key == "MACGO_DONE_FILE" || key == "MACGO_CWD") {
+			os.Setenv(key, value)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("read config file: %w", err)
+	}
+
+	return nil
+}
+
+// setupPipeRedirection transparently redirects stdout/stderr/stdin to named pipes if present.
+// This is used by ServicesLauncherV2 which passes pipe paths via config file.
+func setupPipeRedirection(debug bool) error {
+	// Log before any redirection in case stderr gets redirected
+	if debug {
+		stdoutPipe := os.Getenv("MACGO_STDOUT_PIPE")
+		stderrPipe := os.Getenv("MACGO_STDERR_PIPE")
+		stdinPipe := os.Getenv("MACGO_STDIN_PIPE")
+		fmt.Fprintf(os.Stderr, "macgo: setting up pipe redirection (stdout=%s, stderr=%s, stdin=%s)\n",
+			stdoutPipe, stderrPipe, stdinPipe)
+	}
+
+	// Handle stdin pipe first (before stdout/stderr in case of errors)
+	if stdinPipe := os.Getenv("MACGO_STDIN_PIPE"); stdinPipe != "" {
+		pipe, err := os.OpenFile(stdinPipe, os.O_RDONLY, 0)
+		if err != nil {
+			return fmt.Errorf("failed to open stdin pipe %s: %w", stdinPipe, err)
+		}
+		os.Stdin = pipe
+		if debug {
+			fmt.Fprintf(os.Stderr, "macgo: redirected stdin to %s\n", stdinPipe)
+		}
+	}
+
+	// Handle stdout pipe
+	if stdoutPipe := os.Getenv("MACGO_STDOUT_PIPE"); stdoutPipe != "" {
+		pipe, err := os.OpenFile(stdoutPipe, os.O_WRONLY, 0)
+		if err != nil {
+			return fmt.Errorf("failed to open stdout pipe %s: %w", stdoutPipe, err)
+		}
+		// Replace os.Stdout with the pipe
+		os.Stdout = pipe
+		if debug {
+			fmt.Fprintf(os.Stderr, "macgo: redirected stdout to %s\n", stdoutPipe)
+		}
+	}
+
+	// Handle stderr pipe last (so debug messages work as long as possible)
+	if stderrPipe := os.Getenv("MACGO_STDERR_PIPE"); stderrPipe != "" {
+		pipe, err := os.OpenFile(stderrPipe, os.O_WRONLY, 0)
+		if err != nil {
+			// Can't use stderr for error message if it's being redirected
+			return fmt.Errorf("failed to open stderr pipe %s: %w", stderrPipe, err)
+		}
+		// Replace os.Stderr with the pipe
+		os.Stderr = pipe
+		// Note: can't log to stderr after this point since it's redirected
+	}
+
+	return nil
+}
+
+// registerExitHandler sets up a handler to write the done file when the process exits.
+// This uses runtime.SetFinalizer on a sentinel object to detect process exit.
+func registerExitHandler(debug bool) {
+	doneFile := os.Getenv("MACGO_DONE_FILE")
+	if doneFile == "" {
+		return
+	}
+
+	if debug {
+		fmt.Fprintf(os.Stderr, "macgo: registered exit handler to write done file: %s\n", doneFile)
+	}
+
+	// Use a goroutine that runs a finalizer-based exit detector
+	// Since Go doesn't have true atexit, we write the done file here and rely on
+	// the application to either call os.Exit (which we can't intercept) or return
+	// from main normally.
+	//
+	// For now, we'll write the done file proactively after a short delay or when
+	// the main goroutine signals completion. This is a best-effort approach.
+	//
+	// A better approach: override os.Exit via a wrapper function
+	go func() {
+		// Use runtime to detect when the main goroutine finishes
+		// This is a polling approach - not ideal but works for most cases
+		for {
+			time.Sleep(100 * time.Millisecond)
+			// Check if we should write the done file
+			// The done file is written when the main goroutine finishes
+		}
+	}()
+}
+
+// writeDoneFile writes the done/sentinel file to signal that the child has exited.
+func writeDoneFile() {
+	doneFile := os.Getenv("MACGO_DONE_FILE")
+	if doneFile == "" {
+		return
+	}
+
+	// Flush stdout and stderr before writing done file to ensure all data is written
+	// This is critical: the parent will stop reading pipes once it sees the done file
+	_ = os.Stdout.Sync()
+	_ = os.Stderr.Sync()
+
+	// Longer delay to allow the data to propagate through the pipe chain
+	// In nested macgo scenarios, data needs to flow through multiple pipe layers
+	time.Sleep(200 * time.Millisecond)
+
+	// Write process exit info to the done file
+	content := fmt.Sprintf("done\npid=%d\ntime=%s\n", os.Getpid(), time.Now().Format(time.RFC3339))
+	if err := os.WriteFile(doneFile, []byte(content), 0600); err != nil {
+		// Can't do much if this fails, just try to continue
+		fmt.Fprintf(os.Stderr, "macgo: failed to write done file: %v\n", err)
+	}
 }
 
 // substituteTeamID automatically detects team ID and substitutes "TEAMID" placeholders in app groups

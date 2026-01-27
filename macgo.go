@@ -31,11 +31,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
-	"github.com/tmc/misc/macgo/internal/system"
-	"github.com/tmc/misc/macgo/internal/tcc"
+	"github.com/tmc/macgo/internal/system"
+	"github.com/tmc/macgo/internal/tcc"
 )
 
 // Permission represents a macOS system permission that can be requested.
@@ -44,12 +45,13 @@ type Permission string
 
 // Core permissions covering 95% of use cases.
 const (
-	Camera     Permission = "camera"     // Camera access (com.apple.security.device.camera)
-	Microphone Permission = "microphone" // Microphone access (com.apple.security.device.audio-input)
-	Location   Permission = "location"   // Location services (com.apple.security.personal-information.location)
-	Files      Permission = "files"      // File system access with user selection
-	Network    Permission = "network"    // Network client/server access
-	Sandbox    Permission = "sandbox"    // App sandbox with restricted file access
+	Camera          Permission = "camera"           // Camera access (com.apple.security.device.camera)
+	Microphone      Permission = "microphone"       // Microphone access (com.apple.security.device.audio-input)
+	Location        Permission = "location"         // Location services (com.apple.security.personal-information.location)
+	ScreenRecording Permission = "screen-recording" // Screen recording/capture (requires TCC approval)
+	Files           Permission = "files"            // File system access with user selection
+	Network         Permission = "network"          // Network client/server access
+	Sandbox         Permission = "sandbox"          // App sandbox with restricted file access
 )
 
 // NewConfig creates a new Config with sensible defaults.
@@ -110,11 +112,11 @@ type Config struct {
 	// ForceDirectExecution forces direct execution instead of LaunchServices.
 	// This preserves terminal I/O (stdin/stdout/stderr) but may not trigger
 	// proper TCC dialogs. Use this for CLI commands that need terminal output.
+	// Note: LaunchServices is used by default to ensure TCC compatibility.
 	ForceDirectExecution bool
 
-	// ForceLaunchServices forces use of LaunchServices (open command).
-	// This ensures proper TCC dialogs but breaks terminal I/O.
-	// Use this for commands that need GUI interaction or browser automation.
+	// ForceLaunchServices is deprecated and currently a no-op as LaunchServices
+	// is the default strategy. Use ForceDirectExecution=true to opt out.
 	ForceLaunchServices bool
 }
 
@@ -135,11 +137,13 @@ type Config struct {
 //	MACGO_CAMERA=1          - Request camera permission
 //	MACGO_MICROPHONE=1      - Request microphone permission
 //	MACGO_LOCATION=1        - Request location permission
+//	MACGO_SCREEN_RECORDING=1 - Request screen recording permission
 //	MACGO_FILES=1           - Request file access permission
 //	MACGO_NETWORK=1         - Request network permission
 //	MACGO_SANDBOX=1         - Enable app sandbox
 //	MACGO_FORCE_LAUNCH_SERVICES=1 - Force use of LaunchServices
 //	MACGO_FORCE_DIRECT=1    - Force direct execution
+//	MACGO_OPEN_NEW_INSTANCE=0 - Disable -n flag (new instance) for open command (enabled by default)
 func (c *Config) FromEnv() *Config {
 	if name := os.Getenv("MACGO_APP_NAME"); name != "" {
 		c.AppName = name
@@ -179,6 +183,9 @@ func (c *Config) FromEnv() *Config {
 	}
 	if os.Getenv("MACGO_LOCATION") == "1" {
 		c.Permissions = append(c.Permissions, Location)
+	}
+	if os.Getenv("MACGO_SCREEN_RECORDING") == "1" {
+		c.Permissions = append(c.Permissions, ScreenRecording)
 	}
 	if os.Getenv("MACGO_FILES") == "1" {
 		c.Permissions = append(c.Permissions, Files)
@@ -313,8 +320,6 @@ func Start(cfg *Config) error {
 	return startDarwin(context.Background(), cfg)
 }
 
-// StartContext is like Start but accepts a context for cancellation.
-// The context can be used to cancel the bundle creation and launch process.
 func StartContext(ctx context.Context, cfg *Config) error {
 	if runtime.GOOS != "darwin" {
 		if cfg != nil && cfg.Debug {
@@ -329,12 +334,27 @@ func StartContext(ctx context.Context, cfg *Config) error {
 
 	return startDarwin(ctx, cfg)
 }
+func StartDefault() error {
+	cfg := NewConfig().FromEnv()
+	if cfg.AppName == "" {
+		cfg.AppName = filepath.Base(os.Args[0])
+	}
+	if cfg.BundleID == "" {
+		// Simple bundle ID based on app name
+		cfg.BundleID = "com.example." + strings.ReplaceAll(strings.ToLower(cfg.AppName), " ", "-")
+	}
+	return Start(cfg)
+}
 
 // Request is a convenience function for requesting specific permissions.
 // Creates a minimal config and starts macgo immediately.
-// Equivalent to Start(&Config{Permissions: perms}).
+// Respects MACGO_DEBUG environment variable for debug output.
 func Request(perms ...Permission) error {
-	return Start(&Config{Permissions: perms})
+	cfg := &Config{
+		Permissions: perms,
+		Debug:       os.Getenv("MACGO_DEBUG") == "1",
+	}
+	return Start(cfg)
 }
 
 // Auto loads configuration from environment variables and starts macgo.
@@ -385,4 +405,26 @@ func ShowFullDiskAccessInstructions(programPath string, openSettings bool) {
 	// The programPath parameter is available for future enhancements
 	// to provide program-specific instructions
 	_ = programPath // Acknowledge the parameter is intentionally unused for now
+}
+
+// Cleanup should be called when the macgo-wrapped application exits.
+// It writes the sentinel file that signals to the parent process that the
+// child has finished, enabling proper I/O forwarding completion.
+//
+// Usage: Add "defer macgo.Cleanup()" at the start of main() after calling macgo.Start().
+//
+// Example:
+//
+//	func main() {
+//	    if err := macgo.Start(cfg); err != nil {
+//	        log.Fatal(err)
+//	    }
+//	    defer macgo.Cleanup()
+//	    // ... rest of application
+//	}
+func Cleanup() {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	writeDoneFile()
 }
