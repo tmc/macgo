@@ -32,6 +32,8 @@ type Config struct {
 	ForceLaunchServices bool
 	// ForceDirectExecution forces direct execution
 	ForceDirectExecution bool
+	// Background indicates the app should not steal focus (LSBackgroundOnly apps)
+	Background bool
 }
 
 // Launcher defines the interface for launching applications.
@@ -47,10 +49,32 @@ type Manager struct {
 }
 
 // New creates a new launch manager with default launchers.
+// The services launcher version is selected via MACGO_LAUNCHER_VERSION or MACGO_SERVICES_VERSION env var.
+// - Default: ServicesLauncher (v1, STABLE - uses config-file strategy with continuous polling)
+// - Version "2" or "v2": ServicesLauncherV2 (EXPERIMENTAL - similar to v1 but with future enhancements)
 func New() *Manager {
+	// Determine which services launcher to use
+	var servicesLauncher Launcher
+	version := os.Getenv("MACGO_LAUNCHER_VERSION")
+	if version == "" {
+		version = os.Getenv("MACGO_SERVICES_VERSION")
+	}
+
+	if version == "2" || version == "v2" {
+		servicesLauncher = &ServicesLauncherV2{}
+		if os.Getenv("MACGO_DEBUG") == "1" {
+			fmt.Fprintf(os.Stderr, "macgo: selected ServicesLauncherV2\n")
+		}
+	} else {
+		servicesLauncher = &ServicesLauncher{}
+		if os.Getenv("MACGO_DEBUG") == "1" && version != "" {
+			fmt.Fprintf(os.Stderr, "macgo: selected ServicesLauncher (v1) - unknown version %q\n", version)
+		}
+	}
+
 	return &Manager{
 		directLauncher:   &DirectLauncher{},
-		servicesLauncher: &ServicesLauncher{},
+		servicesLauncher: servicesLauncher,
 	}
 }
 
@@ -88,27 +112,12 @@ func (m *Manager) Launch(ctx context.Context, bundlePath, execPath string, cfg *
 
 // determineStrategy selects the appropriate launch strategy based on configuration.
 func (m *Manager) determineStrategy(cfg *Config) Strategy {
-	// Check explicit configuration overrides first
-	if cfg.ForceLaunchServices {
-		if cfg.Debug {
-			fmt.Fprintf(os.Stderr, "macgo: forced LaunchServices via config\n")
-		}
-		return StrategyServices
-	}
-
+	// Check overrides for Direct Execution (Opt-out)
 	if cfg.ForceDirectExecution {
 		if cfg.Debug {
 			fmt.Fprintf(os.Stderr, "macgo: forced direct execution via config\n")
 		}
 		return StrategyDirect
-	}
-
-	// Check environment variable overrides
-	if os.Getenv("MACGO_FORCE_LAUNCH_SERVICES") == "1" {
-		if cfg.Debug {
-			fmt.Fprintf(os.Stderr, "macgo: forced LaunchServices via environment\n")
-		}
-		return StrategyServices
 	}
 
 	if os.Getenv("MACGO_FORCE_DIRECT") == "1" {
@@ -118,29 +127,11 @@ func (m *Manager) determineStrategy(cfg *Config) Strategy {
 		return StrategyDirect
 	}
 
-	// Determine based on required permissions
-	needsLaunchServices := m.requiresLaunchServices(cfg.Permissions)
-
+	// Default to LaunchServices for TCC compatibility
 	if cfg.Debug {
-		fmt.Fprintf(os.Stderr, "macgo: needsLaunchServices: %v (permissions: %v)\n", needsLaunchServices, cfg.Permissions)
+		fmt.Fprintf(os.Stderr, "macgo: using default strategy (LaunchServices)\n")
 	}
-
-	if needsLaunchServices {
-		return StrategyServices
-	}
-
-	return StrategyDirect
-}
-
-// requiresLaunchServices determines if the requested permissions require LaunchServices.
-func (m *Manager) requiresLaunchServices(permissions []string) bool {
-	for _, perm := range permissions {
-		switch perm {
-		case "files", "camera", "microphone", "location":
-			return true
-		}
-	}
-	return false
+	return StrategyServices
 }
 
 // String returns a string representation of the strategy.

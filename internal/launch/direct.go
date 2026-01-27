@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"syscall"
 )
@@ -14,6 +15,16 @@ type DirectLauncher struct{}
 
 // Launch executes the binary directly within the app bundle.
 func (d *DirectLauncher) Launch(ctx context.Context, bundlePath, execPath string, cfg *Config) error {
+	// Set up signal handling context
+	// We handle: SIGINT, SIGTERM, SIGQUIT, SIGHUP
+	sigCtx, stop := signal.NotifyContext(ctx,
+		syscall.SIGINT,   // Interrupt (Ctrl+C)
+		syscall.SIGTERM,  // Termination request
+		syscall.SIGQUIT,  // Quit with core dump (Ctrl+\)
+		syscall.SIGHUP,   // Hangup
+	)
+	defer stop()
+	ctx = sigCtx
 	bundleExec, err := d.getBundleExecutablePath(bundlePath, execPath, cfg)
 	if err != nil {
 		return fmt.Errorf("get bundle executable path: %w", err)
@@ -28,7 +39,7 @@ func (d *DirectLauncher) Launch(ctx context.Context, bundlePath, execPath string
 		return fmt.Errorf("bundle executable not found at %s: %w", bundleExec, err)
 	}
 
-	cmd := exec.CommandContext(ctx, bundleExec, os.Args[1:]...)
+	cmd := exec.CommandContext(sigCtx, bundleExec, os.Args[1:]...)
 
 	// Set up I/O redirection
 	cmd.Stdin = os.Stdin
@@ -53,6 +64,16 @@ func (d *DirectLauncher) Launch(ctx context.Context, bundlePath, execPath string
 	if cfg.Debug {
 		fmt.Fprintf(os.Stderr, "macgo: process started with PID: %d\n", cmd.Process.Pid)
 	}
+
+	// Monitor context for cancellation to provide debug logging
+	// Note: CommandContext automatically calls cmd.Process.Kill() (sends SIGKILL)
+	// when the context is cancelled, which terminates the process immediately
+	go func() {
+		<-sigCtx.Done()
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: context cancelled, CommandContext will send SIGKILL to process\n")
+		}
+	}()
 
 	// Wait for the process to complete
 	err = cmd.Wait()

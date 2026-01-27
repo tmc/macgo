@@ -52,51 +52,23 @@ func TestManager_determineStrategy(t *testing.T) {
 			want: StrategyServices,
 		},
 		{
-			name: "microphone permission requires services",
-			config: &Config{
-				Permissions: []string{"microphone"},
-			},
-			want: StrategyServices,
-		},
-		{
-			name: "location permission requires services",
-			config: &Config{
-				Permissions: []string{"location"},
-			},
-			want: StrategyServices,
-		},
-		{
-			name: "files permission requires services",
-			config: &Config{
-				Permissions: []string{"files"},
-			},
-			want: StrategyServices,
-		},
-		{
-			name: "network permission uses direct",
+			name: "network permission uses default (services)",
 			config: &Config{
 				Permissions: []string{"network"},
 			},
-			want: StrategyDirect,
+			want: StrategyServices,
 		},
 		{
-			name: "sandbox permission uses direct",
+			name: "sandbox permission uses default (services)",
 			config: &Config{
 				Permissions: []string{"sandbox"},
 			},
-			want: StrategyDirect,
+			want: StrategyServices,
 		},
 		{
-			name: "no permissions uses direct",
+			name: "no permissions uses default (services)",
 			config: &Config{
 				Permissions: []string{},
-			},
-			want: StrategyDirect,
-		},
-		{
-			name: "mixed permissions with camera requires services",
-			config: &Config{
-				Permissions: []string{"network", "camera", "sandbox"},
 			},
 			want: StrategyServices,
 		},
@@ -108,70 +80,6 @@ func TestManager_determineStrategy(t *testing.T) {
 			got := manager.determineStrategy(tt.config)
 			if got != tt.want {
 				t.Errorf("Manager.determineStrategy() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestManager_requiresLaunchServices(t *testing.T) {
-	tests := []struct {
-		name        string
-		permissions []string
-		want        bool
-	}{
-		{
-			name:        "empty permissions",
-			permissions: []string{},
-			want:        false,
-		},
-		{
-			name:        "camera requires services",
-			permissions: []string{"camera"},
-			want:        true,
-		},
-		{
-			name:        "microphone requires services",
-			permissions: []string{"microphone"},
-			want:        true,
-		},
-		{
-			name:        "location requires services",
-			permissions: []string{"location"},
-			want:        true,
-		},
-		{
-			name:        "files requires services",
-			permissions: []string{"files"},
-			want:        true,
-		},
-		{
-			name:        "network doesn't require services",
-			permissions: []string{"network"},
-			want:        false,
-		},
-		{
-			name:        "sandbox doesn't require services",
-			permissions: []string{"sandbox"},
-			want:        false,
-		},
-		{
-			name:        "mixed permissions with TCC requirement",
-			permissions: []string{"network", "camera", "sandbox"},
-			want:        true,
-		},
-		{
-			name:        "only non-TCC permissions",
-			permissions: []string{"network", "sandbox"},
-			want:        false,
-		},
-	}
-
-	manager := New()
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := manager.requiresLaunchServices(tt.permissions)
-			if got != tt.want {
-				t.Errorf("Manager.requiresLaunchServices() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -200,8 +108,9 @@ func TestManager_Launch_DirectStrategy(t *testing.T) {
 	manager := NewWithLaunchers(mockDirect, mockServices)
 
 	cfg := &Config{
-		Permissions: []string{"network"},
-		Debug:       true,
+		Permissions:          []string{"network"},
+		Debug:                true,
+		ForceDirectExecution: true,
 	}
 
 	ctx := context.Background()

@@ -31,15 +31,17 @@ func TestServicesLauncher_createPipeDirectory(t *testing.T) {
 		t.Errorf("Pipe directory is not a directory: %s", pipeDir)
 	}
 
-	// Check that the directory name contains the expected pattern
-	expectedPattern := "macgo-"
-	if !strings.Contains(filepath.Base(pipeDir), expectedPattern) {
-		t.Errorf("Pipe directory name doesn't contain expected pattern %s: %s", expectedPattern, pipeDir)
+	// Check that the path contains "macgo" (either in basename or parent directory)
+	// Implementation uses ~/Library/Application Support/macgo/pipes/PID-TIMESTAMP
+	if !strings.Contains(pipeDir, "macgo") {
+		t.Errorf("Pipe directory path doesn't contain 'macgo': %s", pipeDir)
 	}
 }
 
 func TestServicesLauncher_createNamedPipes(t *testing.T) {
-	launcher := &ServicesLauncher{}
+	launcher := &ServicesLauncher{
+		logger: NewLogger(),
+	}
 
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "macgo-pipe-test-*")
@@ -48,7 +50,7 @@ func TestServicesLauncher_createNamedPipes(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	pipes, err := launcher.createNamedPipes(tmpDir)
+	pipes, err := launcher.createNamedPipes(tmpDir, true, true, true, false)
 	if err != nil {
 		t.Fatalf("createNamedPipes() failed: %v", err)
 	}
@@ -85,7 +87,9 @@ func TestServicesLauncher_createNamedPipes(t *testing.T) {
 }
 
 func TestServicesLauncher_buildOpenCommand(t *testing.T) {
-	launcher := &ServicesLauncher{}
+	launcher := &ServicesLauncher{
+		logger: NewLogger(),
+	}
 	ctx := context.Background()
 	bundlePath := "/path/to/TestApp.app"
 
@@ -100,32 +104,53 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 	defer func() { os.Args = originalArgs }()
 
 	tests := []struct {
-		name     string
-		args     []string
-		wantArgs []string
+		name       string
+		args       []string
+		ioStrategy string
+		wantArgs   []string
 	}{
 		{
-			name: "no command line arguments",
-			args: []string{"program"},
+			name:       "config-file strategy (default) - no args",
+			args:       []string{"program"},
+			ioStrategy: "config-file",
 			wantArgs: []string{
 				"open",
-				"-a", bundlePath,
-				"--wait-apps",
-				"--stdin", "/tmp/stdin",
-				"--stdout", "/tmp/stdout",
-				"--stderr", "/tmp/stderr",
+				bundlePath,
 			},
 		},
 		{
-			name: "with command line arguments",
-			args: []string{"program", "arg1", "arg2", "--flag"},
+			name:       "config-file strategy (default) - with args",
+			args:       []string{"program", "arg1", "arg2", "--flag"},
+			ioStrategy: "config-file",
 			wantArgs: []string{
 				"open",
-				"-a", bundlePath,
-				"--wait-apps",
-				"--stdin", "/tmp/stdin",
-				"--stdout", "/tmp/stdout",
+				bundlePath,
+				"--args",
+				"arg1", "arg2", "--flag",
+			},
+		},
+		{
+			name:       "open-flags strategy - no args",
+			args:       []string{"program"},
+			ioStrategy: "open-flags",
+			wantArgs: []string{
+				"open",
+				"-i", "/tmp/stdin",
+				"-o", "/tmp/stdout",
 				"--stderr", "/tmp/stderr",
+				bundlePath,
+			},
+		},
+		{
+			name:       "open-flags strategy - with args",
+			args:       []string{"program", "arg1", "arg2", "--flag"},
+			ioStrategy: "open-flags",
+			wantArgs: []string{
+				"open",
+				"-i", "/tmp/stdin",
+				"-o", "/tmp/stdout",
+				"--stderr", "/tmp/stderr",
+				bundlePath,
 				"--args",
 				"arg1", "arg2", "--flag",
 			},
@@ -136,7 +161,11 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Args = tt.args
 
-			cmd, err := launcher.buildOpenCommand(ctx, bundlePath, pipes)
+			// Set the I/O strategy for this test
+			os.Setenv("MACGO_IO_STRATEGY", tt.ioStrategy)
+			defer os.Unsetenv("MACGO_IO_STRATEGY")
+
+			cmd, err := launcher.buildOpenCommand(ctx, bundlePath, pipes, false)
 			if err != nil {
 				t.Fatalf("buildOpenCommand() failed: %v", err)
 			}
@@ -187,7 +216,7 @@ func TestServicesLauncher_cleanupPipeDirectory(t *testing.T) {
 	}
 
 	// Test cleanup
-	launcher.cleanupPipeDirectory(tmpDir, false) // debug = false
+	launcher.cleanupPipeDirectory(tmpDir)
 
 	// Verify directory was removed
 	if _, err := os.Stat(tmpDir); !os.IsNotExist(err) {
