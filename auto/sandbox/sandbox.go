@@ -3,7 +3,7 @@
 // Import this package to automatically set up app sandboxing:
 //
 //	import (
-//	    _ "github.com/tmc/misc/macgo/auto/sandbox"
+//	    _ "github.com/tmc/macgo/auto/sandbox"
 //	)
 //
 // This enables app sandboxing which provides security isolation but limits
@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"os"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func init() {

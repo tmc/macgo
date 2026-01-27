@@ -3,7 +3,7 @@
 // Import this package to automatically enable network permissions:
 //
 //	import (
-//	    _ "github.com/tmc/misc/macgo/auto/network"
+//	    _ "github.com/tmc/macgo/auto/network"
 //	)
 //
 // This enables network access for both client and server operations when
@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"os"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func init() {

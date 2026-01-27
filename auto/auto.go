@@ -3,7 +3,7 @@
 // Import this package to automatically initialize macgo with no permissions:
 //
 //	import (
-//	    _ "github.com/tmc/misc/macgo/auto"
+//	    _ "github.com/tmc/macgo/auto"
 //	)
 //
 // This is the simplest way to use macgo - just import and your app will
@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"os"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func init() {

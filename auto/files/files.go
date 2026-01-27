@@ -3,7 +3,7 @@
 // Import this package to automatically enable file system access:
 //
 //	import (
-//	    _ "github.com/tmc/misc/macgo/auto/files"
+//	    _ "github.com/tmc/macgo/auto/files"
 //	)
 //
 // This enables sandboxed file access where users can select files and folders
@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"os"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func init() {

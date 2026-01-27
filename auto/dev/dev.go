@@ -3,7 +3,7 @@
 // Import this package to automatically enable permissions for development tools:
 //
 //	import (
-//	    _ "github.com/tmc/misc/macgo/auto/dev"
+//	    _ "github.com/tmc/macgo/auto/dev"
 //	)
 //
 // This enables:
@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func init() {

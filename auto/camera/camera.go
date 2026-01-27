@@ -3,7 +3,7 @@
 // Import this package to automatically enable camera permissions:
 //
 //	import (
-//	    _ "github.com/tmc/misc/macgo/auto/camera"
+//	    _ "github.com/tmc/macgo/auto/camera"
 //	)
 //
 // This enables camera access which will prompt the user for permission when
@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"os"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func init() {

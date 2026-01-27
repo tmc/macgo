@@ -3,7 +3,7 @@
 // Import this package to automatically enable a comprehensive set of permissions:
 //
 //	import (
-//	    _ "github.com/tmc/misc/macgo/auto/all"
+//	    _ "github.com/tmc/macgo/auto/all"
 //	)
 //
 // This enables:
@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func init() {

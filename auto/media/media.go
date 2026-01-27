@@ -3,7 +3,7 @@
 // Import this package to automatically enable media capture permissions:
 //
 //	import (
-//	    _ "github.com/tmc/misc/macgo/auto/media"
+//	    _ "github.com/tmc/macgo/auto/media"
 //	)
 //
 // This enables:
@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	macgo "github.com/tmc/misc/macgo"
+	macgo "github.com/tmc/macgo"
 )
 
 func init() {
