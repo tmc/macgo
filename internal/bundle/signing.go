@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tmc/misc/macgo/codesign"
-	"github.com/tmc/misc/macgo/internal/system"
+	"github.com/tmc/macgo/codesign"
+	"github.com/tmc/macgo/internal/system"
 )
 
 // codeSignBundle signs the app bundle with the configured identity and options.

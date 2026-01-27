@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/tmc/misc/macgo/internal/system"
+	"github.com/tmc/macgo/internal/system"
 )
 
 func TestBundle_isBundleUpToDate(t *testing.T) {

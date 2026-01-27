@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tmc/misc/macgo/internal/system"
+	"github.com/tmc/macgo/internal/system"
 )
 
 func TestIdentifierInSignedCode(t *testing.T) {

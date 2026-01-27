@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tmc/misc/macgo/internal/plist"
-	"github.com/tmc/misc/macgo/internal/system"
+	"github.com/tmc/macgo/internal/plist"
+	"github.com/tmc/macgo/internal/system"
 )
 
 // Bundle represents a macOS app bundle with its configuration and management methods.
@@ -154,14 +154,22 @@ func (b *Bundle) Create() error {
 				}
 				// Remove the outdated bundle
 				if err := os.RemoveAll(bundleDir); err != nil && !os.IsNotExist(err) {
-					return fmt.Errorf("failed to remove outdated bundle: %w", err)
+					if os.IsPermission(err) {
+						fmt.Fprintf(os.Stderr, "macgo: warning: failed to remove outdated bundle at %s (permission denied), attempting to overwrite: %v\n", bundleDir, err)
+					} else {
+						return fmt.Errorf("failed to remove outdated bundle: %w", err)
+					}
 				}
 			}
 		}
 	} else {
 		// Remove old bundle if not keeping it
 		if err := os.RemoveAll(bundleDir); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove old bundle: %w", err)
+			if os.IsPermission(err) {
+				fmt.Fprintf(os.Stderr, "macgo: warning: failed to remove old bundle at %s (permission denied), attempting to overwrite: %v\n", bundleDir, err)
+			} else {
+				return fmt.Errorf("failed to remove old bundle: %w", err)
+			}
 		}
 	}
 
@@ -215,7 +223,48 @@ func (b *Bundle) Create() error {
 		}
 	}
 
+	// Recursively fix permissions if running under sudo
+	if err := b.fixOwner(bundleDir); err != nil {
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: warning: failed to fix bundle ownership: %v\n", err)
+		}
+	}
+
 	return nil
+}
+
+// fixOwner changes ownership of the bundle to the SUDO_USER if running as root.
+func (b *Bundle) fixOwner(path string) error {
+	// Only proceed if running as root
+	if os.Geteuid() != 0 {
+		return nil
+	}
+
+	// Check for SUDO_UID and SUDO_GID
+	sudoUID := os.Getenv("SUDO_UID")
+	sudoGID := os.Getenv("SUDO_GID")
+
+	if sudoUID == "" || sudoGID == "" {
+		return nil
+	}
+
+	// Parse UID/GID
+	uid := 0
+	gid := 0
+	if _, err := fmt.Sscanf(sudoUID, "%d", &uid); err != nil {
+		return nil
+	}
+	if _, err := fmt.Sscanf(sudoGID, "%d", &gid); err != nil {
+		return nil
+	}
+
+	// Walk and chmod
+	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.Chown(p, uid, gid)
+	})
 }
 
 // Sign performs code signing on the bundle.
