@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/tmc/misc/macgo/internal/system"
+	"github.com/tmc/macgo/internal/system"
 )
 
 func TestConfig(t *testing.T) {

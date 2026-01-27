@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tmc/misc/macgo"
+	"github.com/tmc/macgo"
 )
 
 func ExampleRequest_basic() {
@@ -208,8 +208,8 @@ func TestAutoPackages(t *testing.T) {
 	defer func() { _ = os.Unsetenv("MACGO_NO_RELAUNCH") }()
 
 	// These would normally be imported as:
-	// import _ "github.com/tmc/misc/macgo/auto/camera"
-	// import _ "github.com/tmc/misc/macgo/auto/files"
+	// import _ "github.com/tmc/macgo/auto/camera"
+	// import _ "github.com/tmc/macgo/auto/files"
 	// But we'll test the functionality directly
 
 	t.Run("camera_auto", func(t *testing.T) {
