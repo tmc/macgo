@@ -33,3 +33,32 @@ _testmain.go
 .vscode/
 .idea/
 *.iml
+# Compiled binaries in examples
+examples/*/*.app/
+examples/*/hello
+examples/*/io-test
+examples/*/camera-mic
+examples/*/osascript-wrapper
+examples/*/screen-capture
+examples/*/code-signing
+examples/*/desktop-list
+examples/*/getting-started
+examples/*/hello-files
+examples/*/auto-signed
+examples/*/sandboxed-file-exec
+examples/*/tee-see-see
+examples/*/screencapture-purego
+examples/*/mouse-click
+examples/*/mouse-move
+examples/*/safari-cli
+examples/*/sdef-to-cobra
+examples/*/socket-auth-server
+examples/*/tcc-helper
+cmd/macgo-cleanup/macgo-cleanup
+
+# Root level binaries
+screen-capture
+
+# Beads task tracking database
+.beads/
+examples/press-keys/press-keys
