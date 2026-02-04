@@ -104,6 +104,9 @@ type Config struct {
 	// This preserves TCC permissions across rebuilds since only the wrapper is signed,
 	// not the development binary. Enable via MACGO_DEV_MODE=1 for development workflows.
 	DevMode bool
+
+	// ProvisioningProfile is the path to a provisioning profile to embed in the bundle.
+	ProvisioningProfile string
 }
 
 // shouldCleanupBundle returns true if the bundle should be removed.
@@ -338,6 +341,17 @@ func (b *Bundle) Create() error {
 		}
 	}
 
+	// Copy provisioning profile if specified
+	if b.Config.ProvisioningProfile != "" {
+		profileDest := filepath.Join(contentsDir, "embedded.provisionprofile")
+		if err := system.CopyFile(b.Config.ProvisioningProfile, profileDest); err != nil {
+			return fmt.Errorf("copying provisioning profile: %w", err)
+		}
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: embedded provisioning profile from %s\n", b.Config.ProvisioningProfile)
+		}
+	}
+
 	// Recursively fix permissions if running under sudo
 	if err := b.fixOwner(bundleDir); err != nil {
 		if b.Config.Debug {
@@ -489,7 +503,7 @@ func (b *Bundle) ExecutablePath() string {
 func Create(execPath string, appName, bundleID, version string, permissions []string,
 	custom []string, appGroups []string, debug bool, cleanupBundle bool,
 	codeSignIdentity, codeSigningIdentifier string, autoSign, adHocSign bool,
-	info map[string]interface{}, uiMode UIMode, devMode bool) (*Bundle, error) {
+	info map[string]interface{}, uiMode UIMode, devMode bool, provisioningProfile string) (*Bundle, error) {
 
 	config := &Config{
 		AppName:               appName,
@@ -507,6 +521,7 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 		Info:                  info,
 		UIMode:                uiMode,
 		DevMode:               devMode,
+		ProvisioningProfile:   provisioningProfile,
 	}
 
 	bundle, err := New(execPath, config)

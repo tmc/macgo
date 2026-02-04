@@ -181,6 +181,11 @@ type Config struct {
 	// This preserves TCC permissions across rebuilds since only the wrapper is signed.
 	// Enable via MACGO_DEV_MODE=1 for development workflows where you rebuild frequently.
 	DevMode bool
+
+	// ProvisioningProfile is the path to a provisioning profile (.provisionprofile or .mobileprovision).
+	// When specified, the profile is embedded in the bundle as Contents/embedded.provisionprofile.
+	// Required for entitlements like keychain-access-groups.
+	ProvisioningProfile string
 }
 
 // FromEnv loads configuration from environment variables.
@@ -358,6 +363,14 @@ func (c *Config) WithUIMode(mode UIMode) *Config {
 // Use this when actively developing and rebuilding frequently.
 func (c *Config) WithDevMode() *Config {
 	c.DevMode = true
+	return c
+}
+
+// WithProvisioningProfile sets the path to a provisioning profile to embed in the bundle.
+// The profile will be copied to Contents/embedded.provisionprofile.
+// Required for entitlements like keychain-access-groups.
+func (c *Config) WithProvisioningProfile(path string) *Config {
+	c.ProvisioningProfile = path
 	return c
 }
 
