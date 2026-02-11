@@ -107,6 +107,9 @@ type Config struct {
 
 	// ProvisioningProfile is the path to a provisioning profile to embed in the bundle.
 	ProvisioningProfile string
+
+	// IconPath is the path to an .icns file to use as the app icon.
+	IconPath string
 }
 
 // shouldCleanupBundle returns true if the bundle should be removed.
@@ -278,6 +281,11 @@ func (b *Bundle) Create() error {
 		infoCfg.BackgroundOnly = true
 	}
 
+	// Set app icon if provided
+	if b.Config.IconPath != "" {
+		infoCfg.CustomKeys["CFBundleIconFile"] = filepath.Base(b.Config.IconPath)
+	}
+
 	// Copy custom Info keys
 	for k, v := range b.Config.Info {
 		infoCfg.CustomKeys[k] = v
@@ -349,6 +357,22 @@ func (b *Bundle) Create() error {
 		}
 		if b.Config.Debug {
 			fmt.Fprintf(os.Stderr, "macgo: embedded provisioning profile from %s\n", b.Config.ProvisioningProfile)
+		}
+	}
+
+	// Copy icon file if specified
+	if b.Config.IconPath != "" {
+		resourcesDir := filepath.Join(contentsDir, "Resources")
+		if err := os.MkdirAll(resourcesDir, 0755); err != nil {
+			return fmt.Errorf("failed to create Resources directory: %w", err)
+		}
+		iconName := filepath.Base(b.Config.IconPath)
+		iconDest := filepath.Join(resourcesDir, iconName)
+		if err := system.CopyFile(b.Config.IconPath, iconDest); err != nil {
+			return fmt.Errorf("failed to copy icon: %w", err)
+		}
+		if b.Config.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: copied icon %s to bundle\n", iconName)
 		}
 	}
 
@@ -503,7 +527,7 @@ func (b *Bundle) ExecutablePath() string {
 func Create(execPath string, appName, bundleID, version string, permissions []string,
 	custom []string, appGroups []string, debug bool, cleanupBundle bool,
 	codeSignIdentity, codeSigningIdentifier string, autoSign, adHocSign bool,
-	info map[string]interface{}, uiMode UIMode, devMode bool, provisioningProfile string) (*Bundle, error) {
+	info map[string]interface{}, uiMode UIMode, devMode bool, provisioningProfile string, iconPath string) (*Bundle, error) {
 
 	config := &Config{
 		AppName:               appName,
@@ -522,6 +546,7 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 		UIMode:                uiMode,
 		DevMode:               devMode,
 		ProvisioningProfile:   provisioningProfile,
+		IconPath:              iconPath,
 	}
 
 	bundle, err := New(execPath, config)

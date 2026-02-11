@@ -272,6 +272,7 @@ func createSimpleBundle(execPath string, cfg *Config) (*bundle.Bundle, error) {
 		bundle.UIMode(cfg.UIMode),
 		cfg.DevMode,
 		cfg.ProvisioningProfile,
+		cfg.IconPath,
 	)
 }
 

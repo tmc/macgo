@@ -441,6 +441,7 @@ func TestE2E_BundleStructure(t *testing.T) {
 		bundle.UIModeBackground, // uiMode (default: background)
 		false,                   // devMode
 		"",                      // provisioningProfile
+		"",                      // iconPath
 	)
 
 	if err != nil {
@@ -704,6 +705,7 @@ func BenchmarkE2E_BundleCreation(b *testing.B) {
 			bundle.UIModeBackground, // uiMode (default: background)
 			false,                   // devMode
 			"",                      // provisioningProfile
+			"",                      // iconPath
 		)
 		if err != nil {
 			b.Fatalf("Bundle creation failed: %v", err)

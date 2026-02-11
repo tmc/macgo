@@ -186,6 +186,11 @@ type Config struct {
 	// When specified, the profile is embedded in the bundle as Contents/embedded.provisionprofile.
 	// Required for entitlements like keychain-access-groups.
 	ProvisioningProfile string
+
+	// IconPath is the path to an .icns file to use as the app icon.
+	// When specified, the icon is copied to Contents/Resources/ and
+	// CFBundleIconFile is set in the Info.plist.
+	IconPath string
 }
 
 // FromEnv loads configuration from environment variables.
@@ -371,6 +376,13 @@ func (c *Config) WithDevMode() *Config {
 // Required for entitlements like keychain-access-groups.
 func (c *Config) WithProvisioningProfile(path string) *Config {
 	c.ProvisioningProfile = path
+	return c
+}
+
+// WithIcon sets the path to an .icns file to use as the app icon.
+// The icon is copied into the bundle's Resources directory.
+func (c *Config) WithIcon(path string) *Config {
+	c.IconPath = path
 	return c
 }
 
