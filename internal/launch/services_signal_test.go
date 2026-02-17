@@ -16,11 +16,6 @@ import (
 // TestServicesLauncherV1_SignalInterruption tests that V1 handles SIGINT correctly
 // during I/O forwarding without losing output or deadlocking.
 func TestServicesLauncherV1_SignalInterruption(t *testing.T) {
-	t.Skip("Skipping signal interruption test due to environment polling flakiness")
-	// Disable FIFO usage to force polling behavior for this test
-	os.Setenv("MACGO_USE_FIFO", "0")
-	defer os.Unsetenv("MACGO_USE_FIFO")
-
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
@@ -33,23 +28,10 @@ func TestServicesLauncherV1_SignalInterruption(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create test pipes
-	pipes, err := launcher.createNamedPipes(tmpDir, false, true, true, false)
+	pipes, err := launcher.createNamedPipes(tmpDir, false, true, true, true)
 	if err != nil {
 		t.Fatalf("Failed to create pipes: %v", err)
 	}
-
-	// Write test data to stdout pipe
-	testData := "output before signal\n"
-	stdoutFile, err := os.OpenFile(pipes.stdout, os.O_WRONLY, 0600)
-	if err != nil {
-		t.Fatalf("Failed to open stdout pipe: %v", err)
-	}
-
-	// Write initial data
-	if _, err := stdoutFile.WriteString(testData); err != nil {
-		t.Fatalf("Failed to write test data: %v", err)
-	}
-	stdoutFile.Sync()
 
 	// Capture output
 	capturedStdout := &bytes.Buffer{}
@@ -65,6 +47,17 @@ func TestServicesLauncherV1_SignalInterruption(t *testing.T) {
 
 	// Give forwarding time to start
 	time.Sleep(100 * time.Millisecond)
+
+	stdoutFile, err := os.OpenFile(pipes.stdout, os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatalf("Failed to open stdout pipe: %v", err)
+	}
+
+	// Write test data to stdout pipe
+	testData := "output before signal\n"
+	if _, err := stdoutFile.WriteString(testData); err != nil {
+		t.Fatalf("Failed to write test data: %v", err)
+	}
 
 	// Write more data after signal (simulating ongoing output)
 	moreData := "output during signal handling\n"
@@ -103,11 +96,6 @@ func TestServicesLauncherV1_SignalInterruption(t *testing.T) {
 // TestServicesLauncher_SignalInterruption tests that V2 handles SIGINT correctly
 // during I/O forwarding without losing output or deadlocking.
 func TestServicesLauncher_SignalInterruption(t *testing.T) {
-	t.Skip("Skipping signal interruption test due to environment polling flakiness")
-	// Disable FIFO usage to force polling behavior for this test
-	os.Setenv("MACGO_USE_FIFO", "0")
-	defer os.Unsetenv("MACGO_USE_FIFO")
-
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
@@ -119,19 +107,10 @@ func TestServicesLauncher_SignalInterruption(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create stdout pipe
-	stdoutPipe := filepath.Join(tmpDir, "stdout")
-	stdoutFile, err := os.OpenFile(stdoutPipe, os.O_CREATE|os.O_RDWR, 0600)
+	pipes, err := launcher.createNamedPipes(tmpDir, false, true, false, true)
 	if err != nil {
-		t.Fatalf("Failed to create stdout pipe: %v", err)
+		t.Fatalf("Failed to create pipes: %v", err)
 	}
-
-	// Write initial data
-	testData := "output before signal\n"
-	if _, err := stdoutFile.WriteString(testData); err != nil {
-		t.Fatalf("Failed to write test data: %v", err)
-	}
-	stdoutFile.Sync()
 
 	// Capture output
 	capturedStdout := &bytes.Buffer{}
@@ -142,11 +121,23 @@ func TestServicesLauncher_SignalInterruption(t *testing.T) {
 	// Start forwarding in a goroutine
 	forwardDone := make(chan error, 1)
 	go func() {
-		forwardDone <- launcher.forwardStdout(stdoutPipe)
+		forwardDone <- launcher.forwardStdout(pipes.stdout)
 	}()
 
 	// Give forwarding time to start
 	time.Sleep(100 * time.Millisecond)
+
+	stdoutFile, err := os.OpenFile(pipes.stdout, os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatalf("Failed to open stdout pipe: %v", err)
+	}
+	defer stdoutFile.Close()
+
+	// Write initial data
+	testData := "output before signal\n"
+	if _, err := stdoutFile.WriteString(testData); err != nil {
+		t.Fatalf("Failed to write test data: %v", err)
+	}
 
 	// Write more data (simulating ongoing output during signal handling)
 	moreData := "output during signal handling\n"
@@ -321,11 +312,6 @@ func TestServicesLauncher_MutexProtectionDuringSignal(t *testing.T) {
 // TestServicesLauncher_NoOutputLossDuringSignal tests that no output is lost
 // when signals are sent during active I/O forwarding.
 func TestServicesLauncher_NoOutputLossDuringSignal(t *testing.T) {
-	t.Skip("Skipping signal interruption test due to environment polling flakiness")
-	// Disable FIFO usage to force polling behavior for this test
-	os.Setenv("MACGO_USE_FIFO", "0")
-	defer os.Unsetenv("MACGO_USE_FIFO")
-
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
@@ -337,13 +323,10 @@ func TestServicesLauncher_NoOutputLossDuringSignal(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create stdout pipe
-	stdoutPipe := filepath.Join(tmpDir, "stdout")
-	stdoutFile, err := os.OpenFile(stdoutPipe, os.O_CREATE|os.O_RDWR, 0600)
+	pipes, err := launcher.createNamedPipes(tmpDir, false, true, false, true)
 	if err != nil {
-		t.Fatalf("Failed to create stdout pipe: %v", err)
+		t.Fatalf("Failed to create pipes: %v", err)
 	}
-	defer stdoutFile.Close()
 
 	// Capture output
 	capturedStdout := &bytes.Buffer{}
@@ -354,8 +337,16 @@ func TestServicesLauncher_NoOutputLossDuringSignal(t *testing.T) {
 	// Start forwarding in a goroutine
 	forwardDone := make(chan error, 1)
 	go func() {
-		forwardDone <- launcher.forwardStdout(stdoutPipe)
+		forwardDone <- launcher.forwardStdout(pipes.stdout)
 	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	stdoutFile, err := os.OpenFile(pipes.stdout, os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatalf("Failed to open stdout pipe: %v", err)
+	}
+	defer stdoutFile.Close()
 
 	// Write output in chunks with small delays (simulating real output)
 	expectedOutput := ""
@@ -367,8 +358,6 @@ func TestServicesLauncher_NoOutputLossDuringSignal(t *testing.T) {
 		if _, err := stdoutFile.WriteString(line); err != nil {
 			t.Fatalf("Failed to write line %d: %v", i, err)
 		}
-		stdoutFile.Sync()
-
 		// Simulate signal in the middle of output
 		if i == lineCount/2 {
 			// Just continue - in real scenario, signal would be sent to process
@@ -412,7 +401,6 @@ func TestServicesLauncher_NoOutputLossDuringSignal(t *testing.T) {
 // TestServicesLauncher_SignalInterruptionWithStderr tests that both stdout
 // and stderr forwarding handle interruption correctly.
 func TestServicesLauncher_SignalInterruptionWithStderr(t *testing.T) {
-	t.Skip("Skipping signal interruption test due to environment polling flakiness")
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
@@ -515,4 +503,58 @@ func TestServicesLauncher_SignalInterruptionWithStderr(t *testing.T) {
 	}
 
 	t.Log("Both stdout and stderr handled signal scenario correctly")
+}
+
+// TestServicesLauncher_SignalSIGPIPEPipeCloseForceKill verifies that a SIGPIPE-triggered
+// cancellation forwards SIGPIPE to the child and force-kills it after a grace
+// period if the child ignores SIGPIPE.
+func TestServicesLauncher_SignalSIGPIPEPipeCloseForceKill(t *testing.T) {
+	launcher := &ServicesLauncher{
+		logger: NewLogger(),
+	}
+
+	cmd := exec.Command("sh", "-c", "trap '' PIPE; while :; do sleep 1; done")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start child process: %v", err)
+	}
+	pid := cmd.Process.Pid
+	t.Cleanup(func() {
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+		if cmd.ProcessState == nil {
+			_ = cmd.Wait()
+		}
+	})
+
+	launcher.mu.Lock()
+	launcher.childPID = pid
+	launcher.mu.Unlock()
+	launcher.lastSignal.Store(int32(syscall.SIGPIPE))
+
+	start := time.Now()
+	launcher.forwardSignalToChildWithGrace(launcher.recordedSignal(), 150*time.Millisecond)
+	if elapsed := time.Since(start); elapsed < 100*time.Millisecond {
+		t.Fatalf("signal grace period too short: %v", elapsed)
+	}
+
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-waitDone:
+		if err == nil {
+			t.Fatal("child exited cleanly; expected forced termination after ignored SIGPIPE")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("child did not terminate after SIGPIPE forwarding and force-kill")
+	}
+
+	if err := syscall.Kill(pid, 0); err == nil {
+		t.Fatalf("child process %d is still running", pid)
+	} else if err != syscall.ESRCH {
+		t.Fatalf("unexpected liveness check error for process %d: %v", pid, err)
+	}
 }
