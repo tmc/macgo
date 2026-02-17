@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -51,6 +52,7 @@ type ServicesLauncher struct {
 	useFifo       bool          // true if using FIFOs (EOF signals completion, no done file needed)
 	childPID      int           // PID of the actual app process (for signal forwarding)
 	pidFile       string        // path to file where child writes its PID
+	lastSignal    atomic.Int32  // most recent signal received by the parent
 }
 
 // pipeSet holds the paths to the named pipes used for I/O forwarding.
@@ -110,6 +112,50 @@ func (s *ServicesLauncher) forwardSignalToChild(sig syscall.Signal) {
 	}
 }
 
+func (s *ServicesLauncher) recordedSignal() syscall.Signal {
+	sig := syscall.Signal(s.lastSignal.Load())
+	if sig == 0 {
+		return syscall.SIGINT
+	}
+	return sig
+}
+
+func (s *ServicesLauncher) forwardSignalToChildWithGrace(sig syscall.Signal, grace time.Duration) {
+	s.forwardSignalToChild(sig)
+	time.Sleep(grace)
+
+	s.mu.Lock()
+	pid := s.childPID
+	s.mu.Unlock()
+
+	if pid <= 0 {
+		return
+	}
+	if err := syscall.Kill(pid, 0); err != nil {
+		return
+	}
+	if err := syscall.Kill(pid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
+		s.logger.Warn("failed to force-kill child after signal grace period", "pid", pid, "error", err)
+	}
+}
+
+func (s *ServicesLauncher) cancellationExitCode(defaultCode int) int {
+	sig := s.recordedSignal()
+	if sig > 0 {
+		return 128 + int(sig)
+	}
+	return defaultCode
+}
+
+func (s *ServicesLauncher) exitWithSignalForwarding(pipeDir string, defaultCode int) {
+	sig := s.recordedSignal()
+	s.forwardSignalToChildWithGrace(sig, 150*time.Millisecond)
+	if pipeDir != "" {
+		s.cleanupPipeDirectory(pipeDir)
+	}
+	os.Exit(s.cancellationExitCode(defaultCode))
+}
+
 // Launch executes the application using LaunchServices with I/O forwarding.
 func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath string, cfg *Config) error {
 	// Initialize logger if not already set
@@ -127,6 +173,23 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	)
 	defer stop()
 	ctx = sigCtx
+	s.lastSignal.Store(0)
+
+	sigRecordCh := make(chan os.Signal, 1)
+	signal.Notify(sigRecordCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGPIPE)
+	defer signal.Stop(sigRecordCh)
+	go func() {
+		for {
+			select {
+			case rawSig := <-sigRecordCh:
+				if sig, ok := rawSig.(syscall.Signal); ok {
+					s.lastSignal.Store(int32(sig))
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	// Determine if we should use no-wait mode
 	noWait := os.Getenv("MACGO_NO_WAIT") == "1" || os.Getenv("MACGO_SERVICES_VERSION") == "3"
@@ -330,35 +393,7 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 		}()
 	}
 
-	// Monitor context for cancellation to forward signals (only in wait mode)
 	if !noWait {
-		go func() {
-			<-sigCtx.Done()
-
-			// Forward signal to child process first (the actual app)
-			// This is critical: the child has PPID=1 (adopted by launchd)
-			// and won't receive signals sent to the open command's process group
-			s.forwardSignalToChild(syscall.SIGINT)
-
-			// Also signal the open command's process group
-			s.mu.Lock()
-			if cmd.Process != nil {
-				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
-			}
-			s.mu.Unlock()
-
-			// Wait a bit then escalate to SIGTERM if still running
-			time.Sleep(100 * time.Millisecond)
-
-			s.forwardSignalToChild(syscall.SIGTERM)
-
-			s.mu.Lock()
-			if cmd.Process != nil {
-				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-			}
-			s.mu.Unlock()
-		}()
-
 		// Forward SIGWINCH (terminal resize) to child process
 		// This runs in a separate goroutine because SIGWINCH doesn't terminate
 		// the process - it's an informational signal that apps use to adjust
@@ -514,11 +549,7 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 					_ = cmd.Process.Kill()
 				}
 				s.mu.Unlock()
-				// Cleanup and exit immediately - signal received
-				if pipeDir != "" {
-					s.cleanupPipeDirectory(pipeDir)
-				}
-				os.Exit(130) // 128 + SIGINT(2) - standard exit code for Ctrl+C
+				s.exitWithSignalForwarding(pipeDir, 130)
 
 			case <-ioTimerChan:
 				s.logger.Warn("I/O forwarding timeout exceeded",
@@ -559,10 +590,7 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 						_ = cmd.Process.Kill()
 					}
 					s.mu.Unlock()
-					if pipeDir != "" {
-						s.cleanupPipeDirectory(pipeDir)
-					}
-					return ctx.Err()
+					s.exitWithSignalForwarding(pipeDir, 130)
 				default:
 					if _, err := os.Stat(s.doneFile); err == nil {
 						goto exitCleanly
@@ -618,10 +646,7 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 				_ = cmd.Process.Kill()
 			}
 			s.mu.Unlock()
-			if pipeDir != "" {
-				s.cleanupPipeDirectory(pipeDir)
-			}
-			os.Exit(130) // 128 + SIGINT(2)
+			s.exitWithSignalForwarding(pipeDir, 130)
 		}
 		if pipeDir != "" {
 			s.cleanupPipeDirectory(pipeDir)
@@ -651,10 +676,7 @@ func (s *ServicesLauncher) handleNoWaitMode(ctx context.Context, ioErrChan chan 
 				_ = err // Error already logged in startIOForwarding
 
 			case <-ctx.Done():
-				if pipeDir != "" {
-					s.cleanupPipeDirectory(pipeDir)
-				}
-				os.Exit(0)
+				s.exitWithSignalForwarding(pipeDir, 130)
 			}
 		}
 
@@ -671,10 +693,7 @@ func (s *ServicesLauncher) handleNoWaitMode(ctx context.Context, ioErrChan chan 
 			for {
 				select {
 				case <-ctx.Done():
-					if pipeDir != "" {
-						s.cleanupPipeDirectory(pipeDir)
-					}
-					os.Exit(0)
+					s.exitWithSignalForwarding(pipeDir, 130)
 				default:
 					if _, err := os.Stat(s.doneFile); err == nil {
 						if pipeDir != "" {
@@ -698,6 +717,7 @@ func (s *ServicesLauncher) handleNoWaitMode(ctx context.Context, ioErrChan chan 
 		// No pipes - behavior depends on MACGO_PARENT_WAIT flag
 		if os.Getenv("MACGO_PARENT_WAIT") == "1" {
 			<-ctx.Done()
+			s.exitWithSignalForwarding(pipeDir, 130)
 		}
 		if pipeDir != "" {
 			s.cleanupPipeDirectory(pipeDir)

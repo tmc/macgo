@@ -18,10 +18,11 @@ func (d *DirectLauncher) Launch(ctx context.Context, bundlePath, execPath string
 	// Set up signal handling context
 	// We handle: SIGINT, SIGTERM, SIGQUIT, SIGHUP
 	sigCtx, stop := signal.NotifyContext(ctx,
-		syscall.SIGINT,   // Interrupt (Ctrl+C)
-		syscall.SIGTERM,  // Termination request
-		syscall.SIGQUIT,  // Quit with core dump (Ctrl+\)
-		syscall.SIGHUP,   // Hangup
+		syscall.SIGINT,  // Interrupt (Ctrl+C)
+		syscall.SIGTERM, // Termination request
+		syscall.SIGQUIT, // Quit with core dump (Ctrl+\)
+		syscall.SIGHUP,  // Hangup
+		syscall.SIGPIPE, // Broken pipe when downstream closes early
 	)
 	defer stop()
 	ctx = sigCtx
