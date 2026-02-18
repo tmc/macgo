@@ -133,6 +133,10 @@ type Config struct {
 	// Custom allows specifying custom entitlements not covered by Permission constants.
 	Custom []string
 
+	// CustomStrings allows specifying custom entitlements with string values.
+	// Use WithCustomString to add entries (e.g. com.apple.application-identifier).
+	CustomStrings map[string]string
+
 	// CustomArrays allows specifying custom entitlements with string array values.
 	// Use WithCustomArray to add entries.
 	CustomArrays map[string][]string
@@ -316,6 +320,17 @@ func (c *Config) WithPermissions(perms ...Permission) *Config {
 // Use full entitlement identifiers (e.g. "com.apple.security.device.capture").
 func (c *Config) WithCustom(entitlements ...string) *Config {
 	c.Custom = append(c.Custom, entitlements...)
+	return c
+}
+
+// WithCustomString adds a custom entitlement with a string value.
+// Use for entitlements that require a string instead of a boolean
+// (e.g. "com.apple.application-identifier" or "com.apple.developer.team-identifier").
+func (c *Config) WithCustomString(key, value string) *Config {
+	if c.CustomStrings == nil {
+		c.CustomStrings = make(map[string]string)
+	}
+	c.CustomStrings[key] = value
 	return c
 }
 

@@ -23,10 +23,11 @@ const (
 
 // EntitlementsConfig holds configuration for generating entitlements.plist files.
 type EntitlementsConfig struct {
-	Permissions  []Permission
-	Custom       []string
-	CustomArrays map[string][]string
-	AppGroups    []string
+	Permissions    []Permission
+	Custom         []string
+	CustomStrings  map[string]string
+	CustomArrays   map[string][]string
+	AppGroups      []string
 }
 
 // WriteEntitlements creates an entitlements.plist file at the specified path.
@@ -56,6 +57,18 @@ func generateEntitlementsContent(cfg EntitlementsConfig) string {
 	// Add custom entitlements
 	for _, custom := range cfg.Custom {
 		entries = append(entries, xmlKeyBool(custom, true))
+	}
+
+	// Add custom string entitlements (sorted for deterministic output)
+	if len(cfg.CustomStrings) > 0 {
+		keys := make([]string, 0, len(cfg.CustomStrings))
+		for k := range cfg.CustomStrings {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			entries = append(entries, xmlKeyValue(k, cfg.CustomStrings[k]))
+		}
 	}
 
 	// Add custom array entitlements (sorted for deterministic output)

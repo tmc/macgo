@@ -392,6 +392,45 @@ func TestGenerateEntitlementsContentOnlyAppGroups(t *testing.T) {
 	}
 }
 
+func TestGenerateEntitlementsContentCustomStrings(t *testing.T) {
+	cfg := EntitlementsConfig{
+		CustomStrings: map[string]string{
+			"com.apple.application-identifier":      "LJ98655CHY.dev.tmc.sign-in-with-apple",
+			"com.apple.developer.team-identifier":   "LJ98655CHY",
+		},
+	}
+
+	content := generateEntitlementsContent(cfg)
+
+	expectedElements := []string{
+		`<key>com.apple.application-identifier</key>`,
+		`<string>LJ98655CHY.dev.tmc.sign-in-with-apple</string>`,
+		`<key>com.apple.developer.team-identifier</key>`,
+		`<string>LJ98655CHY</string>`,
+	}
+
+	for _, expected := range expectedElements {
+		if !strings.Contains(content, expected) {
+			t.Errorf("content should contain: %s", expected)
+		}
+	}
+
+	// Should not contain boolean true (these are string values)
+	if strings.Contains(content, `<true/>`) {
+		t.Error("custom string entitlement should not produce <true/>")
+	}
+
+	// Verify deterministic ordering (application-identifier before team-identifier)
+	appIdx := strings.Index(content, "application-identifier")
+	teamIdx := strings.Index(content, "team-identifier")
+	if appIdx == -1 || teamIdx == -1 {
+		t.Fatal("missing expected keys in output")
+	}
+	if appIdx > teamIdx {
+		t.Error("custom string keys should be sorted alphabetically")
+	}
+}
+
 func TestGenerateEntitlementsContentCustomArrays(t *testing.T) {
 	cfg := EntitlementsConfig{
 		CustomArrays: map[string][]string{
