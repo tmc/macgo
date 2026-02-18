@@ -223,6 +223,8 @@ type Config struct {
 //	MACGO_TTY_PASSTHROUGH=1 - Pass TTY device to child (experimental; default: pipe-based I/O)
 //	MACGO_OPEN_NEW_INSTANCE=0 - Disable -n flag (new instance) for open command (enabled by default)
 //	MACGO_DEV_MODE=1        - Dev mode: wrapper exec's original binary, preserves TCC across rebuilds
+//	MACGO_PROVISIONING_PROFILE - Path to provisioning profile to embed in bundle
+//	MACGO_ICON              - Path to app icon (.icns) to embed in bundle
 func (c *Config) FromEnv() *Config {
 	if name := os.Getenv("MACGO_APP_NAME"); name != "" {
 		c.AppName = name
@@ -283,6 +285,14 @@ func (c *Config) FromEnv() *Config {
 	// Dev mode: wrapper exec's original binary, preserves TCC across rebuilds
 	if os.Getenv("MACGO_DEV_MODE") == "1" {
 		c.DevMode = true
+	}
+
+	if profile := os.Getenv("MACGO_PROVISIONING_PROFILE"); profile != "" {
+		c.ProvisioningProfile = profile
+	}
+
+	if icon := os.Getenv("MACGO_ICON"); icon != "" {
+		c.IconPath = icon
 	}
 
 	return c

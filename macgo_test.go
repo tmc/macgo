@@ -53,11 +53,13 @@ func TestConfig(t *testing.T) {
 func TestFromEnv(t *testing.T) {
 	// Save original environment
 	originalEnv := map[string]string{
-		"MACGO_APP_NAME":   os.Getenv("MACGO_APP_NAME"),
-		"MACGO_BUNDLE_ID":  os.Getenv("MACGO_BUNDLE_ID"),
-		"MACGO_DEBUG":      os.Getenv("MACGO_DEBUG"),
-		"MACGO_CAMERA":     os.Getenv("MACGO_CAMERA"),
-		"MACGO_MICROPHONE": os.Getenv("MACGO_MICROPHONE"),
+		"MACGO_APP_NAME":              os.Getenv("MACGO_APP_NAME"),
+		"MACGO_BUNDLE_ID":             os.Getenv("MACGO_BUNDLE_ID"),
+		"MACGO_DEBUG":                 os.Getenv("MACGO_DEBUG"),
+		"MACGO_CAMERA":                os.Getenv("MACGO_CAMERA"),
+		"MACGO_MICROPHONE":            os.Getenv("MACGO_MICROPHONE"),
+		"MACGO_PROVISIONING_PROFILE":  os.Getenv("MACGO_PROVISIONING_PROFILE"),
+		"MACGO_ICON":                  os.Getenv("MACGO_ICON"),
 	}
 	defer func() {
 		for k, v := range originalEnv {
@@ -75,6 +77,8 @@ func TestFromEnv(t *testing.T) {
 	_ = os.Setenv("MACGO_DEBUG", "1")
 	_ = os.Setenv("MACGO_CAMERA", "1")
 	_ = os.Setenv("MACGO_MICROPHONE", "1")
+	_ = os.Setenv("MACGO_PROVISIONING_PROFILE", "/tmp/test.provisionprofile")
+	_ = os.Setenv("MACGO_ICON", "/tmp/test.icns")
 
 	cfg := new(Config).FromEnv()
 
@@ -97,6 +101,13 @@ func TestFromEnv(t *testing.T) {
 		if i >= len(cfg.Permissions) || cfg.Permissions[i] != expected {
 			t.Errorf("expected permission %s at index %d", expected, i)
 		}
+	}
+
+	if cfg.ProvisioningProfile != "/tmp/test.provisionprofile" {
+		t.Errorf("expected ProvisioningProfile=/tmp/test.provisionprofile, got %s", cfg.ProvisioningProfile)
+	}
+	if cfg.IconPath != "/tmp/test.icns" {
+		t.Errorf("expected IconPath=/tmp/test.icns, got %s", cfg.IconPath)
 	}
 }
 
