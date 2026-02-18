@@ -414,6 +414,11 @@ func (c *Config) WithDevMode() *Config {
 // WithProvisioningProfile sets the path to a provisioning profile to embed in the bundle.
 // The profile will be copied to Contents/embedded.provisionprofile.
 // Required for entitlements like keychain-access-groups.
+//
+// When present, com.apple.application-identifier and
+// com.apple.developer.team-identifier are automatically extracted from the
+// profile and injected as string entitlements. Values set explicitly via
+// WithCustomString take precedence over auto-derived values.
 func (c *Config) WithProvisioningProfile(path string) *Config {
 	c.ProvisioningProfile = path
 	return c

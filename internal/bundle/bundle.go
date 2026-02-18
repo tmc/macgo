@@ -315,6 +315,22 @@ func (b *Bundle) Create() error {
 		return fmt.Errorf("failed to write Info.plist: %w", err)
 	}
 
+	// Auto-derive string entitlements from provisioning profile or signing identity.
+	derived := b.deriveStringEntitlements()
+	if len(derived) > 0 {
+		if b.Config.CustomStrings == nil {
+			b.Config.CustomStrings = make(map[string]string)
+		}
+		for k, v := range derived {
+			if _, set := b.Config.CustomStrings[k]; !set {
+				b.Config.CustomStrings[k] = v
+				if b.Config.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: auto-derived entitlement %s=%s\n", k, v)
+				}
+			}
+		}
+	}
+
 	// Create entitlements if needed
 	// We now include entitlements for ad-hoc signing to support Apple Silicon (get-task-allow).
 	needsEntitlements := (len(b.Config.Permissions) > 0 || len(b.Config.Custom) > 0) ||
