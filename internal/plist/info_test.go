@@ -56,17 +56,28 @@ func TestWriteInfoPlist(t *testing.T) {
 		`<string>1.0.0</string>`,
 		`<key>CFBundleShortVersionString</key>`,
 		`<string>1.0.0</string>`,
-		`<key>LSUIElement</key>`,
-		`<true/>`,
 		`<key>NSHighResolutionCapable</key>`,
 		`<true/>`,
 		`</dict>`,
 		`</plist>`,
 	}
 
+	// LSUIElement should NOT be present when BackgroundOnly is false
+	// and no CustomKeys override it (this is UIModeRegular behavior).
+	absentElements := []string{
+		`<key>LSUIElement</key>`,
+		`<key>LSBackgroundOnly</key>`,
+	}
+
 	for _, element := range requiredElements {
 		if !strings.Contains(contentStr, element) {
 			t.Errorf("Missing required element: %s", element)
+		}
+	}
+
+	for _, element := range absentElements {
+		if strings.Contains(contentStr, element) {
+			t.Errorf("Unexpected element present: %s", element)
 		}
 	}
 }
@@ -273,18 +284,11 @@ func TestInfoPlistBackgroundModes(t *testing.T) {
 		wantLSUIElement  *bool  // nil=absent, true/false=present with value
 	}{
 		{
-			name:             "default: LSUIElement=true (no dock icon)",
+			name:             "default: no LSUIElement or LSBackgroundOnly (regular app)",
 			backgroundOnly:   false,
 			showInDockEnv:    "",
 			wantLSBackground: false,
-			wantLSUIElement:  boolPtr(true),
-		},
-		{
-			name:             "MACGO_SHOW_IN_DOCK=1: LSUIElement=false (show in dock)",
-			backgroundOnly:   false,
-			showInDockEnv:    "1",
-			wantLSBackground: false,
-			wantLSUIElement:  boolPtr(false),
+			wantLSUIElement:  nil,
 		},
 		{
 			name:             "BackgroundOnly=true: LSBackgroundOnly=true (no LSUIElement)",
@@ -385,10 +389,6 @@ func TestInfoPlistBackgroundModes(t *testing.T) {
 			t.Logf("Content:\n%s", contentStr)
 		})
 	}
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }
 
 func TestInfoPlistXMLEscaping(t *testing.T) {

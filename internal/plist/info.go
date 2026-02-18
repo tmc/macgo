@@ -79,16 +79,12 @@ func generateInfoPlistContent(cfg InfoPlistConfig) string {
 		entries = append(entries, xmlKeyValue("CFBundleShortVersionString", cfg.Version))
 	}
 
-	// Default behavior: no dock icon (unless disabled for FDA registration), high resolution capable
-	// LSUIElement=true makes app background (no dock icon) but may prevent FDA panel registration
-	showInDock := os.Getenv("MACGO_SHOW_IN_DOCK") == "1"
-
-	// Only apply default background/UI element logic if neither is overridden
+	// Only apply default background logic if neither is overridden.
+	// UIModeAccessory sets LSUIElement=true via CustomKeys in bundle.go.
+	// UIModeRegular sets neither key — the app appears in the Dock normally.
 	if !isOverridden("LSBackgroundOnly") && !isOverridden("LSUIElement") {
 		if cfg.BackgroundOnly {
 			entries = append(entries, xmlKeyBool("LSBackgroundOnly", true))
-		} else {
-			entries = append(entries, xmlKeyBool("LSUIElement", !showInDock))
 		}
 	}
 
