@@ -3,6 +3,7 @@ package plist
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -22,9 +23,10 @@ const (
 
 // EntitlementsConfig holds configuration for generating entitlements.plist files.
 type EntitlementsConfig struct {
-	Permissions []Permission
-	Custom      []string
-	AppGroups   []string
+	Permissions  []Permission
+	Custom       []string
+	CustomArrays map[string][]string
+	AppGroups    []string
 }
 
 // WriteEntitlements creates an entitlements.plist file at the specified path.
@@ -54,6 +56,18 @@ func generateEntitlementsContent(cfg EntitlementsConfig) string {
 	// Add custom entitlements
 	for _, custom := range cfg.Custom {
 		entries = append(entries, xmlKeyBool(custom, true))
+	}
+
+	// Add custom array entitlements (sorted for deterministic output)
+	if len(cfg.CustomArrays) > 0 {
+		keys := make([]string, 0, len(cfg.CustomArrays))
+		for k := range cfg.CustomArrays {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			entries = append(entries, xmlKeyArray(k, cfg.CustomArrays[k]))
+		}
 	}
 
 	// Add app groups entitlements

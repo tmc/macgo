@@ -261,6 +261,7 @@ func createSimpleBundle(execPath string, cfg *Config) (*bundle.Bundle, error) {
 		cfg.Version,
 		permissions,
 		cfg.Custom,
+		cfg.CustomArrays,
 		cfg.AppGroups,
 		cfg.Debug,
 		cfg.CleanupBundle,

@@ -392,6 +392,69 @@ func TestGenerateEntitlementsContentOnlyAppGroups(t *testing.T) {
 	}
 }
 
+func TestGenerateEntitlementsContentCustomArrays(t *testing.T) {
+	cfg := EntitlementsConfig{
+		CustomArrays: map[string][]string{
+			"com.apple.developer.applesignin": {"Default"},
+		},
+	}
+
+	content := generateEntitlementsContent(cfg)
+
+	expectedElements := []string{
+		`<key>com.apple.developer.applesignin</key>`,
+		`<array>`,
+		`<string>Default</string>`,
+		`</array>`,
+	}
+
+	for _, expected := range expectedElements {
+		if !strings.Contains(content, expected) {
+			t.Errorf("content should contain: %s", expected)
+		}
+	}
+
+	// Should not contain boolean true (it's an array, not a bool)
+	if strings.Contains(content, `<true/>`) {
+		t.Error("custom array entitlement should not produce <true/>")
+	}
+}
+
+func TestGenerateEntitlementsContentCustomArraysMultiple(t *testing.T) {
+	cfg := EntitlementsConfig{
+		CustomArrays: map[string][]string{
+			"com.apple.developer.applesignin":             {"Default"},
+			"com.apple.developer.associated-domains":      {"applinks:example.com", "webcredentials:example.com"},
+		},
+	}
+
+	content := generateEntitlementsContent(cfg)
+
+	expectedElements := []string{
+		`<key>com.apple.developer.applesignin</key>`,
+		`<string>Default</string>`,
+		`<key>com.apple.developer.associated-domains</key>`,
+		`<string>applinks:example.com</string>`,
+		`<string>webcredentials:example.com</string>`,
+	}
+
+	for _, expected := range expectedElements {
+		if !strings.Contains(content, expected) {
+			t.Errorf("content should contain: %s", expected)
+		}
+	}
+
+	// Verify deterministic ordering (associated-domains before applesignin alphabetically)
+	domainIdx := strings.Index(content, "associated-domains")
+	signinIdx := strings.Index(content, "applesignin")
+	if domainIdx == -1 || signinIdx == -1 {
+		t.Fatal("missing expected keys in output")
+	}
+	if signinIdx > domainIdx {
+		t.Error("custom array keys should be sorted alphabetically")
+	}
+}
+
 func TestEntitlementsXMLEscaping(t *testing.T) {
 	tempDir := t.TempDir()
 	entPath := filepath.Join(tempDir, "entitlements.plist")

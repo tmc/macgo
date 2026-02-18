@@ -72,6 +72,9 @@ type Config struct {
 	// Custom allows specifying custom entitlements not covered by Permission constants.
 	Custom []string
 
+	// CustomArrays allows specifying custom entitlements with array values.
+	CustomArrays map[string][]string
+
 	// AppGroups specifies app group identifiers for sharing data between apps.
 	AppGroups []string
 
@@ -340,9 +343,10 @@ func (b *Bundle) Create() error {
 		}
 
 		entCfg := plist.EntitlementsConfig{
-			Permissions: plistPermissions,
-			Custom:      customEntitlements,
-			AppGroups:   b.Config.AppGroups,
+			Permissions:  plistPermissions,
+			Custom:       customEntitlements,
+			CustomArrays: b.Config.CustomArrays,
+			AppGroups:    b.Config.AppGroups,
 		}
 		if err := plist.WriteEntitlements(entPath, entCfg); err != nil {
 			return fmt.Errorf("failed to write entitlements: %w", err)
@@ -525,7 +529,7 @@ func (b *Bundle) ExecutablePath() string {
 // Create is a convenience function that creates a bundle from execPath and config fields.
 // This avoids the need for complex config conversion.
 func Create(execPath string, appName, bundleID, version string, permissions []string,
-	custom []string, appGroups []string, debug bool, cleanupBundle bool,
+	custom []string, customArrays map[string][]string, appGroups []string, debug bool, cleanupBundle bool,
 	codeSignIdentity, codeSigningIdentifier string, autoSign, adHocSign bool,
 	info map[string]interface{}, uiMode UIMode, devMode bool, provisioningProfile string, iconPath string) (*Bundle, error) {
 
@@ -535,6 +539,7 @@ func Create(execPath string, appName, bundleID, version string, permissions []st
 		Version:               version,
 		Permissions:           permissions,
 		Custom:                custom,
+		CustomArrays:          customArrays,
 		AppGroups:             appGroups,
 		Debug:                 debug,
 		CleanupBundle:         cleanupBundle,

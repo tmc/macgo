@@ -133,6 +133,10 @@ type Config struct {
 	// Custom allows specifying custom entitlements not covered by Permission constants.
 	Custom []string
 
+	// CustomArrays allows specifying custom entitlements with string array values.
+	// Use WithCustomArray to add entries.
+	CustomArrays map[string][]string
+
 	// AppGroups specifies app group identifiers for sharing data between apps.
 	// Requires sandbox permission and com.apple.security.application-groups entitlement.
 	AppGroups []string
@@ -302,6 +306,17 @@ func (c *Config) WithPermissions(perms ...Permission) *Config {
 // Use full entitlement identifiers (e.g. "com.apple.security.device.capture").
 func (c *Config) WithCustom(entitlements ...string) *Config {
 	c.Custom = append(c.Custom, entitlements...)
+	return c
+}
+
+// WithCustomArray adds a custom entitlement with a string array value.
+// Use for entitlements that require an array instead of a boolean
+// (e.g. "com.apple.developer.applesignin" with values ["Default"]).
+func (c *Config) WithCustomArray(key string, values ...string) *Config {
+	if c.CustomArrays == nil {
+		c.CustomArrays = make(map[string][]string)
+	}
+	c.CustomArrays[key] = append(c.CustomArrays[key], values...)
 	return c
 }
 

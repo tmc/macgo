@@ -430,6 +430,7 @@ func TestE2E_BundleStructure(t *testing.T) {
 		"1.0.0",
 		[]string{"camera"},
 		[]string{},
+		nil,                     // customArrays
 		[]string{},
 		true,                    // debug
 		false,                   // cleanupBundle (nil -> false in old, now explicit false to keep)
@@ -694,6 +695,7 @@ func BenchmarkE2E_BundleCreation(b *testing.B) {
 			"1.0.0",
 			[]string{"camera"},
 			[]string{},
+			nil,                     // customArrays
 			[]string{},
 			false,                   // debug
 			true,                    // cleanupBundle (will be cleaned up)
