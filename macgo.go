@@ -205,6 +205,12 @@ type Config struct {
 	// This eliminates the two-process architecture entirely.
 	// Enable via MACGO_SINGLE_PROCESS=1 or WithSingleProcess().
 	SingleProcess bool
+
+	// PostCreateHook is called after the bundle structure is created but
+	// before code signing. Use this to inject additional files (helper
+	// binaries, LaunchDaemon plists) into Contents/. The bundlePath
+	// argument is the .app directory path.
+	PostCreateHook func(bundlePath string, cfg *Config) error
 }
 
 // FromEnv loads configuration from environment variables.
@@ -449,6 +455,14 @@ func (c *Config) WithIcon(path string) *Config {
 // TCC-dialog permissions (Camera, Microphone, Location) require app bundles.
 func (c *Config) WithSingleProcess() *Config {
 	c.SingleProcess = true
+	return c
+}
+
+// WithPostCreateHook sets a function to run after the bundle is created but
+// before code signing. This allows injecting additional files (helper binaries,
+// LaunchDaemon plists) into the bundle's Contents/ directory.
+func (c *Config) WithPostCreateHook(fn func(bundlePath string, cfg *Config) error) *Config {
+	c.PostCreateHook = fn
 	return c
 }
 

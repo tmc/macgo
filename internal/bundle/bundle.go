@@ -116,6 +116,10 @@ type Config struct {
 
 	// IconPath is the path to an .icns file to use as the app icon.
 	IconPath string
+
+	// ResolvedSigningIdentity is set during Sign() to the identity actually used.
+	// PostCreateHook users can read this to sign inner binaries with the same identity.
+	ResolvedSigningIdentity string
 }
 
 // shouldCleanupBundle returns true if the bundle should be removed.
@@ -478,7 +482,7 @@ func (b *Bundle) Sign() error {
 			fmt.Fprintf(os.Stderr, "macgo: ad-hoc signed\n")
 		}
 	} else if b.Config.AutoSign {
-		if identity := findDeveloperID(b.Config.Debug); identity != "" {
+		if identity := findBestIdentity(b.Config.Debug); identity != "" {
 			b.Config.CodeSignIdentity = identity
 			if err := codeSignBundle(b.Path, b.Config); err != nil {
 				if b.Config.Debug {
@@ -492,9 +496,9 @@ func (b *Bundle) Sign() error {
 				fmt.Fprintf(os.Stderr, "macgo: auto-signed with identity: %s\n", identity)
 			}
 		} else {
-			// No Developer ID found; ad-hoc sign so LaunchServices can open the bundle.
+			// No identity found; ad-hoc sign so LaunchServices can open the bundle.
 			if b.Config.Debug {
-				fmt.Fprintf(os.Stderr, "macgo: no Developer ID found, using ad-hoc signing\n")
+				fmt.Fprintf(os.Stderr, "macgo: no signing identity found, using ad-hoc signing\n")
 			}
 			b.Config.CodeSignIdentity = "-"
 			if err := codeSignBundle(b.Path, b.Config); err != nil {
@@ -503,6 +507,7 @@ func (b *Bundle) Sign() error {
 		}
 	}
 
+	b.Config.ResolvedSigningIdentity = b.Config.CodeSignIdentity
 	return nil
 }
 

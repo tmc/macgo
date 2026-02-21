@@ -25,15 +25,53 @@ func FindDeveloperID() string {
 
 	for _, line := range strings.Split(string(output), "\n") {
 		if strings.Contains(line, "Developer ID Application") {
-			if start := strings.Index(line, `"`); start != -1 {
-				if end := strings.LastIndex(line, `"`); end != -1 && end > start {
-					return line[start+1 : end]
-				}
+			if id := extractQuoted(line); id != "" {
+				return id
 			}
 		}
 	}
 
 	return ""
+}
+
+// FindBestIdentity returns the strongest available signing identity.
+// Preference order: Developer ID Application > Apple Development > "".
+// Returns empty string if no Apple-issued identity is found; callers
+// should fall back to ad-hoc ("-") when appropriate.
+func FindBestIdentity() string {
+	cmd := exec.Command("security", "find-identity", "-v", "-p", "codesigning")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	var appleDev string
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.Contains(line, "Developer ID Application") {
+			if id := extractQuoted(line); id != "" {
+				return id
+			}
+		}
+		if appleDev == "" && strings.Contains(line, "Apple Development") {
+			if id := extractQuoted(line); id != "" {
+				appleDev = id
+			}
+		}
+	}
+	return appleDev
+}
+
+// extractQuoted returns the first double-quoted substring in line.
+func extractQuoted(line string) string {
+	start := strings.Index(line, `"`)
+	if start == -1 {
+		return ""
+	}
+	end := strings.LastIndex(line, `"`)
+	if end <= start {
+		return ""
+	}
+	return line[start+1 : end]
 }
 
 // ValidateCodeSignIdentity checks if the provided code signing identity is valid
@@ -83,12 +121,9 @@ func ListAvailableIdentities() ([]string, error) {
 		if strings.Contains(line, "valid identities found") {
 			continue
 		}
-		if strings.Contains(line, `"`) && !strings.Contains(line, "invalid") {
-			if start := strings.Index(line, `"`); start != -1 {
-				if end := strings.LastIndex(line, `"`); end != -1 && end > start {
-					identity := line[start+1 : end]
-					identities = append(identities, identity)
-				}
+		if !strings.Contains(line, "invalid") {
+			if id := extractQuoted(line); id != "" {
+				identities = append(identities, id)
 			}
 		}
 	}

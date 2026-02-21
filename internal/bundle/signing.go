@@ -13,11 +13,45 @@ import (
 
 // codeSignBundle signs the app bundle with the configured identity and options.
 // This function handles both regular code signing and ad-hoc signing.
+//
+// Before signing, non-code files (entitlements.plist, .source_hash) are moved
+// out of Contents/ to a temp directory. codesign without --deep treats these
+// as unsigned subcomponents and refuses to sign. The entitlements file is
+// referenced via --entitlements from the temp path. These files are not
+// restored — they would break the seal if added after signing.
 func codeSignBundle(bundlePath string, cfg *Config) error {
+	contentsDir := filepath.Join(bundlePath, "Contents")
+
+	// Move non-code files out of Contents/ before signing.
+	// codesign treats files in Contents/ as subcomponents and fails
+	// if they aren't signed Mach-O binaries or standard resources.
+	tmpDir, err := os.MkdirTemp("", "macgo-sign-*")
+	if err != nil {
+		return fmt.Errorf("create temp dir for signing: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	entSrc := filepath.Join(contentsDir, "entitlements.plist")
+	entTmp := filepath.Join(tmpDir, "entitlements.plist")
+	if _, err := os.Stat(entSrc); err == nil {
+		if err := os.Rename(entSrc, entTmp); err != nil {
+			return fmt.Errorf("move entitlements out of bundle: %w", err)
+		}
+	}
+
+	hashSrc := filepath.Join(contentsDir, ".source_hash")
+	if _, err := os.Stat(hashSrc); err == nil {
+		if err := os.Rename(hashSrc, filepath.Join(tmpDir, ".source_hash")); err != nil {
+			return fmt.Errorf("move source hash out of bundle: %w", err)
+		}
+	}
+
+	// Don't restore these files after signing — they would break
+	// the code signature seal since they weren't present at signing time.
+
 	args := []string{
 		"--sign", cfg.CodeSignIdentity,
 		"--force",
-		"--deep",
 	}
 
 	if cfg.CodeSignIdentity != "-" {
@@ -49,10 +83,9 @@ func codeSignBundle(bundlePath string, cfg *Config) error {
 	// Always add the identifier flag
 	args = append(args, "--identifier", identifier)
 
-	// Check for entitlements file and add it if present
-	entitlementsPath := filepath.Join(bundlePath, "Contents", "entitlements.plist")
-	if _, err := os.Stat(entitlementsPath); err == nil {
-		args = append(args, "--entitlements", entitlementsPath)
+	// Reference entitlements from temp path (outside the bundle)
+	if _, err := os.Stat(entTmp); err == nil {
+		args = append(args, "--entitlements", entTmp)
 	}
 
 	args = append(args, bundlePath)
@@ -84,6 +117,16 @@ func findDeveloperID(debug bool) string {
 		} else {
 			fmt.Fprintf(os.Stderr, "macgo: found fallback identity: %s\n", identity)
 		}
+	}
+	return identity
+}
+
+// findBestIdentity returns the strongest available signing identity.
+// Preference: Developer ID Application > Apple Development > "".
+func findBestIdentity(debug bool) string {
+	identity := codesign.FindBestIdentity()
+	if debug && identity != "" {
+		fmt.Fprintf(os.Stderr, "macgo: best identity: %s\n", identity)
 	}
 	return identity
 }
