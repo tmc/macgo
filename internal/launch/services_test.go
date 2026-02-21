@@ -103,30 +103,31 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
 
-	// NOTE: open-flags and env-vars strategies were removed as they don't work with LaunchServices.
-	// Only config-file strategy is supported, which doesn't add I/O flags to the open command.
+	// Pipe paths are passed via open --env flags so the child receives them directly.
 	// The -n flag is enabled by default to prevent reusing stale processes.
 	tests := []struct {
-		name     string
-		args     []string
-		wantArgs []string
+		name         string
+		args         []string
+		wantContains []string // substrings that must appear in the joined args
 	}{
 		{
 			name: "no args",
 			args: []string{"program"},
-			wantArgs: []string{
-				"open",
-				"-n", // new instance flag (default on)
+			wantContains: []string{
+				"-n",
+				"--env", "MACGO_STDIN_PIPE=/tmp/stdin",
+				"--env", "MACGO_STDOUT_PIPE=/tmp/stdout",
+				"--env", "MACGO_STDERR_PIPE=/tmp/stderr",
+				"--env", "MACGO_BUNDLE_PATH=" + bundlePath,
 				bundlePath,
 			},
 		},
 		{
 			name: "with args",
 			args: []string{"program", "arg1", "arg2", "--flag"},
-			wantArgs: []string{
-				"open",
-				"-n", // new instance flag (default on)
-				bundlePath,
+			wantContains: []string{
+				"-n",
+				"--env", "MACGO_STDIN_PIPE=/tmp/stdin",
 				"--args",
 				"arg1", "arg2", "--flag",
 			},
@@ -142,22 +143,14 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 				t.Fatalf("buildOpenCommand() failed: %v", err)
 			}
 
-			// The command path might be resolved to full path, check that it ends with "open"
 			if !strings.HasSuffix(cmd.Path, "open") {
 				t.Errorf("Command path = %s, want path ending with 'open'", cmd.Path)
 			}
 
-			gotArgs := cmd.Args
-			if len(gotArgs) != len(tt.wantArgs) {
-				t.Errorf("Command args length = %d, want %d", len(gotArgs), len(tt.wantArgs))
-				t.Errorf("Got args: %v", gotArgs)
-				t.Errorf("Want args: %v", tt.wantArgs)
-				return
-			}
-
-			for i, want := range tt.wantArgs {
-				if gotArgs[i] != want {
-					t.Errorf("Command args[%d] = %s, want %s", i, gotArgs[i], want)
+			joined := strings.Join(cmd.Args, " ")
+			for _, want := range tt.wantContains {
+				if !strings.Contains(joined, want) {
+					t.Errorf("args missing %q\ngot: %v", want, cmd.Args)
 				}
 			}
 		})

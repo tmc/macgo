@@ -230,8 +230,9 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	//    - Deadlock: xpcproxy waits for parent, parent waits for app
 	//
 	// 2. MACGO_IO_STRATEGY=env-vars
-	//    - macOS's `open --env` does NOT pass env vars to bundled apps
-	//    - Child never receives MACGO_STDOUT_PIPE/MACGO_STDERR_PIPE
+	//    - macOS's `open --env` DOES pass env vars to bundled apps (verified experimentally)
+	//    - Pipe paths are now passed via --env flags as the primary mechanism
+	//    - Config-file discovery remains as fallback for edge cases
 	//
 	// 3. Direct execution bypasses TCC permission prompts
 	//    - Works for I/O but user never sees permission dialogs
@@ -925,11 +926,34 @@ func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath stri
 		}
 	}
 
-	// When using pipes, the config-file strategy is used:
-	// Pipe paths are written to a config file that the child discovers and reads.
-	// NOTE: Other strategies (open-flags, env-vars) do NOT work with LaunchServices
-	// because xpcproxy causes deadlocks with FIFO flags or doesn't pass env vars.
-	// The config-file approach is the only working strategy.
+	// Pass pipe paths via open --env so the child receives them directly.
+	// The child checks env vars first (before config-file fallback), so this
+	// eliminates the need for filesystem-based config discovery in most cases.
+	if pipes != nil {
+		cwd, _ := os.Getwd()
+		if pipes.stdin != "" {
+			args = append(args, "--env", "MACGO_STDIN_PIPE="+pipes.stdin)
+		}
+		if pipes.stdout != "" {
+			args = append(args, "--env", "MACGO_STDOUT_PIPE="+pipes.stdout)
+		}
+		if pipes.stderr != "" {
+			args = append(args, "--env", "MACGO_STDERR_PIPE="+pipes.stderr)
+		}
+		if pipes.done != "" {
+			args = append(args, "--env", "MACGO_DONE_FILE="+pipes.done)
+		}
+		if pipes.pid != "" {
+			args = append(args, "--env", "MACGO_PID_FILE="+pipes.pid)
+		}
+		if cwd != "" {
+			args = append(args, "--env", "MACGO_CWD="+cwd)
+		}
+		if origExec := os.Getenv("MACGO_ORIGINAL_EXECUTABLE"); origExec != "" {
+			args = append(args, "--env", "MACGO_ORIGINAL_EXECUTABLE="+origExec)
+		}
+		args = append(args, "--env", "MACGO_BUNDLE_PATH="+bundlePath)
+	}
 
 	// Add the bundle path
 	if noWait {
