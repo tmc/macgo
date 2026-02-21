@@ -255,50 +255,21 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	var pipes *pipeSet
 	var pipeDir string
 
-	// Create pipes for I/O forwarding (using FIFOs by default, or regular files)
+	// I/O Forwarding with LaunchServices
 	//
-	// IMPORTANT: I/O Forwarding with LaunchServices
-	// ==============================================
+	// Pipe paths (FIFOs) and control pipe are passed to the child via open --env.
+	// The child reads MACGO_*_PIPE and MACGO_CONTROL_PIPE from its environment,
+	// opens them for writing, and I/O flows via io.Copy with clean EOF on close.
 	//
-	// CONFIG-FILE STRATEGY (DEFAULT, WORKS):
-	// 1. Parent creates FIFOs in temp directory
-	// 2. Parent writes FIFO paths to config file
-	// 3. Parent runs: open -n bundle.app (NO -i/-o flags)
-	// 4. xpcproxy spawns app with /dev/null for stdio (no FIFO involvement at spawn)
-	// 5. Child reads config file, opens FIFOs for writing
-	// 6. Parent's blocking open(O_RDONLY) completes when child opens
-	// 7. io.Copy works, EOF when child closes - clean termination
-	//
-	// WHY FIFOs ARE SAFE WITH CONFIG-FILE:
-	// - xpcproxy never touches FIFOs (no -i/-o flags passed to open)
-	// - Child opens FIFOs AFTER being spawned, not during posix_spawn
-	// - Parent opens with O_RDONLY in goroutine (blocks until child opens)
-	// - Clean EOF semantics when child closes write end
-	//
-	// BROKEN APPROACHES (DO NOT USE):
-	// 1. open -i fifo -o fifo --stderr fifo bundle.app
-	//    - xpcproxy tries to open() FIFOs during posix_spawn setup
-	//    - FIFO open(O_WRONLY) blocks waiting for reader
-	//    - Deadlock: xpcproxy waits for parent, parent waits for app
-	//
-	// 2. MACGO_IO_STRATEGY=env-vars
-	//    - macOS's `open --env` DOES pass env vars to bundled apps (verified experimentally)
-	//    - Pipe paths are now passed via --env flags as the primary mechanism
-	//    - Config-file discovery remains as fallback for edge cases
-	//
-	// 3. Direct execution bypasses TCC permission prompts
-	//    - Works for I/O but user never sees permission dialogs
+	// xpcproxy never touches FIFOs (no -i/-o flags passed to open), so there
+	// is no deadlock risk during posix_spawn. Direct execution is not used
+	// because it bypasses TCC permission prompts.
 	//
 	// I/O Forwarding Control:
 	// - Default: FIFO-based I/O forwarding (works reliably with LaunchServices)
 	// - MACGO_TTY_PASSTHROUGH=1           Pass TTY device directly to child (experimental)
 	// - MACGO_DISABLE_IO_FORWARDING=1     Disable all I/O forwarding
 	// - MACGO_IO_LOG_DIR=<path>           Directory to write I/O debug logs
-	//
-	// TTY Passthrough (experimental):
-	// When MACGO_TTY_PASSTHROUGH=1 is set and running on a terminal, the parent's
-	// terminal device is passed directly to the child. This preserves isatty()=true
-	// but may have issues with some terminal configurations.
 	useTTYPassthrough := os.Getenv("MACGO_TTY_PASSTHROUGH") == "1" && getTTYPath() != ""
 	if useTTYPassthrough {
 		s.logger.Debug("TTY passthrough enabled via MACGO_TTY_PASSTHROUGH=1", "tty", getTTYPath())
@@ -312,7 +283,6 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	enableStdout := !disableIO
 	enableStderr := !disableIO
 
-	var configFile string
 	// Always create pipe directory for PID tracking (even in TTY passthrough mode)
 	// This allows signal forwarding to work regardless of I/O mode
 	var err error
@@ -327,13 +297,6 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	if err != nil {
 		return fmt.Errorf("create named pipes: %w", err)
 	}
-
-	// Write config file for child discovery (includes bundle path for matching)
-	configFile = filepath.Join(pipeDir, "config")
-	if err := s.writePipeConfig(configFile, pipes, bundlePath); err != nil {
-		return fmt.Errorf("write pipe config: %w", err)
-	}
-	s.logger.Debug("wrote pipe config", "config", configFile)
 
 	// Build the launch command
 	cmd, err := s.buildOpenCommand(sigCtx, bundlePath, pipes, noWait, cfg)
@@ -517,7 +480,7 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 	// If we have pipes, wait for stdout/stderr or command completion
 	if ioErrChan != nil && expectedIOCount > 0 {
 
-		// I/O timeout is disabled by default since config-file strategy has proper EOF handling.
+		// I/O timeout is disabled by default since FIFO EOF handling is reliable.
 		// Can be explicitly enabled via MACGO_IO_TIMEOUT for debugging.
 		var ioTimerChan <-chan time.Time
 		if timeoutEnv := os.Getenv("MACGO_IO_TIMEOUT"); timeoutEnv != "" {
@@ -776,40 +739,6 @@ func cleanupStalePipeDirectories() {
 	}
 }
 
-// writePipeConfig writes pipe paths to a config file (for config-file strategy).
-func (s *ServicesLauncher) writePipeConfig(configFile string, pipes *pipeSet, bundlePath string) error {
-	var config string
-
-	// Preserve current working directory
-	cwd, _ := os.Getwd()
-
-	// Write stdout, stderr, bundle path (for matching), and CWD
-	config = fmt.Sprintf("MACGO_STDOUT_PIPE=%s\nMACGO_STDERR_PIPE=%s\nMACGO_BUNDLE_PATH=%s\nMACGO_CWD=%s\n",
-		pipes.stdout, pipes.stderr, bundlePath, cwd)
-
-	// Only write stdin if it was created
-	if pipes.stdin != "" {
-		config = fmt.Sprintf("MACGO_STDIN_PIPE=%s\n%s", pipes.stdin, config)
-	}
-
-	// Include control pipe path for PID handshake
-	if pipes.control != "" {
-		config = fmt.Sprintf("MACGO_CONTROL_PIPE=%s\n%s", pipes.control, config)
-	}
-
-	// Pass original executable path so the child can find the real binary
-	if origExec := os.Getenv("MACGO_ORIGINAL_EXECUTABLE"); origExec != "" {
-		config = fmt.Sprintf("MACGO_ORIGINAL_EXECUTABLE=%s\n%s", origExec, config)
-	}
-
-	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
-		s.logger.Error("writePipeConfig: failed to write config file", "path", configFile, "error", err)
-		return fmt.Errorf("write config file: %w", err)
-	}
-	s.logger.Debug("writePipeConfig: wrote config file", "path", configFile, "bundlePath", bundlePath)
-
-	return nil
-}
 
 // createNamedPipes creates the named pipes (FIFOs or regular files) for I/O forwarding.
 func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableStdout, enableStderr bool) (*pipeSet, error) {
@@ -894,8 +823,6 @@ func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath stri
 	}
 
 	// Pass pipe paths via open --env so the child receives them directly.
-	// The child checks env vars first (before config-file fallback), so this
-	// eliminates the need for filesystem-based config discovery in most cases.
 	if pipes != nil {
 		cwd, _ := os.Getwd()
 		if pipes.stdin != "" {

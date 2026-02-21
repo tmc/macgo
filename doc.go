@@ -138,7 +138,7 @@
 //	MACGO_STDERR_PIPE         Path to stderr named pipe (child writes to parent)
 //	MACGO_CONTROL_PIPE        Path to control FIFO (child writes PID for signal forwarding)
 //	MACGO_CWD                 Original working directory to restore in child
-//	MACGO_BUNDLE_PATH         Path to the .app bundle (for config file matching)
+//	MACGO_BUNDLE_PATH         Path to the .app bundle
 //	MACGO_ORIGINAL_EXECUTABLE Path to the original binary before bundle copy
 //	MACGO_SINGLE_PROCESS_ACTIVE  Sentinel: set to "1" after single-process re-exec
 //

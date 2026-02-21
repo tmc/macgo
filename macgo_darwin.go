@@ -1,7 +1,6 @@
 package macgo
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/tmc/macgo/internal/bundle"
 	"github.com/tmc/macgo/internal/launch"
@@ -43,48 +41,16 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		}
 	}
 
-	// Check for MACGO_*_PIPE env vars (restored for V2 env-flags support).
-	// Any pipe env var indicates we're a relaunched child — stdin may not
-	// always be present (e.g., when shouldAutoEnableStdin returns false).
-	if os.Getenv("MACGO_STDIN_PIPE") != "" || os.Getenv("MACGO_STDOUT_PIPE") != "" || os.Getenv("MACGO_STDERR_PIPE") != "" {
+	// Detect relaunched child via env vars set by parent's open --env.
+	// Any pipe or control env var means we are the child process.
+	isChild := os.Getenv("MACGO_STDOUT_PIPE") != "" ||
+		os.Getenv("MACGO_STDERR_PIPE") != "" ||
+		os.Getenv("MACGO_STDIN_PIPE") != "" ||
+		os.Getenv("MACGO_CONTROL_PIPE") != ""
+
+	if isChild {
 		if cfg.Debug {
-			fmt.Fprintf(os.Stderr, "macgo: detected pipes via environment\n")
-		}
-		if err := setupPipeRedirection(cfg.Debug); err != nil {
-			if cfg.Debug {
-				fmt.Fprintf(os.Stderr, "macgo: failed to setup pipe redirection: %v\n", err)
-			}
-		} else {
-			// Successfully set up pipes via env, register exit handler and return
-			registerExitHandler(cfg.Debug)
-			return nil
-		}
-	}
-
-	// Check for V2 launcher config file
-	// Since `open --args` doesn't reliably pass arguments to .app bundles,
-	// we look for a config file in a well-known location based on parent PID
-	configFile := findPipeConfig(cfg.Debug)
-
-	// Note: We check env vars first now to support open --env
-
-	// If we found a matching config file, we're in the relaunched app
-	if configFile != "" {
-		if cfg.Debug {
-			execPath, _ := os.Executable()
-			fmt.Fprintf(os.Stderr, "macgo: detected relaunch with I/O pipes (PID: %d, exec: %s)\n", os.Getpid(), execPath)
-			if configFile != "" {
-				fmt.Fprintf(os.Stderr, "macgo: loading pipe config from: %s\n", configFile)
-			}
-		}
-
-		// Load config file if provided (V2 launcher)
-		if configFile != "" {
-			if err := loadPipeConfig(configFile); err != nil {
-				if cfg.Debug {
-					fmt.Fprintf(os.Stderr, "macgo: failed to load pipe config: %v\n", err)
-				}
-			}
+			fmt.Fprintf(os.Stderr, "macgo: detected relaunch via environment (PID: %d)\n", os.Getpid())
 		}
 
 		// Write our PID to the control FIFO so parent can forward signals
@@ -105,16 +71,14 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 			}
 		}
 
-		// Transparently redirect stdout/stderr to the named pipes
+		// Redirect stdout/stderr/stdin to the named pipes
 		if err := setupPipeRedirection(cfg.Debug); err != nil {
 			if cfg.Debug {
 				fmt.Fprintf(os.Stderr, "macgo: failed to setup pipe redirection: %v\n", err)
 			}
 		}
 
-		// Register signal handler to write done file on termination
 		registerExitHandler(cfg.Debug)
-
 		return nil
 	}
 
@@ -295,29 +259,52 @@ func createSimpleBundle(execPath string, cfg *Config) (*bundle.Bundle, error) {
 		permissions = append(permissions, string(perm))
 	}
 
-	// Use the bundle package to create the bundle
-	return bundle.Create(
-		execPath,
-		cfg.AppName,
-		cfg.BundleID,
-		cfg.Version,
-		permissions,
-		cfg.Custom,
-		cfg.CustomStrings,
-		cfg.CustomArrays,
-		cfg.AppGroups,
-		cfg.Debug,
-		cfg.CleanupBundle,
-		cfg.CodeSignIdentity,
-		cfg.CodeSigningIdentifier,
-		cfg.AutoSign,
-		cfg.AdHocSign,
-		cfg.Info,
-		bundle.UIMode(cfg.UIMode),
-		cfg.DevMode,
-		cfg.ProvisioningProfile,
-		cfg.IconPath,
-	)
+	bundleCfg := &bundle.Config{
+		AppName:               cfg.AppName,
+		BundleID:              cfg.BundleID,
+		Version:               cfg.Version,
+		Permissions:           permissions,
+		Custom:                cfg.Custom,
+		CustomStrings:         cfg.CustomStrings,
+		CustomArrays:          cfg.CustomArrays,
+		AppGroups:             cfg.AppGroups,
+		Debug:                 cfg.Debug,
+		CleanupBundle:         cfg.CleanupBundle,
+		CodeSignIdentity:      cfg.CodeSignIdentity,
+		CodeSigningIdentifier: cfg.CodeSigningIdentifier,
+		AutoSign:              cfg.AutoSign,
+		AdHocSign:             cfg.AdHocSign,
+		Info:                  cfg.Info,
+		UIMode:                bundle.UIMode(cfg.UIMode),
+		DevMode:               cfg.DevMode,
+		ProvisioningProfile:   cfg.ProvisioningProfile,
+		IconPath:              cfg.IconPath,
+	}
+
+	b, err := bundle.New(execPath, bundleCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.Create(); err != nil {
+		return nil, err
+	}
+
+	// Run user hook between Create and Sign.
+	if cfg.PostCreateHook != nil {
+		if err := cfg.PostCreateHook(b.Path, cfg); err != nil {
+			return nil, fmt.Errorf("post-create hook: %w", err)
+		}
+		// Hook modified bundle contents, so force re-signing even if
+		// Create() determined the bundle was up-to-date.
+		b.ForceResign()
+	}
+
+	if err := b.Sign(); err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }
 
 // convertPermissions converts Permission values to strings for the launch package.
@@ -351,162 +338,9 @@ func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Con
 	return manager.Launch(ctx, bundlePath, execPath, launchCfg)
 }
 
-// findPipeConfig looks for a V2 launcher config file in /tmp/macgo-*/config.
-// Returns the path to the config file if found, empty string otherwise.
-// It matches config files by bundle path to handle nested macgo calls correctly.
-func findPipeConfig(debug bool) string {
-	// Get current executable path to match against config files
-	execPath, err := os.Executable()
-	if err != nil {
-		if debug {
-			fmt.Fprintf(os.Stderr, "macgo: error getting executable path: %v\n", err)
-		}
-		return ""
-	}
-
-	// The bundle path is the .app directory containing our executable
-	// e.g., /path/to/App.app/Contents/MacOS/App -> /path/to/App.app
-	bundlePath := ""
-	if idx := strings.Index(execPath, ".app/"); idx != -1 {
-		bundlePath = execPath[:idx+4] // Include ".app"
-	}
-
-	if debug {
-		fmt.Fprintf(os.Stderr, "macgo: findPipeConfig: execPath=%q\n", execPath)
-		fmt.Fprintf(os.Stderr, "macgo: findPipeConfig: determined bundlePath=%q\n", bundlePath)
-	}
-
-	if bundlePath == "" {
-		if debug {
-			fmt.Fprintf(os.Stderr, "macgo: findPipeConfig: no .app/ found in path, assuming CLI mode, checking parent PID configs...\n")
-		}
-		// Logic to handle CLI tool scenario?
-	}
-
-	// Look for recent config files in ~/Library/Application Support/macgo/pipes/
-	// This location is user-specific and protected by macOS sandbox rules
-	var matches []string
-	if home, err := os.UserHomeDir(); err == nil {
-		pattern := filepath.Join(home, "Library", "Application Support", "macgo", "pipes", "*", "config")
-		if m, err := filepath.Glob(pattern); err == nil {
-			matches = m
-		}
-	}
-	// Fallback: also check /tmp/macgo/ for backward compatibility
-	if fallbackMatches, err := filepath.Glob(filepath.Join(os.TempDir(), "macgo", "*", "config")); err == nil {
-		matches = append(matches, fallbackMatches...)
-	}
-
-	// Find the most recent config file that matches our bundle path
-	var newestConfig string
-	var newestTime time.Time
-	var skippedOld, skippedMismatch int
-
-	for _, match := range matches {
-		info, err := os.Stat(match)
-		if err != nil {
-			continue
-		}
-
-		// Only consider files modified within the last 10 seconds
-		age := time.Since(info.ModTime())
-		if age > 10*time.Second {
-			skippedOld++
-			continue
-		}
-
-		// Read the config file to check if it's for our bundle
-		configBundle := readBundlePathFromConfig(match)
-
-		if debug {
-			fmt.Fprintf(os.Stderr, "macgo: checking candidate %s: bundlePath=%q vs configBundle=%q\n", filepath.Base(match), bundlePath, configBundle)
-		}
-
-		// Only use configs that match our bundle path
-		// If bundlePath is empty (CLI tool?), matches might be ambiguous.
-		if configBundle != "" && configBundle != bundlePath {
-			skippedMismatch++
-			continue
-		}
-
-		if debug {
-			fmt.Fprintf(os.Stderr, "macgo: config candidate match found: %s\n", match)
-		}
-
-		if newestConfig == "" || info.ModTime().After(newestTime) {
-			newestConfig = match
-			newestTime = info.ModTime()
-		}
-	}
-
-	if debug && (skippedOld > 0 || skippedMismatch > 0) {
-		fmt.Fprintf(os.Stderr, "macgo: skipped %d old and %d mismatched configs\n", skippedOld, skippedMismatch)
-	}
-
-	if newestConfig != "" && debug {
-		fmt.Fprintf(os.Stderr, "macgo: selected config file: %s (age: %v)\n", newestConfig, time.Since(newestTime))
-	}
-
-	return newestConfig
-}
-
-// readBundlePathFromConfig reads the MACGO_BUNDLE_PATH from a config file.
-func readBundlePathFromConfig(configFile string) string {
-	f, err := os.Open(configFile)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "MACGO_BUNDLE_PATH=") {
-			return strings.TrimPrefix(line, "MACGO_BUNDLE_PATH=")
-		}
-	}
-	return ""
-}
-
-// loadPipeConfig reads pipe paths from a config file and sets them as environment variables.
-func loadPipeConfig(configFile string) error {
-	f, err := os.Open(configFile)
-	if err != nil {
-		return fmt.Errorf("open config file: %w", err)
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Parse KEY=VALUE format
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		// Set MACGO_*_PIPE, MACGO_CWD, and MACGO_ORIGINAL_EXECUTABLE variables
-		if strings.HasPrefix(key, "MACGO_") && (strings.HasSuffix(key, "_PIPE") || key == "MACGO_CWD" || key == "MACGO_ORIGINAL_EXECUTABLE") {
-			os.Setenv(key, value)
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("read config file: %w", err)
-	}
-
-	return nil
-}
 
 // setupPipeRedirection transparently redirects stdout/stderr/stdin to named pipes if present.
-// This is used by ServicesLauncherV2 which passes pipe paths via config file.
+// Pipe paths are received via open --env from the parent process.
 func setupPipeRedirection(debug bool) error {
 	// Log before any redirection in case stderr gets redirected
 	if debug {
