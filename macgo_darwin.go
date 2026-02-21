@@ -491,8 +491,8 @@ func loadPipeConfig(configFile string) error {
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
 
-		// Set MACGO_*_PIPE, MACGO_DONE_FILE, MACGO_CWD, and MACGO_ORIGINAL_EXECUTABLE variables
-		if strings.HasPrefix(key, "MACGO_") && (strings.HasSuffix(key, "_PIPE") || key == "MACGO_DONE_FILE" || key == "MACGO_CWD" || key == "MACGO_ORIGINAL_EXECUTABLE") {
+		// Set MACGO_*_PIPE, MACGO_CWD, and MACGO_ORIGINAL_EXECUTABLE variables
+		if strings.HasPrefix(key, "MACGO_") && (strings.HasSuffix(key, "_PIPE") || key == "MACGO_CWD" || key == "MACGO_ORIGINAL_EXECUTABLE") {
 			os.Setenv(key, value)
 		}
 	}
@@ -561,15 +561,13 @@ func setupPipeRedirection(debug bool) error {
 // This function is called in the child process (the app running inside the bundle).
 // It handles the following signals:
 //
-//   - SIGINT, SIGTERM, SIGHUP: Write done file (if configured), exit with 128+signal
+//   - SIGINT, SIGTERM, SIGHUP: Exit with 128+signal
 //   - SIGQUIT: Dump all goroutine stacks to stderr, then exit with 128+signal
 //   - SIGWINCH: Log receipt (debug mode only), do not exit
 //
 // The parent process forwards signals to us since we have PPID=1 (adopted by launchd)
 // and are not in the terminal's foreground process group.
 func registerExitHandler(debug bool) {
-	doneFile := os.Getenv("MACGO_DONE_FILE")
-
 	// Always register signal handlers for stack dumps and cleanup
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
@@ -584,10 +582,6 @@ func registerExitHandler(debug bool) {
 		}
 		// Convert signal to exit code (128 + signal number)
 		exitCode := 128 + int(sig.(syscall.Signal))
-		// Write done file if configured (non-FIFO mode)
-		if doneFile != "" {
-			writeDoneFile()
-		}
 		os.Exit(exitCode)
 	}()
 
@@ -628,30 +622,6 @@ func writeChildPID(configFile string, debug bool) error {
 		fmt.Fprintf(os.Stderr, "macgo: wrote child PID %d to %s\n", os.Getpid(), pidFile)
 	}
 	return nil
-}
-
-// writeDoneFile writes the done/sentinel file to signal that the child has exited.
-func writeDoneFile() {
-	doneFile := os.Getenv("MACGO_DONE_FILE")
-	if doneFile == "" {
-		return
-	}
-
-	// Flush stdout and stderr before writing done file to ensure all data is written
-	// This is critical: the parent will stop reading pipes once it sees the done file
-	_ = os.Stdout.Sync()
-	_ = os.Stderr.Sync()
-
-	// Longer delay to allow the data to propagate through the pipe chain
-	// In nested macgo scenarios, data needs to flow through multiple pipe layers
-	time.Sleep(200 * time.Millisecond)
-
-	// Write process exit info to the done file
-	content := fmt.Sprintf("done\npid=%d\ntime=%s\n", os.Getpid(), time.Now().Format(time.RFC3339))
-	if err := os.WriteFile(doneFile, []byte(content), 0600); err != nil {
-		// Can't do much if this fails, just try to continue
-		fmt.Fprintf(os.Stderr, "macgo: failed to write done file: %v\n", err)
-	}
 }
 
 // substituteTeamID automatically detects team ID and substitutes "TEAMID" placeholders in app groups

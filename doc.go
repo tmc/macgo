@@ -136,7 +136,6 @@
 //	MACGO_STDIN_PIPE          Path to stdin named pipe (child reads from parent)
 //	MACGO_STDOUT_PIPE         Path to stdout named pipe (child writes to parent)
 //	MACGO_STDERR_PIPE         Path to stderr named pipe (child writes to parent)
-//	MACGO_DONE_FILE           Path to sentinel file signaling child exit
 //	MACGO_CWD                 Original working directory to restore in child
 //	MACGO_BUNDLE_PATH         Path to the .app bundle (for config file matching)
 //	MACGO_ORIGINAL_EXECUTABLE Path to the original binary before bundle copy
@@ -180,16 +179,9 @@
 //
 // # Cleanup
 //
-// When using macgo with I/O forwarding (the default), call Cleanup on exit:
-//
-//	func main() {
-//	    defer macgo.Cleanup()
-//	    err := macgo.Request(macgo.Camera)
-//	    // ...
-//	}
-//
-// Signal handlers (SIGINT, SIGTERM) call cleanup automatically, but an explicit
-// defer ensures proper behavior on normal exit.
+// Cleanup is no longer required. FIFO-based I/O forwarding uses pipe EOF as
+// the exit signal, so no explicit cleanup call is needed. The function is
+// retained as a no-op for backward compatibility.
 //
 // # TCC Integration
 //

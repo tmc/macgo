@@ -559,13 +559,9 @@ func LaunchAppBundle(bundlePath string) error {
 }
 
 // Cleanup should be called when the macgo-wrapped application exits.
-// It writes the sentinel file that signals to the parent process that the
-// child has finished, enabling proper I/O forwarding completion.
+// Cleanup is a no-op retained for backward compatibility. Previously it wrote
+// a sentinel file to signal the parent that the child had exited. With FIFO-based
+// I/O forwarding, pipe EOF serves as the exit signal and no sentinel is needed.
 //
-// Deprecated: Use the cleanup function returned by Start() instead.
-func Cleanup() {
-	if runtime.GOOS != "darwin" {
-		return
-	}
-	writeDoneFile()
-}
+// Deprecated: No longer required. Safe to remove from callers.
+func Cleanup() {}

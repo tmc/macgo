@@ -47,9 +47,8 @@ import (
 type ServicesLauncher struct {
 	logger        *Logger
 	mu            sync.Mutex    // protects process access during signal forwarding
-	doneFile      string        // path to sentinel file that child writes when exiting
 	firstOutputCh chan struct{} // closed when first output is received (signals successful launch)
-	useFifo       bool          // true if using FIFOs (EOF signals completion, no done file needed)
+	useFifo       bool          // true if using FIFOs (EOF signals completion)
 	childPID      int           // PID of the actual app process (for signal forwarding)
 	pidFile       string        // path to file where child writes its PID
 	lastSignal    atomic.Int32  // most recent signal received by the parent
@@ -60,7 +59,6 @@ type pipeSet struct {
 	stdin  string
 	stdout string
 	stderr string
-	done   string // sentinel file written by child when it exits
 	pid    string // file where child writes its PID
 }
 
@@ -455,7 +453,6 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	}
 
 	// Always set up PID tracking for signal forwarding
-	s.doneFile = pipes.done
 	s.pidFile = pipes.pid
 
 	// Start waiting for child PID in background (for signal forwarding)
@@ -601,38 +598,8 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 			}
 		}
 
-		// All IO forwarding completed
-
-		// With FIFOs, EOF on stdout/stderr means the child closed them (typically by exiting).
-		// This is a reliable signal - no need to wait for the done file.
-		// Only wait for done file when using regular files (polling mode) where we can't
-		// detect child exit from EOF.
-		if s.useFifo {
-			goto exitCleanly
-		}
-
-		// If we have a doneFile sentinel, wait for it before exiting
-		// This allows long-running servers to keep running even after initial output
-		if s.doneFile != "" {
-			for {
-				select {
-				case <-ctx.Done():
-					s.mu.Lock()
-					if cmd.Process != nil {
-						_ = cmd.Process.Kill()
-					}
-					s.mu.Unlock()
-					s.exitWithSignalForwarding(pipeDir, 130)
-				default:
-					if _, err := os.Stat(s.doneFile); err == nil {
-						goto exitCleanly
-					}
-					time.Sleep(500 * time.Millisecond)
-				}
-			}
-		}
-
-	exitCleanly:
+		// All IO forwarding completed — EOF on stdout/stderr means the child
+		// closed them (typically by exiting). Exit cleanly.
 		// Kill the open process if it's still running
 		s.mu.Lock()
 		if cmd.Process != nil {
@@ -712,34 +679,8 @@ func (s *ServicesLauncher) handleNoWaitMode(ctx context.Context, ioErrChan chan 
 			}
 		}
 
-		// With FIFOs, EOF on stdout/stderr means the child closed them (typically by exiting).
-		if s.useFifo {
-			if pipeDir != "" {
-				s.cleanupPipeDirectory(pipeDir)
-			}
-			os.Exit(0)
-		}
-
-		// If we have a doneFile sentinel, wait for it before exiting
-		if s.doneFile != "" {
-			for {
-				select {
-				case <-ctx.Done():
-					s.exitWithSignalForwarding(pipeDir, 130)
-				default:
-					if _, err := os.Stat(s.doneFile); err == nil {
-						if pipeDir != "" {
-							s.cleanupPipeDirectory(pipeDir)
-						}
-						os.Exit(0)
-					}
-					time.Sleep(500 * time.Millisecond)
-				}
-			}
-		}
-
-		// No done file configured, exit immediately
-		// Cleanup before exit (defer won't run with os.Exit)
+		// All I/O forwarding completed — EOF means the child closed its
+		// pipe ends (typically by exiting). Exit cleanly.
 		if pipeDir != "" {
 			s.cleanupPipeDirectory(pipeDir)
 		}
@@ -839,11 +780,6 @@ func (s *ServicesLauncher) writePipeConfig(configFile string, pipes *pipeSet, bu
 	config = fmt.Sprintf("MACGO_STDOUT_PIPE=%s\nMACGO_STDERR_PIPE=%s\nMACGO_BUNDLE_PATH=%s\nMACGO_CWD=%s\n",
 		pipes.stdout, pipes.stderr, bundlePath, cwd)
 
-	// Only write done file path for non-FIFO mode
-	if pipes.done != "" {
-		config = fmt.Sprintf("MACGO_DONE_FILE=%s\n%s", pipes.done, config)
-	}
-
 	// Only write stdin if it was created
 	if pipes.stdin != "" {
 		config = fmt.Sprintf("MACGO_STDIN_PIPE=%s\n%s", pipes.stdin, config)
@@ -895,12 +831,6 @@ func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableS
 			f.Close()
 		}
 		_ = name // unused but useful for debugging
-	}
-
-	// Only create done file path for non-FIFO mode
-	// With FIFOs, EOF on stdout/stderr reliably signals child exit
-	if !useFifo {
-		pipes.done = filepath.Join(pipeDir, "done")
 	}
 
 	// Always set up PID file path - child will write its PID here
@@ -970,9 +900,6 @@ func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath stri
 		}
 		if pipes.stderr != "" {
 			args = append(args, "--env", "MACGO_STDERR_PIPE="+pipes.stderr)
-		}
-		if pipes.done != "" {
-			args = append(args, "--env", "MACGO_DONE_FILE="+pipes.done)
 		}
 		if pipes.pid != "" {
 			args = append(args, "--env", "MACGO_PID_FILE="+pipes.pid)
@@ -1238,29 +1165,6 @@ func (s *ServicesLauncher) forwardStderr(stderrPipe string) error {
 
 			noGrowthCount++
 			if noGrowthCount >= maxNoGrowth {
-				// Check if done file exists before giving up
-				if s.doneFile != "" {
-					if _, err := os.Stat(s.doneFile); err == nil {
-						// Done file exists, do final read pass
-						r.Seek(totalBytes, 0)
-						for {
-							n, readErr := r.Read(buf)
-							if n > 0 {
-								totalBytes += int64(n)
-								output.Write(buf[:n])
-							}
-							if readErr == io.EOF || n == 0 || readErr != nil {
-								break
-							}
-						}
-						return nil
-					}
-					// Done file doesn't exist yet, wait indefinitely
-					noGrowthCount = 0
-					time.Sleep(100 * time.Millisecond)
-					r.Seek(totalBytes, 0)
-					continue
-				}
 				return nil
 			}
 
