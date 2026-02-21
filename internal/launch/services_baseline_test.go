@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -308,33 +307,40 @@ func TestRecordedSignal(t *testing.T) {
 	}
 }
 
-// ---------- #20: PID file write/read round-trip ----------
+// ---------- #20: Control FIFO PID round-trip ----------
 
-// TestPIDFileRoundTrip verifies the full cycle:
-//  1. Child writes its PID to a file.
-//  2. Parent's waitForChildPID polls and discovers it.
+// TestControlPipeRoundTrip verifies the full cycle:
+//  1. Child writes its PID to a control FIFO.
+//  2. Parent's readChildPID reads it (blocking, no polling).
 //  3. Parent can then forward signals using that PID.
-func TestPIDFileRoundTrip(t *testing.T) {
+func TestControlPipeRoundTrip(t *testing.T) {
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
 	tmpDir := t.TempDir()
-	pidFile := filepath.Join(tmpDir, "child.pid")
-
-	// Simulate child writing PID after a short delay.
-	childPID := os.Getpid() // use our own PID as a known-valid PID
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		os.WriteFile(pidFile, []byte(strconv.Itoa(childPID)), 0600)
-	}()
-
-	got := launcher.waitForChildPID(pidFile, 5*time.Second)
-	if got != childPID {
-		t.Fatalf("waitForChildPID = %d, want %d", got, childPID)
+	controlPipe := filepath.Join(tmpDir, "control")
+	if err := syscall.Mkfifo(controlPipe, 0600); err != nil {
+		t.Fatalf("mkfifo: %v", err)
 	}
 
-	// Verify the PID was stored on the launcher.
+	// Simulate child writing PID after a short delay.
+	childPID := os.Getpid()
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		f, err := os.OpenFile(controlPipe, os.O_WRONLY, 0)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		fmt.Fprintf(f, "%d\n", childPID)
+	}()
+
+	got := launcher.readChildPID(controlPipe, 5*time.Second)
+	if got != childPID {
+		t.Fatalf("readChildPID = %d, want %d", got, childPID)
+	}
+
 	launcher.mu.Lock()
 	storedPID := launcher.childPID
 	launcher.mu.Unlock()
@@ -343,63 +349,67 @@ func TestPIDFileRoundTrip(t *testing.T) {
 	}
 }
 
-// TestPIDFileTimeout verifies that waitForChildPID returns 0 when the PID
-// file never appears.
-func TestPIDFileTimeout(t *testing.T) {
+// TestControlPipeTimeout verifies that readChildPID returns 0 when no
+// writer opens the FIFO within the timeout.
+func TestControlPipeTimeout(t *testing.T) {
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
 	tmpDir := t.TempDir()
-	pidFile := filepath.Join(tmpDir, "child.pid") // never written
+	controlPipe := filepath.Join(tmpDir, "control")
+	if err := syscall.Mkfifo(controlPipe, 0600); err != nil {
+		t.Fatalf("mkfifo: %v", err)
+	}
 
 	start := time.Now()
-	got := launcher.waitForChildPID(pidFile, 200*time.Millisecond)
+	got := launcher.readChildPID(controlPipe, 200*time.Millisecond)
 	elapsed := time.Since(start)
 
 	if got != 0 {
-		t.Errorf("waitForChildPID = %d, want 0 (timeout)", got)
+		t.Errorf("readChildPID = %d, want 0 (timeout)", got)
 	}
 	if elapsed < 150*time.Millisecond {
 		t.Errorf("returned too quickly: %v (expected ~200ms timeout)", elapsed)
 	}
 }
 
-// TestPIDFileEmptyPath verifies that waitForChildPID returns 0 immediately
+// TestControlPipeEmptyPath verifies that readChildPID returns 0 immediately
 // when given an empty path.
-func TestPIDFileEmptyPath(t *testing.T) {
+func TestControlPipeEmptyPath(t *testing.T) {
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
 	start := time.Now()
-	got := launcher.waitForChildPID("", 5*time.Second)
+	got := launcher.readChildPID("", 5*time.Second)
 	elapsed := time.Since(start)
 
 	if got != 0 {
-		t.Errorf("waitForChildPID(\"\") = %d, want 0", got)
+		t.Errorf("readChildPID(\"\") = %d, want 0", got)
 	}
 	if elapsed > 100*time.Millisecond {
 		t.Errorf("empty path should return immediately, took %v", elapsed)
 	}
 }
 
-// TestPIDFileSignalForwardAfterDiscovery is an end-to-end test that verifies
-// the complete PID discovery → signal forwarding path:
-//  1. Start a real child process.
-//  2. Child writes its PID to a file.
-//  3. Parent discovers PID via waitForChildPID.
-//  4. Parent forwards SIGTERM via forwardSignalToChild.
-//  5. Child receives the signal and exits.
-func TestPIDFileSignalForwardAfterDiscovery(t *testing.T) {
+// TestControlPipeSignalForwardAfterDiscovery is an end-to-end test:
+//  1. Start a real child process (sleep 60).
+//  2. Simulate child writing PID to control FIFO.
+//  3. Parent discovers PID via readChildPID.
+//  4. Parent forwards SIGTERM.
+//  5. Child exits.
+func TestControlPipeSignalForwardAfterDiscovery(t *testing.T) {
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
 	tmpDir := t.TempDir()
-	pidFile := filepath.Join(tmpDir, "child.pid")
+	controlPipe := filepath.Join(tmpDir, "control")
+	if err := syscall.Mkfifo(controlPipe, 0600); err != nil {
+		t.Fatalf("mkfifo: %v", err)
+	}
 
-	// Start a real child process: "sleep 60" which can be killed by SIGTERM.
 	child, err := os.StartProcess("/bin/sleep",
 		[]string{"sleep", "60"},
 		&os.ProcAttr{
@@ -415,19 +425,23 @@ func TestPIDFileSignalForwardAfterDiscovery(t *testing.T) {
 		child.Wait()
 	})
 
-	// Simulate child writing its PID (in real code, the child does this at startup).
-	os.WriteFile(pidFile, []byte(strconv.Itoa(child.Pid)), 0600)
+	// Simulate child writing its PID to the control FIFO.
+	go func() {
+		f, err := os.OpenFile(controlPipe, os.O_WRONLY, 0)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		fmt.Fprintf(f, "%d\n", child.Pid)
+	}()
 
-	// Parent discovers PID.
-	got := launcher.waitForChildPID(pidFile, 5*time.Second)
+	got := launcher.readChildPID(controlPipe, 5*time.Second)
 	if got != child.Pid {
-		t.Fatalf("waitForChildPID = %d, want %d", got, child.Pid)
+		t.Fatalf("readChildPID = %d, want %d", got, child.Pid)
 	}
 
-	// Parent forwards SIGTERM.
 	launcher.forwardSignalToChild(syscall.SIGTERM)
 
-	// Child should exit.
 	waitCh := make(chan error, 1)
 	go func() {
 		_, err := child.Wait()
@@ -436,12 +450,11 @@ func TestPIDFileSignalForwardAfterDiscovery(t *testing.T) {
 
 	select {
 	case <-waitCh:
-		// Success: child exited after receiving SIGTERM.
+		// Child exited after SIGTERM.
 	case <-time.After(5 * time.Second):
 		t.Fatal("child did not exit after SIGTERM forwarding")
 	}
 
-	// Verify child is gone.
 	if err := syscall.Kill(child.Pid, 0); err == nil {
 		t.Errorf("child %d still alive after SIGTERM", child.Pid)
 	}

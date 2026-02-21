@@ -65,6 +65,9 @@ func TestServicesLauncher_createNamedPipes(t *testing.T) {
 	if pipes.stderr == "" {
 		t.Error("stderr pipe path is empty")
 	}
+	if pipes.control == "" {
+		t.Error("control pipe path is empty")
+	}
 
 	// Check that pipe paths are in the expected directory
 	expectedDir := tmpDir
@@ -78,8 +81,8 @@ func TestServicesLauncher_createNamedPipes(t *testing.T) {
 		t.Errorf("stderr pipe not in expected directory: %s", pipes.stderr)
 	}
 
-	// Check that pipe files were created
-	for _, pipe := range []string{pipes.stdin, pipes.stdout, pipes.stderr} {
+	// Check that pipe files were created (including control FIFO)
+	for _, pipe := range []string{pipes.stdin, pipes.stdout, pipes.stderr, pipes.control} {
 		if _, err := os.Stat(pipe); os.IsNotExist(err) {
 			t.Errorf("Pipe was not created: %s", pipe)
 		}
@@ -94,9 +97,10 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 	bundlePath := "/path/to/TestApp.app"
 
 	pipes := &pipeSet{
-		stdin:  "/tmp/stdin",
-		stdout: "/tmp/stdout",
-		stderr: "/tmp/stderr",
+		stdin:   "/tmp/stdin",
+		stdout:  "/tmp/stdout",
+		stderr:  "/tmp/stderr",
+		control: "/tmp/control",
 	}
 
 	// Save original os.Args and restore after test
@@ -118,6 +122,7 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 				"--env", "MACGO_STDIN_PIPE=/tmp/stdin",
 				"--env", "MACGO_STDOUT_PIPE=/tmp/stdout",
 				"--env", "MACGO_STDERR_PIPE=/tmp/stderr",
+				"--env", "MACGO_CONTROL_PIPE=/tmp/control",
 				"--env", "MACGO_BUNDLE_PATH=" + bundlePath,
 				bundlePath,
 			},
@@ -197,9 +202,10 @@ func TestServicesLauncher_Launch_ErrorHandling(t *testing.T) {
 // TestPipeSet verifies the pipeSet structure
 func TestPipeSet(t *testing.T) {
 	pipes := &pipeSet{
-		stdin:  "/tmp/stdin",
-		stdout: "/tmp/stdout",
-		stderr: "/tmp/stderr",
+		stdin:   "/tmp/stdin",
+		stdout:  "/tmp/stdout",
+		stderr:  "/tmp/stderr",
+		control: "/tmp/control",
 	}
 
 	if pipes.stdin != "/tmp/stdin" {
@@ -210,5 +216,8 @@ func TestPipeSet(t *testing.T) {
 	}
 	if pipes.stderr != "/tmp/stderr" {
 		t.Errorf("stderr = %s, want /tmp/stderr", pipes.stderr)
+	}
+	if pipes.control != "/tmp/control" {
+		t.Errorf("control = %s, want /tmp/control", pipes.control)
 	}
 }

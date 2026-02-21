@@ -136,6 +136,7 @@
 //	MACGO_STDIN_PIPE          Path to stdin named pipe (child reads from parent)
 //	MACGO_STDOUT_PIPE         Path to stdout named pipe (child writes to parent)
 //	MACGO_STDERR_PIPE         Path to stderr named pipe (child writes to parent)
+//	MACGO_CONTROL_PIPE        Path to control FIFO (child writes PID for signal forwarding)
 //	MACGO_CWD                 Original working directory to restore in child
 //	MACGO_BUNDLE_PATH         Path to the .app bundle (for config file matching)
 //	MACGO_ORIGINAL_EXECUTABLE Path to the original binary before bundle copy

@@ -29,8 +29,8 @@ import (
 //
 // To ensure proper signal handling, we implement the following:
 //
-//   - PID Tracking: Child writes its PID to a file in the pipe directory after
-//     startup. Parent polls for this file and stores the PID for signal forwarding.
+//   - PID Tracking: Child writes its PID to a control FIFO in the pipe directory
+//     after startup. Parent reads the PID (blocking, no polling) for signal forwarding.
 //
 //   - Signal Forwarding: When parent receives SIGINT/SIGTERM (via context
 //     cancellation), it forwards these signals to the child before exiting.
@@ -48,44 +48,68 @@ type ServicesLauncher struct {
 	logger        *Logger
 	mu            sync.Mutex    // protects process access during signal forwarding
 	firstOutputCh chan struct{} // closed when first output is received (signals successful launch)
-	childPID      int           // PID of the actual app process (for signal forwarding)
-	pidFile       string        // path to file where child writes its PID
-	lastSignal    atomic.Int32  // most recent signal received by the parent
+	childPID   int          // PID of the actual app process (for signal forwarding)
+	lastSignal atomic.Int32 // most recent signal received by the parent
 }
 
 // pipeSet holds the paths to the named pipes used for I/O forwarding.
 type pipeSet struct {
-	stdin  string
-	stdout string
-	stderr string
-	pid    string // file where child writes its PID
+	stdin   string
+	stdout  string
+	stderr  string
+	control string // FIFO where child writes its PID
 }
 
-// waitForChildPID waits for the child to write its PID file and returns the PID.
-// Returns 0 if the PID file doesn't appear within the timeout.
-func (s *ServicesLauncher) waitForChildPID(pidFile string, timeout time.Duration) int {
-	if pidFile == "" {
+// readChildPID opens the control FIFO and reads the child's PID.
+// The open blocks until the child writes, so no polling is needed.
+// Returns 0 if the PID isn't received within the timeout.
+func (s *ServicesLauncher) readChildPID(controlPipe string, timeout time.Duration) int {
+	if controlPipe == "" {
 		return 0
 	}
 
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		data, err := os.ReadFile(pidFile)
-		if err == nil {
-			pidStr := strings.TrimSpace(string(data))
-			if pid, err := strconv.Atoi(pidStr); err == nil && pid > 0 {
-				s.mu.Lock()
-				s.childPID = pid
-				s.mu.Unlock()
-				s.logger.Debug("read child PID for signal forwarding", "pid", pid)
-				return pid
-			}
-		}
-		time.Sleep(50 * time.Millisecond)
+	type result struct {
+		pid int
+		err error
 	}
+	ch := make(chan result, 1)
+	go func() {
+		f, err := os.OpenFile(controlPipe, os.O_RDONLY, 0)
+		if err != nil {
+			ch <- result{err: fmt.Errorf("open control pipe: %w", err)}
+			return
+		}
+		defer f.Close()
+		var buf [64]byte
+		n, err := f.Read(buf[:])
+		if err != nil && n == 0 {
+			ch <- result{err: fmt.Errorf("read control pipe: %w", err)}
+			return
+		}
+		pidStr := strings.TrimSpace(string(buf[:n]))
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil || pid <= 0 {
+			ch <- result{err: fmt.Errorf("invalid PID from control pipe: %q", pidStr)}
+			return
+		}
+		ch <- result{pid: pid}
+	}()
 
-	s.logger.Warn("timeout waiting for child PID file", "file", pidFile, "timeout", timeout)
-	return 0
+	select {
+	case r := <-ch:
+		if r.err != nil {
+			s.logger.Warn("failed to read child PID", "error", r.err)
+			return 0
+		}
+		s.mu.Lock()
+		s.childPID = r.pid
+		s.mu.Unlock()
+		s.logger.Debug("read child PID from control pipe", "pid", r.pid)
+		return r.pid
+	case <-time.After(timeout):
+		s.logger.Warn("timeout waiting for child PID", "pipe", controlPipe, "timeout", timeout)
+		return 0
+	}
 }
 
 // forwardSignalToChild sends a signal to the child process if we know its PID.
@@ -298,17 +322,10 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	}
 	defer s.cleanupPipeDirectory(pipeDir)
 
-	if enableStdin || enableStdout || enableStderr {
-		// Create FIFOs for I/O forwarding (EOF signals child exit)
-		pipes, err = s.createNamedPipes(pipeDir, enableStdin, enableStdout, enableStderr)
-		if err != nil {
-			return fmt.Errorf("create named pipes: %w", err)
-		}
-	} else {
-		// No I/O forwarding, but still need PID file path
-		pipes = &pipeSet{
-			pid: filepath.Join(pipeDir, "child.pid"),
-		}
+	// Create FIFOs for I/O forwarding (EOF signals child exit) and control pipe
+	pipes, err = s.createNamedPipes(pipeDir, enableStdin, enableStdout, enableStderr)
+	if err != nil {
+		return fmt.Errorf("create named pipes: %w", err)
 	}
 
 	// Write config file for child discovery (includes bundle path for matching)
@@ -445,12 +462,9 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 		}
 	}
 
-	// Always set up PID tracking for signal forwarding
-	s.pidFile = pipes.pid
-
-	// Start waiting for child PID in background (for signal forwarding)
+	// Read child PID from control FIFO in background (for signal forwarding)
 	go func() {
-		s.waitForChildPID(s.pidFile, 30*time.Second)
+		s.readChildPID(pipes.control, 30*time.Second)
 	}()
 
 	// Set up I/O forwarding only if pipes are available
@@ -778,6 +792,11 @@ func (s *ServicesLauncher) writePipeConfig(configFile string, pipes *pipeSet, bu
 		config = fmt.Sprintf("MACGO_STDIN_PIPE=%s\n%s", pipes.stdin, config)
 	}
 
+	// Include control pipe path for PID handshake
+	if pipes.control != "" {
+		config = fmt.Sprintf("MACGO_CONTROL_PIPE=%s\n%s", pipes.control, config)
+	}
+
 	// Pass original executable path so the child can find the real binary
 	if origExec := os.Getenv("MACGO_ORIGINAL_EXECUTABLE"); origExec != "" {
 		config = fmt.Sprintf("MACGO_ORIGINAL_EXECUTABLE=%s\n%s", origExec, config)
@@ -817,8 +836,11 @@ func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableS
 		}
 	}
 
-	// Always set up PID file path - child will write its PID here
-	pipes.pid = filepath.Join(pipeDir, "child.pid")
+	// Control FIFO for child PID handshake (replaces PID file polling)
+	pipes.control = filepath.Join(pipeDir, "control")
+	if err := syscall.Mkfifo(pipes.control, 0600); err != nil {
+		return nil, fmt.Errorf("create control FIFO: %w", err)
+	}
 
 	s.logger.Debug("pipes ready", "dir", pipeDir)
 
@@ -885,8 +907,8 @@ func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath stri
 		if pipes.stderr != "" {
 			args = append(args, "--env", "MACGO_STDERR_PIPE="+pipes.stderr)
 		}
-		if pipes.pid != "" {
-			args = append(args, "--env", "MACGO_PID_FILE="+pipes.pid)
+		if pipes.control != "" {
+			args = append(args, "--env", "MACGO_CONTROL_PIPE="+pipes.control)
 		}
 		if cwd != "" {
 			args = append(args, "--env", "MACGO_CWD="+cwd)

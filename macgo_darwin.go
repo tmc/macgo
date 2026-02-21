@@ -85,11 +85,12 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 					fmt.Fprintf(os.Stderr, "macgo: failed to load pipe config: %v\n", err)
 				}
 			}
-			// Write our PID so parent can forward signals to us
-			if err := writeChildPID(configFile, cfg.Debug); err != nil {
-				if cfg.Debug {
-					fmt.Fprintf(os.Stderr, "macgo: failed to write child PID: %v\n", err)
-				}
+		}
+
+		// Write our PID to the control FIFO so parent can forward signals
+		if err := writeChildPID(cfg.Debug); err != nil {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: failed to write child PID: %v\n", err)
 			}
 		}
 
@@ -606,20 +607,27 @@ func dumpGoroutineStacks() {
 	fmt.Fprintf(os.Stderr, "\n*** goroutine dump ***\n%s\n", buf[:n])
 }
 
-// writeChildPID writes this process's PID to a file in the pipe directory.
-// This allows the parent process to forward signals to us.
-func writeChildPID(configFile string, debug bool) error {
-	// Derive PID file path from config file path (same directory)
-	pipeDir := filepath.Dir(configFile)
-	pidFile := filepath.Join(pipeDir, "child.pid")
+// writeChildPID writes this process's PID to the control FIFO.
+// The parent reads this to enable signal forwarding.
+func writeChildPID(debug bool) error {
+	controlPipe := os.Getenv("MACGO_CONTROL_PIPE")
+	if controlPipe == "" {
+		return nil // no control pipe configured
+	}
 
-	content := fmt.Sprintf("%d\n", os.Getpid())
-	if err := os.WriteFile(pidFile, []byte(content), 0600); err != nil {
-		return fmt.Errorf("write PID file: %w", err)
+	f, err := os.OpenFile(controlPipe, os.O_WRONLY, 0)
+	if err != nil {
+		return fmt.Errorf("open control pipe: %w", err)
+	}
+	defer f.Close()
+
+	pid := os.Getpid()
+	if _, err := fmt.Fprintf(f, "%d\n", pid); err != nil {
+		return fmt.Errorf("write PID to control pipe: %w", err)
 	}
 
 	if debug {
-		fmt.Fprintf(os.Stderr, "macgo: wrote child PID %d to %s\n", os.Getpid(), pidFile)
+		fmt.Fprintf(os.Stderr, "macgo: wrote child PID %d to control pipe %s\n", pid, controlPipe)
 	}
 	return nil
 }
