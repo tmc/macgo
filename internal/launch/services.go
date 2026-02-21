@@ -80,7 +80,7 @@ func (s *ServicesLauncher) waitForChildPID(pidFile string, timeout time.Duration
 				s.mu.Lock()
 				s.childPID = pid
 				s.mu.Unlock()
-				s.logger.Info("read child PID for signal forwarding", "pid", pid)
+				s.logger.Debug("read child PID for signal forwarding", "pid", pid)
 				return pid
 			}
 		}
