@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
 // DirectLauncher implements direct execution of the binary within the bundle.
@@ -53,6 +54,17 @@ func (d *DirectLauncher) Launch(ctx context.Context, bundlePath, execPath string
 		Pgid:    0,
 	}
 
+	// Override CommandContext's default SIGKILL behavior: send SIGINT instead
+	// so the child process can perform graceful cleanup (e.g., VM suspend).
+	// WaitDelay gives the child up to 3 minutes to finish cleanup before SIGKILL.
+	cmd.Cancel = func() error {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: forwarding interrupt to child process %d\n", cmd.Process.Pid)
+		}
+		return cmd.Process.Signal(syscall.SIGINT)
+	}
+	cmd.WaitDelay = 3 * time.Minute
+
 	if cfg.Debug {
 		fmt.Fprintf(os.Stderr, "macgo: starting process with args: %v\n", cmd.Args)
 	}
@@ -66,16 +78,6 @@ func (d *DirectLauncher) Launch(ctx context.Context, bundlePath, execPath string
 		fmt.Fprintf(os.Stderr, "macgo: process started with PID: %d\n", cmd.Process.Pid)
 	}
 
-	// Monitor context for cancellation to provide debug logging
-	// Note: CommandContext automatically calls cmd.Process.Kill() (sends SIGKILL)
-	// when the context is cancelled, which terminates the process immediately
-	go func() {
-		<-sigCtx.Done()
-		if cfg.Debug {
-			fmt.Fprintf(os.Stderr, "macgo: context cancelled, CommandContext will send SIGKILL to process\n")
-		}
-	}()
-
 	// Wait for the process to complete
 	err = cmd.Wait()
 	if err != nil {
@@ -85,6 +87,16 @@ func (d *DirectLauncher) Launch(ctx context.Context, bundlePath, execPath string
 				fmt.Fprintf(os.Stderr, "macgo: process exited with code: %d\n", exitErr.ExitCode())
 			}
 			os.Exit(exitErr.ExitCode())
+		}
+		// When the context is cancelled (e.g., SIGINT to process group),
+		// cmd.Wait returns context.Canceled instead of an ExitError.
+		// The child received SIGINT via cmd.Cancel and may have exited
+		// cleanly. Treat this as a signal exit, not a launch failure.
+		if sigCtx.Err() != nil {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: context cancelled, exiting with signal code\n")
+			}
+			os.Exit(130) // 128 + SIGINT
 		}
 		return fmt.Errorf("bundle execution failed: %w", err)
 	}
