@@ -199,6 +199,12 @@ type Config struct {
 	// When specified, the icon is copied to Contents/Resources/ and
 	// CFBundleIconFile is set in the Info.plist.
 	IconPath string
+
+	// SingleProcess enables single-process mode: codesign in-place, re-exec,
+	// and call setActivationPolicy instead of creating an app bundle.
+	// This eliminates the two-process architecture entirely.
+	// Enable via MACGO_SINGLE_PROCESS=1 or WithSingleProcess().
+	SingleProcess bool
 }
 
 // FromEnv loads configuration from environment variables.
@@ -229,6 +235,7 @@ type Config struct {
 //	MACGO_DEV_MODE=1        - Dev mode: wrapper exec's original binary, preserves TCC across rebuilds
 //	MACGO_PROVISIONING_PROFILE - Path to provisioning profile to embed in bundle
 //	MACGO_ICON              - Path to app icon (.icns) to embed in bundle
+//	MACGO_SINGLE_PROCESS=1  - Single-process mode: codesign + re-exec, no app bundle
 func (c *Config) FromEnv() *Config {
 	if name := os.Getenv("MACGO_APP_NAME"); name != "" {
 		c.AppName = name
@@ -297,6 +304,11 @@ func (c *Config) FromEnv() *Config {
 
 	if icon := os.Getenv("MACGO_ICON"); icon != "" {
 		c.IconPath = icon
+	}
+
+	// Single-process mode: codesign + re-exec + setActivationPolicy
+	if os.Getenv("MACGO_SINGLE_PROCESS") == "1" {
+		c.SingleProcess = true
 	}
 
 	return c
@@ -428,6 +440,15 @@ func (c *Config) WithProvisioningProfile(path string) *Config {
 // The icon is copied into the bundle's Resources directory.
 func (c *Config) WithIcon(path string) *Config {
 	c.IconPath = path
+	return c
+}
+
+// WithSingleProcess enables single-process mode: codesign in-place, re-exec,
+// and call setActivationPolicy. No app bundle is created. Only works for
+// entitlement-only permissions (Accessibility, Virtualization, Network);
+// TCC-dialog permissions (Camera, Microphone, Location) require app bundles.
+func (c *Config) WithSingleProcess() *Config {
+	c.SingleProcess = true
 	return c
 }
 

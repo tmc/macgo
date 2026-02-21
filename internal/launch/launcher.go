@@ -15,6 +15,8 @@ const (
 	StrategyDirect Strategy = iota
 	// StrategyServices uses LaunchServices via the 'open' command.
 	StrategyServices
+	// StrategySingleProcess codesigns in-place, re-execs, and uses setActivationPolicy.
+	StrategySingleProcess
 )
 
 // Config contains the launch-specific configuration extracted from the main Config.
@@ -34,6 +36,14 @@ type Config struct {
 	ForceDirectExecution bool
 	// Background indicates the app should not steal focus (LSBackgroundOnly apps)
 	Background bool
+	// SingleProcess enables single-process mode via codesign + re-exec + setActivationPolicy.
+	SingleProcess bool
+	// Entitlements are the entitlement keys to sign the binary with (for transform mode).
+	Entitlements []string
+	// UIMode controls how the transformed app appears: "regular", "accessory", or "background".
+	UIMode string
+	// IconPath is the path to an .icns file for the Dock icon (transform mode, regular UI only).
+	IconPath string
 }
 
 // Launcher defines the interface for launching applications.
@@ -44,23 +54,26 @@ type Launcher interface {
 
 // Manager coordinates different launch strategies.
 type Manager struct {
-	directLauncher   Launcher
-	servicesLauncher Launcher
+	directLauncher    Launcher
+	servicesLauncher  Launcher
+	singleProcessLauncher Launcher
 }
 
 // New creates a new launch manager with default launchers.
 func New() *Manager {
 	return &Manager{
-		directLauncher:   &DirectLauncher{},
-		servicesLauncher: &ServicesLauncher{},
+		directLauncher:    &DirectLauncher{},
+		servicesLauncher:  &ServicesLauncher{},
+		singleProcessLauncher: &SingleProcessLauncher{},
 	}
 }
 
 // NewWithLaunchers creates a new launch manager with custom launchers.
 func NewWithLaunchers(direct, services Launcher) *Manager {
 	return &Manager{
-		directLauncher:   direct,
-		servicesLauncher: services,
+		directLauncher:    direct,
+		servicesLauncher:  services,
+		singleProcessLauncher: &SingleProcessLauncher{},
 	}
 }
 
@@ -83,6 +96,11 @@ func (m *Manager) Launch(ctx context.Context, bundlePath, execPath string, cfg *
 			fmt.Fprintf(os.Stderr, "macgo: using LaunchServices\n")
 		}
 		return m.servicesLauncher.Launch(ctx, bundlePath, execPath, cfg)
+	case StrategySingleProcess:
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: using single-process mode\n")
+		}
+		return m.singleProcessLauncher.Launch(ctx, bundlePath, execPath, cfg)
 	default:
 		return fmt.Errorf("unknown launch strategy: %v", strategy)
 	}
@@ -90,6 +108,21 @@ func (m *Manager) Launch(ctx context.Context, bundlePath, execPath string, cfg *
 
 // determineStrategy selects the appropriate launch strategy based on configuration.
 func (m *Manager) determineStrategy(cfg *Config) Strategy {
+	// Check for single-process mode
+	if cfg.SingleProcess {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: single-process mode requested via config\n")
+		}
+		return StrategySingleProcess
+	}
+
+	if os.Getenv("MACGO_SINGLE_PROCESS") == "1" {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: single-process mode requested via environment\n")
+		}
+		return StrategySingleProcess
+	}
+
 	// Check overrides for Direct Execution (Opt-out)
 	if cfg.ForceDirectExecution {
 		if cfg.Debug {
@@ -119,6 +152,8 @@ func (s Strategy) String() string {
 		return "direct"
 	case StrategyServices:
 		return "services"
+	case StrategySingleProcess:
+		return "single-process"
 	default:
 		return "unknown"
 	}

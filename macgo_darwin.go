@@ -43,8 +43,10 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		}
 	}
 
-	// Check for MACGO_*_PIPE env vars (restored for V2 env-flags support)
-	if stdin := os.Getenv("MACGO_STDIN_PIPE"); stdin != "" {
+	// Check for MACGO_*_PIPE env vars (restored for V2 env-flags support).
+	// Any pipe env var indicates we're a relaunched child — stdin may not
+	// always be present (e.g., when shouldAutoEnableStdin returns false).
+	if os.Getenv("MACGO_STDIN_PIPE") != "" || os.Getenv("MACGO_STDOUT_PIPE") != "" || os.Getenv("MACGO_STDERR_PIPE") != "" {
 		if cfg.Debug {
 			fmt.Fprintf(os.Stderr, "macgo: detected pipes via environment\n")
 		}
@@ -148,6 +150,15 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		return nil
 	}
 
+	// Single-process mode: codesign in-place, re-exec, setActivationPolicy.
+	// Bypasses bundle creation entirely.
+	if cfg.SingleProcess || os.Getenv("MACGO_SINGLE_PROCESS") == "1" {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "macgo: using single-process mode\n")
+		}
+		return launchSingleProcess(ctx, cfg)
+	}
+
 	// Get current executable
 	execPath, err := os.Executable()
 	if err != nil {
@@ -185,6 +196,31 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 	}
 	// The parent process (launcher) also returns nil as cleanup is redundant for default FIFO IO
 	return nil
+}
+
+// launchSingleProcess runs the single-process launcher.
+func launchSingleProcess(ctx context.Context, cfg *Config) error {
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("macgo: get executable: %w", err)
+	}
+
+	permissions := convertPermissions(cfg.Permissions)
+	permissions = append(permissions, cfg.Custom...)
+
+	launchCfg := &launch.Config{
+		AppName:       cfg.AppName,
+		BundleID:      cfg.BundleID,
+		Permissions:   permissions,
+		Debug:         cfg.Debug,
+		SingleProcess: true,
+		Entitlements:  cfg.Custom,
+		UIMode:        string(cfg.UIMode),
+		IconPath:      cfg.IconPath,
+	}
+
+	manager := launch.New()
+	return manager.Launch(ctx, "", execPath, launchCfg)
 }
 
 // execDevTarget execs the development source binary if DevMode is enabled.
