@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -15,7 +14,6 @@ import (
 // TestServicesLauncher_LargeStdoutOutput verifies that V2 correctly handles
 // multi-MB stdout output without truncation or deadlocks.
 func TestServicesLauncher_LargeStdoutOutput(t *testing.T) {
-	t.Skip("Skipping large output test due to persistent FIFO flakiness on macOS CI environment")
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
@@ -135,7 +133,6 @@ func TestServicesLauncher_LargeStdoutOutput(t *testing.T) {
 // TestServicesLauncher_LargeStderrOutput verifies that V2 correctly handles
 // multi-MB stderr output without truncation or deadlocks.
 func TestServicesLauncher_LargeStderrOutput(t *testing.T) {
-	t.Skip("Skipping large output test due to persistent FIFO flakiness on macOS CI environment")
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
@@ -244,7 +241,6 @@ func TestServicesLauncher_LargeStderrOutput(t *testing.T) {
 // TestServicesLauncher_ConcurrentLargeOutput verifies that V2 correctly handles
 // simultaneous large stdout and stderr output without deadlocks.
 func TestServicesLauncher_ConcurrentLargeOutput(t *testing.T) {
-	t.Skip("Skipping concurrent large output test due to persistent FIFO flakiness on macOS CI environment")
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
@@ -411,14 +407,13 @@ func TestServicesLauncher_ConcurrentLargeOutput(t *testing.T) {
 }
 
 // TestServicesLauncher_BufferBoundaryConditions tests edge cases around
-// the 32KB buffer boundary to ensure correct handling.
+// the 32KB io.Copy buffer boundary to ensure correct handling.
 func TestServicesLauncher_BufferBoundaryConditions(t *testing.T) {
-	t.Skip("Skipping buffer boundary test due to persistent FIFO flakiness on macOS CI environment")
 	launcher := &ServicesLauncher{
 		logger: NewLogger(),
 	}
 
-	bufferSize := 32 * 1024 // V2 uses 32KB buffer
+	bufferSize := 32 * 1024
 
 	testCases := []struct {
 		name      string
@@ -434,24 +429,17 @@ func TestServicesLauncher_BufferBoundaryConditions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir, err := os.MkdirTemp("", "macgo-v2-boundary-*")
+			tmpDir, err := os.MkdirTemp("", "macgo-boundary-*")
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
 			}
 			defer os.RemoveAll(tmpDir)
 
 			stdoutPipe := filepath.Join(tmpDir, "stdout")
-
-			// Generate exact size test data
 			testData := generateTestData(int64(tc.sizeBytes))
-			expectedSize := int64(len(testData))
 
-			// Create and write all data at once (boundary condition test)
-			if err := os.WriteFile(stdoutPipe, testData, 0600); err != nil {
-				t.Fatalf("Failed to write test data: %v", err)
-			}
+			mkFifo(t, stdoutPipe)
 
-			// Start forwardStdout
 			done := make(chan error, 1)
 			captured := &bytes.Buffer{}
 
@@ -463,13 +451,22 @@ func TestServicesLauncher_BufferBoundaryConditions(t *testing.T) {
 				done <- launcher.forwardStdout(stdoutPipe)
 			}()
 
+			// Write all data then close to trigger EOF
+			f, err := os.OpenFile(stdoutPipe, os.O_WRONLY, 0600)
+			if err != nil {
+				t.Fatalf("Failed to open FIFO for writing: %v", err)
+			}
+			go func() {
+				defer f.Close()
+				f.Write(testData)
+			}()
+
 			captureDone := make(chan struct{})
 			go func() {
 				io.Copy(captured, r)
 				close(captureDone)
 			}()
 
-			// Wait for completion
 			select {
 			case err := <-done:
 				w.Close()
@@ -480,143 +477,17 @@ func TestServicesLauncher_BufferBoundaryConditions(t *testing.T) {
 					t.Errorf("forwardStdout failed: %v", err)
 				}
 
-				capturedSize := int64(captured.Len())
-				if capturedSize != expectedSize {
-					t.Errorf("Size mismatch at buffer boundary!\nExpected: %d bytes\nGot: %d bytes\nDiff: %d bytes",
-						expectedSize, capturedSize, expectedSize-capturedSize)
-				}
-
-				// Verify exact data match
 				if !bytes.Equal(testData, captured.Bytes()) {
-					t.Error("Data corruption at buffer boundary")
+					t.Errorf("data mismatch at buffer boundary: expected %d bytes, got %d",
+						len(testData), captured.Len())
 				}
 
 			case <-time.After(30 * time.Second):
 				w.Close()
 				os.Stdout = oldStdout
-				t.Fatal("Test timed out")
+				t.Fatal("test timed out")
 			}
 		})
-	}
-}
-
-// TestServicesLauncher_MemoryUsage verifies that V2 doesn't accumulate
-// memory when processing large streams.
-func TestServicesLauncher_MemoryUsage(t *testing.T) {
-	t.Skip("Skipping memory usage test due to persistent FIFO flakiness on macOS CI environment")
-	if testing.Short() {
-		t.Skip("Skipping memory usage test in short mode")
-	}
-
-	launcher := &ServicesLauncher{
-		logger: NewLogger(),
-	}
-
-	// Test with 5MB to ensure memory doesn't grow linearly with data size
-	dataSize := int64(5 * 1024 * 1024)
-
-	tmpDir, err := os.MkdirTemp("", "macgo-v2-memory-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	stdoutPipe := filepath.Join(tmpDir, "stdout")
-	testData := generateTestData(dataSize)
-
-	f, err := os.OpenFile(stdoutPipe, os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		t.Fatalf("Failed to create stdout pipe: %v", err)
-	}
-
-	// Capture initial memory stats
-	var memBefore runtime.MemStats
-	runtime.GC()
-	runtime.ReadMemStats(&memBefore)
-
-	done := make(chan error, 1)
-	captured := &bytes.Buffer{}
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	go func() {
-		done <- launcher.forwardStdout(stdoutPipe)
-	}()
-
-	// Write data in chunks
-	go func() {
-		defer f.Close()
-		chunkSize := 128 * 1024
-		written := 0
-		for written < len(testData) {
-			end := written + chunkSize
-			if end > len(testData) {
-				end = len(testData)
-			}
-			f.Write(testData[written:end])
-			written += end - (end - chunkSize)
-			f.Sync()
-		}
-	}()
-
-	captureDone := make(chan struct{})
-	go func() {
-		io.Copy(captured, r)
-		close(captureDone)
-	}()
-
-	select {
-	case err := <-done:
-		w.Close()
-		os.Stdout = oldStdout
-		<-captureDone
-
-		if err != nil {
-			t.Fatalf("forwardStdout failed: %v", err)
-		}
-
-		// Capture final memory stats
-		var memAfter runtime.MemStats
-		runtime.GC()
-		runtime.ReadMemStats(&memAfter)
-
-		// Calculate memory increase
-		memIncrease := memAfter.Alloc - memBefore.Alloc
-		memIncreaseMB := float64(memIncrease) / (1024 * 1024)
-
-		// Memory increase should not be significantly more than data size
-		// The test captures output in a buffer, so we expect ~dataSize memory use
-		// Plus overhead for test infrastructure, goroutines, etc.
-		// Key insight: forwardStdout uses fixed 32KB buffer for streaming
-		// The memory growth is from our test's capture buffer, not the implementation
-		dataSizeMB := 20.0
-		maxAllowedIncreaseMB := dataSizeMB + 10.0 // Data + 10MB overhead
-		if memIncreaseMB > maxAllowedIncreaseMB {
-			t.Errorf("Excessive memory usage detected!\nData size: %.0fMB\nMemory increase: %.2f MB\nMax allowed: %.2f MB",
-				dataSizeMB, memIncreaseMB, maxAllowedIncreaseMB)
-		}
-
-		// Verify streaming behavior: memory should be close to data size
-		// (not 2x due to buffering in both read and write sides)
-		if memIncreaseMB > dataSizeMB*1.8 {
-			t.Errorf("Memory usage too high - possible double buffering!\nExpected: ~%.0fMB\nGot: %.2f MB",
-				dataSizeMB, memIncreaseMB)
-		}
-
-		t.Logf("Memory usage: Data=%.0fMB, MemIncrease=%.2f MB (%.1f%% of data) - Streaming verified",
-			dataSizeMB, memIncreaseMB, (memIncreaseMB/dataSizeMB)*100)
-
-		// Verify data integrity
-		if int64(captured.Len()) != dataSize {
-			t.Errorf("Data size mismatch: expected %d, got %d", dataSize, captured.Len())
-		}
-
-	case <-time.After(90 * time.Second):
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatal("Test timed out")
 	}
 }
 
