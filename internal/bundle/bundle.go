@@ -482,19 +482,35 @@ func (b *Bundle) Sign() error {
 			b.Config.CodeSignIdentity = identity
 			if err := codeSignBundle(b.Path, b.Config); err != nil {
 				if b.Config.Debug {
-					fmt.Fprintf(os.Stderr, "macgo: auto-signing failed, continuing unsigned: %v\n", err)
+					fmt.Fprintf(os.Stderr, "macgo: auto-signing failed, falling back to ad-hoc: %v\n", err)
 				}
-			} else {
-				if b.Config.Debug {
-					fmt.Fprintf(os.Stderr, "macgo: auto-signed with identity: %s\n", identity)
+				b.Config.CodeSignIdentity = "-"
+				if err := codeSignBundle(b.Path, b.Config); err != nil {
+					return fmt.Errorf("ad-hoc signing fallback failed: %w", err)
 				}
+			} else if b.Config.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: auto-signed with identity: %s\n", identity)
 			}
-		} else if b.Config.Debug {
-			fmt.Fprintf(os.Stderr, "macgo: no Developer ID found, creating unsigned bundle\n")
+		} else {
+			// No Developer ID found; ad-hoc sign so LaunchServices can open the bundle.
+			if b.Config.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: no Developer ID found, using ad-hoc signing\n")
+			}
+			b.Config.CodeSignIdentity = "-"
+			if err := codeSignBundle(b.Path, b.Config); err != nil {
+				return fmt.Errorf("ad-hoc signing fallback failed: %w", err)
+			}
 		}
 	}
 
 	return nil
+}
+
+// ForceResign clears the reused flag so the next Sign() call
+// performs code signing even if Create() determined the bundle was up-to-date.
+// Use this after modifying bundle contents via a post-create hook.
+func (b *Bundle) ForceResign() {
+	b.reused = false
 }
 
 // Validate checks if the bundle is properly formed and signed.

@@ -11,9 +11,9 @@ import (
 // FindDeveloperID attempts to find a Developer ID Application certificate
 // by querying the system keychain for available code signing identities.
 //
-// This function searches for "Developer ID Application" certificates first,
-// which are preferred for distribution outside the Mac App Store. If none
-// are found, it falls back to any valid code signing identity.
+// Only "Developer ID Application" certificates are returned. Other certificate
+// types (e.g. "Apple Development") are rejected because Gatekeeper blocks apps
+// signed with them when launched via LaunchServices, causing EPOLICY (error 163).
 //
 // Returns the certificate name/identity string, or empty string if none found.
 func FindDeveloperID() string {
@@ -23,30 +23,11 @@ func FindDeveloperID() string {
 		return ""
 	}
 
-	lines := strings.Split(string(output), "\n")
-
-	// First pass: look for Developer ID Application certificates (preferred)
-	for _, line := range lines {
+	for _, line := range strings.Split(string(output), "\n") {
 		if strings.Contains(line, "Developer ID Application") {
 			if start := strings.Index(line, `"`); start != -1 {
 				if end := strings.LastIndex(line, `"`); end != -1 && end > start {
-					identity := line[start+1 : end]
-					return identity
-				}
-			}
-		}
-	}
-
-	// Second pass: look for any valid identity as fallback
-	for _, line := range lines {
-		if strings.Contains(line, "valid identities found") {
-			continue
-		}
-		if strings.Contains(line, `"`) && !strings.Contains(line, "invalid") {
-			if start := strings.Index(line, `"`); start != -1 {
-				if end := strings.LastIndex(line, `"`); end != -1 && end > start {
-					identity := line[start+1 : end]
-					return identity
+					return line[start+1 : end]
 				}
 			}
 		}
