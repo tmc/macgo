@@ -48,7 +48,6 @@ type ServicesLauncher struct {
 	logger        *Logger
 	mu            sync.Mutex    // protects process access during signal forwarding
 	firstOutputCh chan struct{} // closed when first output is received (signals successful launch)
-	useFifo       bool          // true if using FIFOs (EOF signals completion)
 	childPID      int           // PID of the actual app process (for signal forwarding)
 	pidFile       string        // path to file where child writes its PID
 	lastSignal    atomic.Int32  // most recent signal received by the parent
@@ -267,10 +266,9 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	//    - Works for I/O but user never sees permission dialogs
 	//
 	// I/O Forwarding Control:
-	// - Default: Pipe-based I/O forwarding (works reliably with LaunchServices)
+	// - Default: FIFO-based I/O forwarding (works reliably with LaunchServices)
 	// - MACGO_TTY_PASSTHROUGH=1           Pass TTY device directly to child (experimental)
 	// - MACGO_DISABLE_IO_FORWARDING=1     Disable all I/O forwarding
-	// - MACGO_USE_FIFO=0                  Use regular files instead of FIFOs (when using pipes)
 	// - MACGO_IO_LOG_DIR=<path>           Directory to write I/O debug logs
 	//
 	// TTY Passthrough (experimental):
@@ -290,11 +288,6 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	enableStdout := !disableIO
 	enableStderr := !disableIO
 
-	// FIFOs are default (clean EOF semantics)
-	// Disable with MACGO_USE_FIFO=0 to use regular files with polling instead
-	useFifo := os.Getenv("MACGO_USE_FIFO") != "0"
-	s.useFifo = useFifo
-
 	var configFile string
 	// Always create pipe directory for PID tracking (even in TTY passthrough mode)
 	// This allows signal forwarding to work regardless of I/O mode
@@ -306,8 +299,8 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	defer s.cleanupPipeDirectory(pipeDir)
 
 	if enableStdin || enableStdout || enableStderr {
-		// Create named pipes for I/O forwarding
-		pipes, err = s.createNamedPipes(pipeDir, enableStdin, enableStdout, enableStderr, useFifo)
+		// Create FIFOs for I/O forwarding (EOF signals child exit)
+		pipes, err = s.createNamedPipes(pipeDir, enableStdin, enableStdout, enableStderr)
 		if err != nil {
 			return fmt.Errorf("create named pipes: %w", err)
 		}
@@ -800,7 +793,7 @@ func (s *ServicesLauncher) writePipeConfig(configFile string, pipes *pipeSet, bu
 }
 
 // createNamedPipes creates the named pipes (FIFOs or regular files) for I/O forwarding.
-func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableStdout, enableStderr, useFifo bool) (*pipeSet, error) {
+func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableStdout, enableStderr bool) (*pipeSet, error) {
 	pipes := &pipeSet{}
 
 	// Only create pipes that are enabled
@@ -818,25 +811,16 @@ func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableS
 		pipesToCreate["stderr"] = &pipes.stderr
 	}
 
-	for name, path := range pipesToCreate {
-		if useFifo {
-			if err := syscall.Mkfifo(*path, 0600); err != nil {
-				return nil, fmt.Errorf("create FIFO %s: %w", *path, err)
-			}
-		} else {
-			f, err := os.OpenFile(*path, os.O_CREATE|os.O_RDWR, 0600)
-			if err != nil {
-				return nil, fmt.Errorf("create file %s: %w", *path, err)
-			}
-			f.Close()
+	for _, path := range pipesToCreate {
+		if err := syscall.Mkfifo(*path, 0600); err != nil {
+			return nil, fmt.Errorf("create FIFO %s: %w", *path, err)
 		}
-		_ = name // unused but useful for debugging
 	}
 
 	// Always set up PID file path - child will write its PID here
 	pipes.pid = filepath.Join(pipeDir, "child.pid")
 
-	s.logger.Debug("pipes ready", "dir", pipeDir, "fifo", useFifo)
+	s.logger.Debug("pipes ready", "dir", pipeDir)
 
 	return pipes, nil
 }
@@ -1095,21 +1079,18 @@ func (s *ServicesLauncher) forwardStdout(stdoutPipe string) error {
 }
 
 // forwardStderr forwards data from the named pipe to the parent's stderr.
-// With regular files (not FIFOs), we need to poll continuously until the writer closes.
+// forwardStderr forwards data from the stderr FIFO to the parent's stderr.
+// io.Copy blocks until the child closes the write end (EOF).
 func (s *ServicesLauncher) forwardStderr(stderrPipe string) error {
 	if stderrPipe == "" {
 		return fmt.Errorf("stderr pipe path is empty")
 	}
 
-	// Check if using FIFOs (default with config-file) or regular files (polling)
-	ioStrategy := os.Getenv("MACGO_IO_STRATEGY")
-	useFifo := os.Getenv("MACGO_USE_FIFO") != "0" && (ioStrategy == "" || ioStrategy == "config-file")
-
 	r, err := os.OpenFile(stderrPipe, os.O_RDONLY, 0)
 	if err != nil {
 		return fmt.Errorf("open stderr pipe: %w", err)
 	}
-	defer func() { _ = r.Close() }()
+	defer r.Close()
 
 	// Wrap stderr if configured
 	output := io.Writer(NewIOWrapper(os.Stderr, "stderr"))
@@ -1120,63 +1101,16 @@ func (s *ServicesLauncher) forwardStderr(stderrPipe string) error {
 		output = &teeWriter{primary: output, log: stderrLog}
 	}
 
-	if useFifo {
-		// FIFO behavior (default): simple io.Copy blocks until writer closes
-		_, err := io.Copy(output, r)
-		if err != nil {
-			// Broken pipe is expected when piping to head, tail, etc.
-			if pathErr, ok := err.(*os.PathError); ok {
-				if errno, ok := pathErr.Err.(syscall.Errno); ok && errno == syscall.EPIPE {
-					return nil
-				}
-			}
-			return fmt.Errorf("copy stderr: %w", err)
-		}
-		return nil
-	}
-
-	// Regular file behavior: continuous polling (MACGO_USE_FIFO=0)
-	totalBytes := int64(0)
-	buf := make([]byte, 32*1024)
-	lastSize := int64(0)
-	noGrowthCount := 0
-	maxNoGrowth := 50 // 50 * 100ms = 5 seconds of no growth
-
-	for {
-		n, err := r.Read(buf)
-		if n > 0 {
-			totalBytes += int64(n)
-			output.Write(buf[:n])
-			noGrowthCount = 0
-		}
-
-		if err == io.EOF {
-			// Check if file is still growing
-			info, statErr := os.Stat(stderrPipe)
-			if statErr == nil {
-				currentSize := info.Size()
-				if currentSize > lastSize {
-					lastSize = currentSize
-					noGrowthCount = 0
-					r.Seek(totalBytes, 0)
-					continue
-				}
-			}
-
-			noGrowthCount++
-			if noGrowthCount >= maxNoGrowth {
+	_, err = io.Copy(output, r)
+	if err != nil {
+		if pathErr, ok := err.(*os.PathError); ok {
+			if errno, ok := pathErr.Err.(syscall.Errno); ok && errno == syscall.EPIPE {
 				return nil
 			}
-
-			time.Sleep(100 * time.Millisecond)
-			r.Seek(totalBytes, 0)
-			continue
 		}
-
-		if err != nil {
-			return fmt.Errorf("copy stderr: %w", err)
-		}
+		return fmt.Errorf("copy stderr: %w", err)
 	}
+	return nil
 }
 
 // isPipeOutput checks if stdout is piped to another command

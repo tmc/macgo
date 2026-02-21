@@ -28,7 +28,7 @@ func TestServicesLauncherV1_SignalInterruption(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create test pipes
-	pipes, err := launcher.createNamedPipes(tmpDir, false, true, true, true)
+	pipes, err := launcher.createNamedPipes(tmpDir, false, true, true)
 	if err != nil {
 		t.Fatalf("Failed to create pipes: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestServicesLauncher_SignalInterruption(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	pipes, err := launcher.createNamedPipes(tmpDir, false, true, false, true)
+	pipes, err := launcher.createNamedPipes(tmpDir, false, true, false)
 	if err != nil {
 		t.Fatalf("Failed to create pipes: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestServicesLauncher_NoOutputLossDuringSignal(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	pipes, err := launcher.createNamedPipes(tmpDir, false, true, false, true)
+	pipes, err := launcher.createNamedPipes(tmpDir, false, true, false)
 	if err != nil {
 		t.Fatalf("Failed to create pipes: %v", err)
 	}

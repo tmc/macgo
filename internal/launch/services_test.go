@@ -50,7 +50,7 @@ func TestServicesLauncher_createNamedPipes(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	pipes, err := launcher.createNamedPipes(tmpDir, true, true, true, false)
+	pipes, err := launcher.createNamedPipes(tmpDir, true, true, true)
 	if err != nil {
 		t.Fatalf("createNamedPipes() failed: %v", err)
 	}
