@@ -148,8 +148,39 @@ func (s *ServicesLauncher) cancellationExitCode(defaultCode int) int {
 }
 
 func (s *ServicesLauncher) exitWithSignalForwarding(pipeDir string, defaultCode int) {
+	s.exitWithSignalForwardingDrain(pipeDir, defaultCode, nil, 0)
+}
+
+// exitWithSignalForwardingDrain forwards the recorded signal to the child,
+// waits for the child to exit (with SIGKILL escalation), then drains any
+// remaining I/O forwarder goroutines before calling os.Exit.
+//
+// If ioDrain is non-nil, up to ioCount completions are awaited with a 500ms
+// deadline. This prevents output loss: after the child receives the signal it
+// may flush final output and close its pipe ends, causing the forwarders to
+// see EOF and return. Without draining, that output would be lost.
+func (s *ServicesLauncher) exitWithSignalForwardingDrain(pipeDir string, defaultCode int, ioDrain <-chan error, ioCount int) {
 	sig := s.recordedSignal()
 	s.forwardSignalToChildWithGrace(sig, 150*time.Millisecond)
+
+	// Drain remaining I/O forwarders. After the grace period the child should
+	// be dead (or dying), so its pipe ends will close and forwarders will see
+	// EOF promptly. Use a bounded timeout to avoid hanging.
+	if ioDrain != nil && ioCount > 0 {
+		drainTimeout := time.After(500 * time.Millisecond)
+		drained := 0
+		for drained < ioCount {
+			select {
+			case <-ioDrain:
+				drained++
+			case <-drainTimeout:
+				s.logger.Debug("I/O drain timeout during signal exit",
+					"drained", drained, "expected", ioCount)
+				goto done
+			}
+		}
+	}
+done:
 	if pipeDir != "" {
 		s.cleanupPipeDirectory(pipeDir)
 	}
@@ -544,13 +575,13 @@ func (s *ServicesLauncher) handleWaitMode(ctx context.Context, cmd *exec.Cmd, io
 				continue
 
 			case <-ctx.Done():
-				// Kill the process and exit
+				// Kill the process and exit, draining remaining I/O first
 				s.mu.Lock()
 				if cmd.Process != nil {
 					_ = cmd.Process.Kill()
 				}
 				s.mu.Unlock()
-				s.exitWithSignalForwarding(pipeDir, 130)
+				s.exitWithSignalForwardingDrain(pipeDir, 130, ioErrChan, expectedIOCount-ioCompleted)
 
 			case <-ioTimerChan:
 				s.logger.Warn("I/O forwarding timeout exceeded",
@@ -677,7 +708,7 @@ func (s *ServicesLauncher) handleNoWaitMode(ctx context.Context, ioErrChan chan 
 				_ = err // Error already logged in startIOForwarding
 
 			case <-ctx.Done():
-				s.exitWithSignalForwarding(pipeDir, 130)
+				s.exitWithSignalForwardingDrain(pipeDir, 130, ioErrChan, expectedIOCount-ioCompleted)
 			}
 		}
 
