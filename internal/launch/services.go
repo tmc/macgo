@@ -817,6 +817,11 @@ func (s *ServicesLauncher) writePipeConfig(configFile string, pipes *pipeSet, bu
 		config = fmt.Sprintf("MACGO_STDIN_PIPE=%s\n%s", pipes.stdin, config)
 	}
 
+	// Pass original executable path so the child can find the real binary
+	if origExec := os.Getenv("MACGO_ORIGINAL_EXECUTABLE"); origExec != "" {
+		config = fmt.Sprintf("MACGO_ORIGINAL_EXECUTABLE=%s\n%s", origExec, config)
+	}
+
 	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
 		s.logger.Error("writePipeConfig: failed to write config file", "path", configFile, "error", err)
 		return fmt.Errorf("write config file: %w", err)

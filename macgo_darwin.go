@@ -166,6 +166,11 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		fmt.Fprintf(os.Stderr, "macgo: permissions requested: %v\n", cfg.Permissions)
 	}
 
+	// Store the original executable path so the inner process can find it.
+	// os.Executable() inside the bundle returns the bundle binary path,
+	// so this is the only way for the child to know the real source binary.
+	os.Setenv("MACGO_ORIGINAL_EXECUTABLE", execPath)
+
 	// In DevMode, store the source path in env for mismatch detection
 	if cfg.DevMode {
 		if cfg.Debug {
@@ -450,8 +455,8 @@ func loadPipeConfig(configFile string) error {
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
 
-		// Set MACGO_*_PIPE, MACGO_DONE_FILE, and MACGO_CWD variables
-		if strings.HasPrefix(key, "MACGO_") && (strings.HasSuffix(key, "_PIPE") || key == "MACGO_DONE_FILE" || key == "MACGO_CWD") {
+		// Set MACGO_*_PIPE, MACGO_DONE_FILE, MACGO_CWD, and MACGO_ORIGINAL_EXECUTABLE variables
+		if strings.HasPrefix(key, "MACGO_") && (strings.HasSuffix(key, "_PIPE") || key == "MACGO_DONE_FILE" || key == "MACGO_CWD" || key == "MACGO_ORIGINAL_EXECUTABLE") {
 			os.Setenv(key, value)
 		}
 	}
