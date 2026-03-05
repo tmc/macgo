@@ -444,21 +444,36 @@ func dumpGoroutineStacks() {
 // writeChildPID writes this process's PID to the control FIFO.
 // The parent reads this to enable signal forwarding.
 func writeChildPID(debug bool) error {
+	// Avoid re-writing the PID if Start is called more than once in the
+	// relaunched child process.
+	if os.Getenv("MACGO_CHILD_PID_WRITTEN") == "1" {
+		return nil
+	}
+
 	controlPipe := os.Getenv("MACGO_CONTROL_PIPE")
 	if controlPipe == "" {
 		return nil // no control pipe configured
 	}
 
-	f, err := os.OpenFile(controlPipe, os.O_WRONLY, 0)
+	// Open non-blocking so a missing reader cannot wedge the child forever.
+	f, err := os.OpenFile(controlPipe, os.O_WRONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
+		// No reader is expected once the parent has already consumed the first PID write.
+		if pathErr, ok := err.(*os.PathError); ok && pathErr.Err == syscall.ENXIO {
+			return nil
+		}
 		return fmt.Errorf("open control pipe: %w", err)
 	}
 	defer f.Close()
 
 	pid := os.Getpid()
 	if _, err := fmt.Fprintf(f, "%d\n", pid); err != nil {
+		if pathErr, ok := err.(*os.PathError); ok && pathErr.Err == syscall.EPIPE {
+			return nil
+		}
 		return fmt.Errorf("write PID to control pipe: %w", err)
 	}
+	_ = os.Setenv("MACGO_CHILD_PID_WRITTEN", "1")
 
 	if debug {
 		fmt.Fprintf(os.Stderr, "macgo: wrote child PID %d to control pipe %s\n", pid, controlPipe)
