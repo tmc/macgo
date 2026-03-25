@@ -631,8 +631,8 @@ func (b *Bundle) isBundleUpToDate() bool {
 		return b.isDevModeBundleUpToDate()
 	}
 
-	// Normal bundle - check source hash
-	hashPath := filepath.Join(b.Path, "Contents", sourceHashFile)
+	// Normal bundle - check source hash (stored in Contents/Resources/)
+	hashPath := filepath.Join(b.Path, "Contents", "Resources", sourceHashFile)
 	storedHashBytes, err := os.ReadFile(hashPath)
 	if err != nil {
 		if b.Config.Debug {
@@ -659,6 +659,9 @@ func (b *Bundle) isBundleUpToDate() bool {
 }
 
 // storeSourceHash saves the source binary's SHA256 hash to a metadata file.
+// The hash is stored in Contents/Resources/ so it gets sealed into the code
+// signature (files in Contents/ are treated as unsigned subcomponents and
+// block signing; files in Contents/Resources/ are sealed as bundle resources).
 // This must be called BEFORE code signing since signing modifies the binary.
 func (b *Bundle) storeSourceHash(contentsDir string) error {
 	hash, err := system.CalculateFileSHA256(b.execPath)
@@ -666,7 +669,12 @@ func (b *Bundle) storeSourceHash(contentsDir string) error {
 		return fmt.Errorf("calculate hash: %w", err)
 	}
 
-	hashPath := filepath.Join(contentsDir, sourceHashFile)
+	resourcesDir := filepath.Join(contentsDir, "Resources")
+	if err := os.MkdirAll(resourcesDir, 0755); err != nil {
+		return fmt.Errorf("create Resources dir: %w", err)
+	}
+
+	hashPath := filepath.Join(resourcesDir, sourceHashFile)
 	if err := os.WriteFile(hashPath, []byte(hash+"\n"), 0644); err != nil {
 		return fmt.Errorf("write hash file: %w", err)
 	}

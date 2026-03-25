@@ -14,17 +14,20 @@ import (
 // codeSignBundle signs the app bundle with the configured identity and options.
 // This function handles both regular code signing and ad-hoc signing.
 //
-// Before signing, non-code files (entitlements.plist, .source_hash) are moved
-// out of Contents/ to a temp directory. codesign without --deep treats these
-// as unsigned subcomponents and refuses to sign. The entitlements file is
-// referenced via --entitlements from the temp path. These files are not
-// restored — they would break the seal if added after signing.
+// Before signing, entitlements.plist is moved out of Contents/ to a temp
+// directory. codesign treats files directly in Contents/ as unsigned
+// subcomponents and refuses to sign. The entitlements file is referenced
+// via --entitlements from the temp path.
+//
+// Note: .source_hash lives in Contents/Resources/ where codesign seals it
+// as a standard bundle resource, so it survives signing and enables bundle
+// reuse detection on subsequent launches.
 func codeSignBundle(bundlePath string, cfg *Config) error {
 	contentsDir := filepath.Join(bundlePath, "Contents")
 
-	// Move non-code files out of Contents/ before signing.
-	// codesign treats files in Contents/ as subcomponents and fails
-	// if they aren't signed Mach-O binaries or standard resources.
+	// Move entitlements.plist out of Contents/ before signing.
+	// codesign treats files directly in Contents/ as subcomponents and fails
+	// if they aren't signed Mach-O binaries or standard bundle directories.
 	tmpDir, err := os.MkdirTemp("", "macgo-sign-*")
 	if err != nil {
 		return fmt.Errorf("create temp dir for signing: %w", err)
@@ -38,16 +41,6 @@ func codeSignBundle(bundlePath string, cfg *Config) error {
 			return fmt.Errorf("move entitlements out of bundle: %w", err)
 		}
 	}
-
-	hashSrc := filepath.Join(contentsDir, ".source_hash")
-	if _, err := os.Stat(hashSrc); err == nil {
-		if err := os.Rename(hashSrc, filepath.Join(tmpDir, ".source_hash")); err != nil {
-			return fmt.Errorf("move source hash out of bundle: %w", err)
-		}
-	}
-
-	// Don't restore these files after signing — they would break
-	// the code signature seal since they weren't present at signing time.
 
 	args := []string{
 		"--sign", cfg.CodeSignIdentity,
