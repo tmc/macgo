@@ -625,7 +625,7 @@ func (b *Bundle) isBundleUpToDate() bool {
 	}
 
 	// Check if this is a dev mode bundle first
-	targetPath := filepath.Join(b.Path, "Contents", devModeTargetFile)
+	targetPath := filepath.Join(b.Path, "Contents", "Resources", devModeTargetFile)
 	if _, err := os.Stat(targetPath); err == nil {
 		// This is a dev mode bundle - use dev mode check
 		return b.isDevModeBundleUpToDate()
@@ -686,9 +686,15 @@ func (b *Bundle) storeSourceHash(contentsDir string) error {
 const devModeTargetFile = ".dev_target"
 
 // storeDevModeTarget saves the target binary path for dev mode bundles.
-// This is used to detect if the target path has changed (requiring bundle recreation).
+// Stored in Contents/Resources/ so codesign seals it as a bundle resource
+// (files directly in Contents/ are treated as unsigned subcomponents).
 func (b *Bundle) storeDevModeTarget(contentsDir string) error {
-	targetPath := filepath.Join(contentsDir, devModeTargetFile)
+	resourcesDir := filepath.Join(contentsDir, "Resources")
+	if err := os.MkdirAll(resourcesDir, 0755); err != nil {
+		return fmt.Errorf("create Resources dir: %w", err)
+	}
+
+	targetPath := filepath.Join(resourcesDir, devModeTargetFile)
 	if err := os.WriteFile(targetPath, []byte(b.execPath+"\n"), 0644); err != nil {
 		return fmt.Errorf("write target file: %w", err)
 	}
@@ -703,7 +709,7 @@ func (b *Bundle) isDevModeBundleUpToDate() bool {
 	}
 
 	// Check if this is a dev mode bundle by looking for the target file
-	targetPath := filepath.Join(b.Path, "Contents", devModeTargetFile)
+	targetPath := filepath.Join(b.Path, "Contents", "Resources", devModeTargetFile)
 	storedTargetBytes, err := os.ReadFile(targetPath)
 	if err != nil {
 		// Not a dev mode bundle or file missing

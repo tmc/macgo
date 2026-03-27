@@ -192,9 +192,9 @@ func launchSingleProcess(ctx context.Context, cfg *Config) error {
 // This allows the signed bundle to exec the rebuilt source binary,
 // preserving TCC permissions while allowing rapid iteration.
 //
-// The target path is read from .dev_target in the bundle's Contents directory.
-// This file is written at bundle creation time and contains the path to the
-// binary that created the bundle. This prevents arbitrary exec attacks.
+// The target path is read from .dev_target in the bundle's Contents/Resources
+// directory. This file is written at bundle creation time and contains the path
+// to the binary that created the bundle. This prevents arbitrary exec attacks.
 //
 // If exec succeeds, this function never returns.
 // If no target found, returns nil.
@@ -205,9 +205,9 @@ func execDevTarget(cfg *Config) error {
 		return nil // Can't determine bundle path, skip
 	}
 	// execPath is like /path/to/App.app/Contents/MacOS/binary
-	// We want /path/to/App.app/Contents/.dev_target
+	// We want /path/to/App.app/Contents/Resources/.dev_target
 	contentsDir := filepath.Dir(filepath.Dir(execPath))
-	targetFile := filepath.Join(contentsDir, ".dev_target")
+	targetFile := filepath.Join(contentsDir, "Resources", ".dev_target")
 	data, err := os.ReadFile(targetFile)
 	if err != nil {
 		return nil // No stored target, skip
