@@ -177,6 +177,8 @@ func initObjC() {
 }
 
 // derefGlobalPtr reads an ObjC object pointer from a global variable address.
+// The unsafe.Pointer conversion is intentional: addr is a symbol address
+// obtained from Dlsym, and we need to read the pointer stored there.
 //
 //go:nocheckptr
 func derefGlobalPtr(addr uintptr) uintptr {
