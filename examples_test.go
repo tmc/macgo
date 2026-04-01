@@ -76,7 +76,8 @@ func ExampleConfig_builder() {
 	// Using builder pattern with Config
 	cfg := macgo.NewConfig().
 		WithAppName("BuilderApp").
-		WithPermissions(macgo.Camera, macgo.Microphone).
+		WithCameraUsage("Capture photos for profile setup.").
+		WithMicrophoneUsage("Record audio notes.").
 		WithCustom("com.apple.security.device.capture").
 		WithDebug()
 
@@ -86,6 +87,20 @@ func ExampleConfig_builder() {
 		return
 	}
 	// App configured using builder pattern
+}
+
+func ExampleConfig_cliIdentityLocalNetwork() {
+	// Derived CLI identity plus Local Network / Bonjour metadata
+	cfg := macgo.NewConfig().
+		WithLocalNetworkUsage("Discovers and connects to peers on the local network.").
+		WithBonjourServices("_peer-tool._tcp")
+
+	err := macgo.Start(cfg)
+	if err != nil {
+		// Handle error
+		return
+	}
+	// App configured for reusable Local Network permissions
 }
 
 func ExampleConfig_fromEnv() {
@@ -99,6 +114,20 @@ func ExampleConfig_fromEnv() {
 		return
 	}
 	// App configured from environment variables
+}
+
+func ExampleConfig_mediaUsage() {
+	// Usage-description helpers also add the matching permissions
+	cfg := macgo.NewConfig().
+		WithCameraUsage("Capture images from the attached camera.").
+		WithMicrophoneUsage("Capture audio from the attached microphone.")
+
+	err := macgo.Start(cfg)
+	if err != nil {
+		// Handle error
+		return
+	}
+	// App configured for camera and microphone prompts
 }
 
 func ExamplePermission_constants() {
@@ -150,8 +179,16 @@ func TestExampleFunctions(t *testing.T) {
 		ExampleConfig_builder()
 	})
 
+	t.Run("cli_identity_local_network", func(t *testing.T) {
+		ExampleConfig_cliIdentityLocalNetwork()
+	})
+
 	t.Run("env_config", func(t *testing.T) {
 		ExampleConfig_fromEnv()
+	})
+
+	t.Run("media_usage", func(t *testing.T) {
+		ExampleConfig_mediaUsage()
 	})
 
 	t.Run("permission_constants", func(t *testing.T) {
@@ -193,6 +230,28 @@ func TestHelperFunctions(t *testing.T) {
 
 	if len(cfg.Permissions) != 1 || cfg.Permissions[0] != macgo.Camera {
 		t.Error("Expected Camera permission")
+	}
+
+	cfg = macgo.NewConfig().
+		WithLocalNetworkUsage("Discover nearby peers.").
+		WithBonjourServices("_peer-tool._tcp")
+
+	if cfg.LocalNetworkUsageDescription != "Discover nearby peers." {
+		t.Errorf("Expected local network usage description, got %q", cfg.LocalNetworkUsageDescription)
+	}
+	if len(cfg.BonjourServices) != 1 || cfg.BonjourServices[0] != "_peer-tool._tcp" {
+		t.Errorf("Expected bonjour service _peer-tool._tcp, got %#v", cfg.BonjourServices)
+	}
+
+	cfg = macgo.NewConfig().
+		WithCameraUsage("Take pictures.").
+		WithMicrophoneUsage("Record audio.")
+
+	if cfg.CameraUsageDescription != "Take pictures." {
+		t.Errorf("Expected camera usage description, got %q", cfg.CameraUsageDescription)
+	}
+	if cfg.MicrophoneUsageDescription != "Record audio." {
+		t.Errorf("Expected microphone usage description, got %q", cfg.MicrophoneUsageDescription)
 	}
 
 	// Test WithAppGroups

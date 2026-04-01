@@ -79,6 +79,30 @@ cfg := macgo.NewConfig().
     WithAutoSign() // Auto-detects Developer ID
 ```
 
+### Stable CLI Identity and Local Network
+
+For CLI tools that need reusable TCC and Local Network permissions:
+
+```go
+cfg := macgo.NewConfig().
+    WithLocalNetworkUsage("Discovers and connects to peers on the local network.").
+    WithBonjourServices("_peer-tool._tcp")
+```
+
+When `AppName` and `BundleID` are unset, macgo derives them from the current executable and module path. `WithLocalNetworkUsage()` and `WithBonjourServices()` populate the required Info.plist metadata and automatically add `macgo.Network`.
+
+### Camera and Microphone Usage
+
+For permissions that also need usage-description strings:
+
+```go
+cfg := macgo.NewConfig().
+    WithCameraUsage("Capture images from the attached camera.").
+    WithMicrophoneUsage("Capture audio from the attached microphone.")
+```
+
+These helpers populate `NSCameraUsageDescription` and `NSMicrophoneUsageDescription` and automatically add the matching permissions.
+
 ### Environment Configuration
 
 Configure via environment variables:
@@ -88,6 +112,8 @@ MACGO_APP_NAME=MyApp          # Application name
 MACGO_BUNDLE_ID=com.example   # Bundle identifier
 MACGO_AD_HOC_SIGN=1          # Enable ad-hoc signing
 MACGO_AUTO_SIGN=1             # Auto-detect signing identity
+MACGO_LOCAL_NETWORK_USAGE_DESCRIPTION="Discover nearby peers"
+MACGO_BONJOUR_SERVICES=_peer-tool._tcp,_peer-tool._udp
 MACGO_DEBUG=1                 # Debug output
 MACGO_FORCE_DIRECT=1          # Force direct execution (bypass LaunchServices)
 MACGO_FORCE_LAUNCH_SERVICES=1 # Force use of LaunchServices

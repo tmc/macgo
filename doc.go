@@ -27,11 +27,10 @@
 // For more control, use the Config struct with builder methods:
 //
 //	cfg := macgo.NewConfig().
-//	    WithAppName("MyApp").
-//	    WithBundleID("com.example.myapp").
-//	    WithPermissions(macgo.Camera, macgo.Microphone).
-//	    WithAdHocSign().
-//	    WithDebug()
+//	    WithCameraUsage("Capture images from the attached camera.").
+//	    WithMicrophoneUsage("Capture audio from the attached microphone.").
+//	    WithLocalNetworkUsage("Discovers and connects to peers on the local network.").
+//	    WithBonjourServices("_peer-tool._tcp")
 //
 //	err := macgo.Start(cfg)
 //	if err != nil {
@@ -129,6 +128,8 @@
 // Development:
 //
 //	MACGO_DEV_MODE            Dev mode: signed wrapper exec's the source binary (set to "1")
+//	MACGO_LOCAL_NETWORK_USAGE_DESCRIPTION  Set NSLocalNetworkUsageDescription
+//	MACGO_BONJOUR_SERVICES    Comma-separated NSBonjourServices entries
 //	MACGO_TTY_PASSTHROUGH     Pass TTY device to child process (experimental, set to "1")
 //
 // Internal (set by macgo, not typically set by users):
