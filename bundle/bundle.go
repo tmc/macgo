@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var multiHyphenRe = regexp.MustCompile("-+")
+
 // CleanAppName removes problematic characters from app names.
 // It replaces filesystem-problematic characters with hyphens and
 // removes non-printable ASCII characters.
@@ -54,8 +56,7 @@ func CleanAppName(name string) string {
 	cleaned = strings.Trim(cleaned, "- ")
 
 	// Collapse multiple consecutive hyphens into single hyphens
-	re := regexp.MustCompile("-+")
-	cleaned = re.ReplaceAllString(cleaned, "-")
+	cleaned = multiHyphenRe.ReplaceAllString(cleaned, "-")
 
 	return cleaned
 }

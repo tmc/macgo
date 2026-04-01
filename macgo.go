@@ -181,6 +181,22 @@ type Config struct {
 	// This is useful for UsageDescriptions (e.g. NSAccessibilityUsageDescription).
 	Info map[string]interface{}
 
+	// CameraUsageDescription sets NSCameraUsageDescription in Info.plist.
+	// When set, macgo also enables Camera permission automatically.
+	CameraUsageDescription string
+
+	// MicrophoneUsageDescription sets NSMicrophoneUsageDescription in Info.plist.
+	// When set, macgo also enables Microphone permission automatically.
+	MicrophoneUsageDescription string
+
+	// LocalNetworkUsageDescription sets NSLocalNetworkUsageDescription in Info.plist.
+	// When set, macgo also enables Network permission automatically.
+	LocalNetworkUsageDescription string
+
+	// BonjourServices sets NSBonjourServices in Info.plist.
+	// When set, macgo also enables Network permission automatically.
+	BonjourServices []string
+
 	// UIMode controls how the app appears in the UI.
 	// Default (UIModeBackground): LSBackgroundOnly=true for CLI tools.
 	UIMode UIMode
@@ -227,6 +243,8 @@ type Config struct {
 //	MACGO_CODE_SIGN_IDENTITY - Code signing identity
 //	MACGO_AUTO_SIGN=1       - Enable automatic code signing
 //	MACGO_AD_HOC_SIGN=1     - Enable ad-hoc code signing
+//	MACGO_LOCAL_NETWORK_USAGE_DESCRIPTION - Set NSLocalNetworkUsageDescription
+//	MACGO_BONJOUR_SERVICES  - Comma-separated NSBonjourServices entries
 //	MACGO_CAMERA=1          - Request camera permission
 //	MACGO_MICROPHONE=1      - Request microphone permission
 //	MACGO_LOCATION=1        - Request location permission
@@ -269,6 +287,14 @@ func (c *Config) FromEnv() *Config {
 
 	if os.Getenv("MACGO_AD_HOC_SIGN") == "1" {
 		c.AdHocSign = true
+	}
+
+	if description := os.Getenv("MACGO_LOCAL_NETWORK_USAGE_DESCRIPTION"); description != "" {
+		c.LocalNetworkUsageDescription = description
+	}
+
+	if services := system.GetStringSlice("MACGO_BONJOUR_SERVICES"); len(services) > 0 {
+		c.BonjourServices = append(c.BonjourServices, services...)
 	}
 
 	// Parse permissions from environment
@@ -324,6 +350,12 @@ func (c *Config) FromEnv() *Config {
 // If empty, defaults to the executable name.
 func (c *Config) WithAppName(name string) *Config {
 	c.AppName = name
+	return c
+}
+
+// WithBundleID sets the bundle identifier for the app bundle.
+func (c *Config) WithBundleID(id string) *Config {
+	c.BundleID = id
 	return c
 }
 
@@ -414,6 +446,34 @@ func (c *Config) WithUsageDescription(key, description string) *Config {
 	return c.WithInfo(key, description)
 }
 
+// WithCameraUsage sets NSCameraUsageDescription in Info.plist.
+// When Start is called, this also enables Camera permission automatically.
+func (c *Config) WithCameraUsage(description string) *Config {
+	c.CameraUsageDescription = description
+	return c
+}
+
+// WithMicrophoneUsage sets NSMicrophoneUsageDescription in Info.plist.
+// When Start is called, this also enables Microphone permission automatically.
+func (c *Config) WithMicrophoneUsage(description string) *Config {
+	c.MicrophoneUsageDescription = description
+	return c
+}
+
+// WithLocalNetworkUsage sets NSLocalNetworkUsageDescription in Info.plist.
+// When Start is called, this also enables Network permission automatically.
+func (c *Config) WithLocalNetworkUsage(description string) *Config {
+	c.LocalNetworkUsageDescription = description
+	return c
+}
+
+// WithBonjourServices adds NSBonjourServices entries to Info.plist.
+// When Start is called, this also enables Network permission automatically.
+func (c *Config) WithBonjourServices(services ...string) *Config {
+	c.BonjourServices = append(c.BonjourServices, services...)
+	return c
+}
+
 // WithUIMode sets how the app appears in the macOS UI.
 // Options: UIModeBackground (default), UIModeAccessory, UIModeRegular
 func (c *Config) WithUIMode(mode UIMode) *Config {
@@ -498,6 +558,12 @@ func (c *Config) Validate() error {
 	if c.AppName != "" {
 		if err := system.ValidateAppName(c.AppName); err != nil {
 			return fmt.Errorf("invalid app name: %w", err)
+		}
+	}
+
+	for _, service := range c.BonjourServices {
+		if strings.TrimSpace(service) == "" {
+			return fmt.Errorf("invalid bonjour service: empty")
 		}
 	}
 

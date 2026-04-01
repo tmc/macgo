@@ -53,13 +53,15 @@ func TestConfig(t *testing.T) {
 func TestFromEnv(t *testing.T) {
 	// Save original environment
 	originalEnv := map[string]string{
-		"MACGO_APP_NAME":              os.Getenv("MACGO_APP_NAME"),
-		"MACGO_BUNDLE_ID":             os.Getenv("MACGO_BUNDLE_ID"),
-		"MACGO_DEBUG":                 os.Getenv("MACGO_DEBUG"),
-		"MACGO_CAMERA":                os.Getenv("MACGO_CAMERA"),
-		"MACGO_MICROPHONE":            os.Getenv("MACGO_MICROPHONE"),
-		"MACGO_PROVISIONING_PROFILE":  os.Getenv("MACGO_PROVISIONING_PROFILE"),
-		"MACGO_ICON":                  os.Getenv("MACGO_ICON"),
+		"MACGO_APP_NAME":                        os.Getenv("MACGO_APP_NAME"),
+		"MACGO_BUNDLE_ID":                       os.Getenv("MACGO_BUNDLE_ID"),
+		"MACGO_DEBUG":                           os.Getenv("MACGO_DEBUG"),
+		"MACGO_LOCAL_NETWORK_USAGE_DESCRIPTION": os.Getenv("MACGO_LOCAL_NETWORK_USAGE_DESCRIPTION"),
+		"MACGO_BONJOUR_SERVICES":                os.Getenv("MACGO_BONJOUR_SERVICES"),
+		"MACGO_CAMERA":                          os.Getenv("MACGO_CAMERA"),
+		"MACGO_MICROPHONE":                      os.Getenv("MACGO_MICROPHONE"),
+		"MACGO_PROVISIONING_PROFILE":            os.Getenv("MACGO_PROVISIONING_PROFILE"),
+		"MACGO_ICON":                            os.Getenv("MACGO_ICON"),
 	}
 	defer func() {
 		for k, v := range originalEnv {
@@ -75,6 +77,8 @@ func TestFromEnv(t *testing.T) {
 	_ = os.Setenv("MACGO_APP_NAME", "TestApp")
 	_ = os.Setenv("MACGO_BUNDLE_ID", "com.test.app")
 	_ = os.Setenv("MACGO_DEBUG", "1")
+	_ = os.Setenv("MACGO_LOCAL_NETWORK_USAGE_DESCRIPTION", "Discover nearby peers")
+	_ = os.Setenv("MACGO_BONJOUR_SERVICES", "_test._tcp,_test._udp")
 	_ = os.Setenv("MACGO_CAMERA", "1")
 	_ = os.Setenv("MACGO_MICROPHONE", "1")
 	_ = os.Setenv("MACGO_PROVISIONING_PROFILE", "/tmp/test.provisionprofile")
@@ -90,6 +94,15 @@ func TestFromEnv(t *testing.T) {
 	}
 	if !cfg.Debug {
 		t.Error("expected Debug=true")
+	}
+	if cfg.LocalNetworkUsageDescription != "Discover nearby peers" {
+		t.Errorf("expected LocalNetworkUsageDescription to be loaded from env, got %q", cfg.LocalNetworkUsageDescription)
+	}
+	if len(cfg.BonjourServices) != 2 {
+		t.Fatalf("expected 2 bonjour services, got %d", len(cfg.BonjourServices))
+	}
+	if cfg.BonjourServices[0] != "_test._tcp" || cfg.BonjourServices[1] != "_test._udp" {
+		t.Errorf("unexpected bonjour services: %#v", cfg.BonjourServices)
 	}
 
 	expectedPerms := []Permission{Camera, Microphone}
@@ -205,6 +218,116 @@ func TestInferBundleID(t *testing.T) {
 				t.Errorf("InferBundleID(%q) = %q, invalid bundle ID: %v", tt.appName, result, err)
 			}
 		})
+	}
+}
+
+func TestConfigPrepareDefaultIdentity(t *testing.T) {
+	cfg := NewConfig()
+
+	cfg.prepare("/tmp/peer-tool")
+
+	if cfg.AppName != "peer-tool" {
+		t.Fatalf("prepare should infer AppName from executable, got %q", cfg.AppName)
+	}
+	if cfg.BundleID == "" {
+		t.Fatal("prepare should infer BundleID when unset")
+	}
+}
+
+func TestConfigPrepareCameraUsage(t *testing.T) {
+	cfg := NewConfig().WithCameraUsage("Take pictures.")
+
+	cfg.prepare("/tmp/camera-tool")
+
+	if len(cfg.Permissions) != 1 || cfg.Permissions[0] != Camera {
+		t.Fatalf("prepare should auto-enable Camera permission, got %#v", cfg.Permissions)
+	}
+	if cfg.Info == nil {
+		t.Fatal("prepare should initialize Info map for camera usage")
+	}
+	if got := cfg.Info["NSCameraUsageDescription"]; got != "Take pictures." {
+		t.Fatalf("unexpected NSCameraUsageDescription: %#v", got)
+	}
+}
+
+func TestConfigPrepareMicrophoneUsage(t *testing.T) {
+	cfg := NewConfig().WithMicrophoneUsage("Record audio.")
+
+	cfg.prepare("/tmp/mic-tool")
+
+	if len(cfg.Permissions) != 1 || cfg.Permissions[0] != Microphone {
+		t.Fatalf("prepare should auto-enable Microphone permission, got %#v", cfg.Permissions)
+	}
+	if cfg.Info == nil {
+		t.Fatal("prepare should initialize Info map for microphone usage")
+	}
+	if got := cfg.Info["NSMicrophoneUsageDescription"]; got != "Record audio." {
+		t.Fatalf("unexpected NSMicrophoneUsageDescription: %#v", got)
+	}
+}
+
+func TestConfigPreparePermissionDefaultDescriptions(t *testing.T) {
+	cfg := NewConfig().
+		WithAppName("MediaTool").
+		WithPermissions(Camera, Microphone)
+
+	cfg.prepare("/tmp/media-tool")
+
+	cameraDescription, ok := cfg.Info["NSCameraUsageDescription"].(string)
+	if !ok || cameraDescription == "" {
+		t.Fatal("prepare should add a default camera usage description")
+	}
+	if !contains(cameraDescription, "MediaTool") {
+		t.Fatalf("default camera usage description should mention app name, got %q", cameraDescription)
+	}
+
+	microphoneDescription, ok := cfg.Info["NSMicrophoneUsageDescription"].(string)
+	if !ok || microphoneDescription == "" {
+		t.Fatal("prepare should add a default microphone usage description")
+	}
+	if !contains(microphoneDescription, "MediaTool") {
+		t.Fatalf("default microphone usage description should mention app name, got %q", microphoneDescription)
+	}
+}
+
+func TestConfigPrepareLocalNetwork(t *testing.T) {
+	cfg := NewConfig().
+		WithBonjourServices("_peer-tool._tcp", "_peer-tool._tcp", " ").
+		WithLocalNetworkUsage("PeerTool discovers peers on the local network.")
+
+	cfg.prepare("/tmp/peer-tool")
+
+	if len(cfg.Permissions) != 1 || cfg.Permissions[0] != Network {
+		t.Fatalf("prepare should auto-enable Network permission, got %#v", cfg.Permissions)
+	}
+	if cfg.Info == nil {
+		t.Fatal("prepare should initialize Info map for local network settings")
+	}
+	if got := cfg.Info["NSLocalNetworkUsageDescription"]; got != "PeerTool discovers peers on the local network." {
+		t.Fatalf("unexpected NSLocalNetworkUsageDescription: %#v", got)
+	}
+	services, ok := cfg.Info["NSBonjourServices"].([]string)
+	if !ok {
+		t.Fatalf("NSBonjourServices should be []string, got %T", cfg.Info["NSBonjourServices"])
+	}
+	if len(services) != 1 || services[0] != "_peer-tool._tcp" {
+		t.Fatalf("unexpected NSBonjourServices: %#v", services)
+	}
+}
+
+func TestConfigPrepareBonjourServicesDefaultDescription(t *testing.T) {
+	cfg := NewConfig().
+		WithAppName("PeerTool").
+		WithBonjourServices("_peer-tool._tcp")
+
+	cfg.prepare("/tmp/peer-tool")
+
+	description, ok := cfg.Info["NSLocalNetworkUsageDescription"].(string)
+	if !ok || description == "" {
+		t.Fatal("prepare should add a default local network usage description")
+	}
+	if !contains(description, "PeerTool") {
+		t.Fatalf("default local network usage description should mention app name, got %q", description)
 	}
 }
 

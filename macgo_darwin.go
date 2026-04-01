@@ -23,6 +23,12 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		fmt.Fprintf(os.Stderr, "macgo: starting on darwin (PID: %d)\n", os.Getpid())
 	}
 
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("macgo: get executable: %w", err)
+	}
+	cfg.prepare(execPath)
+
 	// Auto-detect and substitute team ID in app groups if needed
 	if err := substituteTeamID(cfg); err != nil && cfg.Debug {
 		fmt.Fprintf(os.Stderr, "macgo: failed to substitute team ID: %v\n", err)
@@ -122,12 +128,6 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 			fmt.Fprintf(os.Stderr, "macgo: using single-process mode\n")
 		}
 		return launchSingleProcess(ctx, cfg)
-	}
-
-	// Get current executable
-	execPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("macgo: get executable: %w", err)
 	}
 
 	// Create or reuse bundle
@@ -337,7 +337,6 @@ func relaunchInBundle(ctx context.Context, bundlePath, execPath string, cfg *Con
 	manager := launch.New()
 	return manager.Launch(ctx, bundlePath, execPath, launchCfg)
 }
-
 
 // setupPipeRedirection transparently redirects stdout/stderr/stdin to named pipes if present.
 // Pipe paths are received via open --env from the parent process.

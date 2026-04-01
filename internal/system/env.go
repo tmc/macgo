@@ -26,12 +26,14 @@ const (
 	EnvForceDirectExecution = "MACGO_FORCE_DIRECT"
 
 	// Permission flags
-	EnvCamera     = "MACGO_CAMERA"
-	EnvMicrophone = "MACGO_MICROPHONE"
-	EnvLocation   = "MACGO_LOCATION"
-	EnvFiles      = "MACGO_FILES"
-	EnvNetwork    = "MACGO_NETWORK"
-	EnvSandbox    = "MACGO_SANDBOX"
+	EnvCamera                       = "MACGO_CAMERA"
+	EnvMicrophone                   = "MACGO_MICROPHONE"
+	EnvLocation                     = "MACGO_LOCATION"
+	EnvFiles                        = "MACGO_FILES"
+	EnvNetwork                      = "MACGO_NETWORK"
+	EnvSandbox                      = "MACGO_SANDBOX"
+	EnvLocalNetworkUsageDescription = "MACGO_LOCAL_NETWORK_USAGE_DESCRIPTION"
+	EnvBonjourServices              = "MACGO_BONJOUR_SERVICES"
 
 	// TCC and permissions
 	EnvResetPermissions = "MACGO_RESET_PERMISSIONS"
@@ -209,6 +211,8 @@ func AllMacgoEnvVars() []string {
 		EnvFiles,
 		EnvNetwork,
 		EnvSandbox,
+		EnvLocalNetworkUsageDescription,
+		EnvBonjourServices,
 		EnvResetPermissions,
 		EnvTestIntegration,
 	}
