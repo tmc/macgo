@@ -47,7 +47,7 @@ import (
 type ServicesLauncher struct {
 	logger        *Logger
 	mu            sync.Mutex    // protects process access during signal forwarding
-	firstOutputCh chan struct{} // closed when first output is received (signals successful launch)
+	firstOutputCh chan struct{} // closed when child launch is confirmed (PID received or first output)
 	childPID   int          // PID of the actual app process (for signal forwarding)
 	lastSignal atomic.Int32 // most recent signal received by the parent
 }
@@ -105,6 +105,17 @@ func (s *ServicesLauncher) readChildPID(controlPipe string, timeout time.Duratio
 		s.childPID = r.pid
 		s.mu.Unlock()
 		s.logger.Debug("read child PID from control pipe", "pid", r.pid)
+		// Signal successful launch to cancel the launch timer.
+		// This is essential for TTY passthrough mode where no I/O
+		// FIFOs exist to trigger firstOutputCh.
+		if s.firstOutputCh != nil {
+			select {
+			case <-s.firstOutputCh:
+				// already closed
+			default:
+				close(s.firstOutputCh)
+			}
+		}
 		return r.pid
 	case <-time.After(timeout):
 		s.logger.Warn("timeout waiting for child PID", "pipe", controlPipe, "timeout", timeout)
