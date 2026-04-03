@@ -396,17 +396,14 @@ func setupPipeRedirection(debug bool) error {
 // It handles the following signals:
 //
 //   - SIGQUIT: Dump all goroutine stacks to stderr, then exit with 128+signal
-//   - SIGWINCH: Log receipt (debug mode only), do not exit
 //
-// SIGINT, SIGTERM, and SIGHUP are left to the application so it can perform
-// graceful shutdown (e.g. flush buffers, print final output).
+// All other signals (SIGINT, SIGTERM, SIGHUP, SIGWINCH, etc.) are left to the
+// application so it can handle them as needed (graceful shutdown, terminal
+// resize, etc.).
 //
 // The parent process forwards signals to us since we have PPID=1 (adopted by launchd)
 // and are not in the terminal's foreground process group.
 func registerExitHandler(debug bool) {
-	// Handle SIGQUIT for goroutine stack dumps. Only SIGQUIT calls os.Exit
-	// directly — SIGINT/SIGTERM/SIGHUP are left to the application so it
-	// can perform graceful shutdown (e.g. flush buffers, print final output).
 	quitCh := make(chan os.Signal, 1)
 	signal.Notify(quitCh, syscall.SIGQUIT)
 	go func() {
@@ -416,18 +413,6 @@ func registerExitHandler(debug bool) {
 		}
 		dumpGoroutineStacks()
 		os.Exit(128 + int(syscall.SIGQUIT))
-	}()
-
-	// Handle SIGWINCH (terminal resize) - log but don't exit
-	// This helps with debugging signal forwarding from parent to child
-	winchChan := make(chan os.Signal, 1)
-	signal.Notify(winchChan, syscall.SIGWINCH)
-	go func() {
-		for range winchChan {
-			if debug {
-				fmt.Fprintf(os.Stderr, "macgo: child received SIGWINCH (pid=%d)\n", os.Getpid())
-			}
-		}
 	}()
 }
 
