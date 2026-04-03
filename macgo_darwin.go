@@ -395,28 +395,27 @@ func setupPipeRedirection(debug bool) error {
 // This function is called in the child process (the app running inside the bundle).
 // It handles the following signals:
 //
-//   - SIGINT, SIGTERM, SIGHUP: Exit with 128+signal
 //   - SIGQUIT: Dump all goroutine stacks to stderr, then exit with 128+signal
 //   - SIGWINCH: Log receipt (debug mode only), do not exit
+//
+// SIGINT, SIGTERM, and SIGHUP are left to the application so it can perform
+// graceful shutdown (e.g. flush buffers, print final output).
 //
 // The parent process forwards signals to us since we have PPID=1 (adopted by launchd)
 // and are not in the terminal's foreground process group.
 func registerExitHandler(debug bool) {
-	// Always register signal handlers for stack dumps and cleanup
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	// Handle SIGQUIT for goroutine stack dumps. Only SIGQUIT calls os.Exit
+	// directly — SIGINT/SIGTERM/SIGHUP are left to the application so it
+	// can perform graceful shutdown (e.g. flush buffers, print final output).
+	quitCh := make(chan os.Signal, 1)
+	signal.Notify(quitCh, syscall.SIGQUIT)
 	go func() {
-		sig := <-c
+		<-quitCh
 		if debug {
-			fmt.Fprintf(os.Stderr, "macgo: received signal %v\n", sig)
+			fmt.Fprintf(os.Stderr, "macgo: received SIGQUIT\n")
 		}
-		// For SIGQUIT, dump all goroutine stacks (Go's default behavior)
-		if sig == syscall.SIGQUIT {
-			dumpGoroutineStacks()
-		}
-		// Convert signal to exit code (128 + signal number)
-		exitCode := 128 + int(sig.(syscall.Signal))
-		os.Exit(exitCode)
+		dumpGoroutineStacks()
+		os.Exit(128 + int(syscall.SIGQUIT))
 	}()
 
 	// Handle SIGWINCH (terminal resize) - log but don't exit
