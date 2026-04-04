@@ -48,8 +48,8 @@ type ServicesLauncher struct {
 	logger        *Logger
 	mu            sync.Mutex    // protects process access during signal forwarding
 	firstOutputCh chan struct{} // closed when child launch is confirmed (PID received or first output)
-	childPID   int          // PID of the actual app process (for signal forwarding)
-	lastSignal atomic.Int32 // most recent signal received by the parent
+	childPID      int           // PID of the actual app process (for signal forwarding)
+	lastSignal    atomic.Int32  // most recent signal received by the parent
 }
 
 // pipeSet holds the paths to the named pipes used for I/O forwarding.
@@ -140,7 +140,7 @@ func (s *ServicesLauncher) forwardSignalToChild(sig syscall.Signal) {
 			s.logger.Warn("failed to forward signal to child", "signal", sig, "pid", pid, "error", err)
 		}
 	} else {
-		s.logger.Info("forwarded signal to child", "signal", sig, "pid", pid)
+		s.logger.Debug("forwarded signal to child", "signal", sig, "pid", pid)
 	}
 }
 
@@ -749,7 +749,6 @@ func cleanupStalePipeDirectories() {
 		}
 	}
 }
-
 
 // createNamedPipes creates the named pipes (FIFOs or regular files) for I/O forwarding.
 func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableStdout, enableStderr bool) (*pipeSet, error) {
