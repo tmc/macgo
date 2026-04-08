@@ -282,6 +282,13 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	// - MACGO_DISABLE_IO_FORWARDING=1     Disable all I/O forwarding
 	// - MACGO_IO_LOG_DIR=<path>           Directory to write I/O debug logs
 	useTTYPassthrough := os.Getenv("MACGO_TTY_PASSTHROUGH") == "1" && getTTYPath() != ""
+	if useTTYPassthrough && (isPipeOutput() || isPipeStderr()) {
+		// stdout or stderr is a pipe (e.g. "go run app 2>&1 | pp"), so passing
+		// the TTY device to the child would bypass the pipe. Fall back to
+		// FIFO-based forwarding so output flows through the parent.
+		s.logger.Debug("TTY passthrough disabled: output is piped, falling back to FIFO forwarding")
+		useTTYPassthrough = false
+	}
 	if useTTYPassthrough {
 		s.logger.Debug("TTY passthrough enabled via MACGO_TTY_PASSTHROUGH=1", "tty", getTTYPath())
 	}
@@ -1075,6 +1082,15 @@ func (s *ServicesLauncher) forwardStderr(stderrPipe string) error {
 // isPipeOutput checks if stdout is piped to another command
 func isPipeOutput() bool {
 	stat, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) == 0
+}
+
+// isPipeStderr checks if stderr is piped (not a terminal)
+func isPipeStderr() bool {
+	stat, err := os.Stderr.Stat()
 	if err != nil {
 		return false
 	}

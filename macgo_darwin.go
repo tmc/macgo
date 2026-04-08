@@ -368,7 +368,10 @@ func setupPipeRedirection(debug bool) error {
 		if err != nil {
 			return fmt.Errorf("failed to open stdout pipe %s: %w", stdoutPipe, err)
 		}
-		// Replace os.Stdout with the pipe
+		// Dup2 so fd 1 itself points at the pipe — catches C code, runtime, etc.
+		if err := syscall.Dup2(int(pipe.Fd()), int(os.Stdout.Fd())); err != nil {
+			return fmt.Errorf("dup2 stdout: %w", err)
+		}
 		os.Stdout = pipe
 		if debug {
 			fmt.Fprintf(os.Stderr, "macgo: redirected stdout to %s\n", stdoutPipe)
@@ -379,12 +382,13 @@ func setupPipeRedirection(debug bool) error {
 	if stderrPipe := os.Getenv("MACGO_STDERR_PIPE"); stderrPipe != "" {
 		pipe, err := os.OpenFile(stderrPipe, os.O_WRONLY, 0)
 		if err != nil {
-			// Can't use stderr for error message if it's being redirected
 			return fmt.Errorf("failed to open stderr pipe %s: %w", stderrPipe, err)
 		}
-		// Replace os.Stderr with the pipe
+		// Dup2 so fd 2 itself points at the pipe — catches C code, runtime, trace output, etc.
+		if err := syscall.Dup2(int(pipe.Fd()), int(os.Stderr.Fd())); err != nil {
+			return fmt.Errorf("dup2 stderr: %w", err)
+		}
 		os.Stderr = pipe
-		// Note: can't log to stderr after this point since it's redirected
 	}
 
 	return nil
