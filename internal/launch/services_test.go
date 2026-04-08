@@ -143,7 +143,7 @@ func TestServicesLauncher_buildOpenCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Args = tt.args
 
-			cmd, err := launcher.buildOpenCommand(ctx, bundlePath, pipes, false, nil)
+			cmd, err := launcher.buildOpenCommand(ctx, bundlePath, pipes, false, false, nil)
 			if err != nil {
 				t.Fatalf("buildOpenCommand() failed: %v", err)
 			}

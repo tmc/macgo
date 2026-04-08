@@ -18,7 +18,7 @@ func TestServicesLauncher_BuildCommand_NoPipes(t *testing.T) {
 	ctx := context.Background()
 	bundlePath := "/path/to/TestApp.app"
 
-	cmd, err := launcher.buildOpenCommand(ctx, bundlePath, nil, false, nil)
+	cmd, err := launcher.buildOpenCommand(ctx, bundlePath, nil, false, false, nil)
 	if err != nil {
 		t.Fatalf("buildOpenCommand failed: %v", err)
 	}

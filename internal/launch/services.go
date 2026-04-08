@@ -277,20 +277,34 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	// because it bypasses TCC permission prompts.
 	//
 	// I/O Forwarding Control:
-	// - Default: FIFO-based I/O forwarding (works reliably with LaunchServices)
-	// - MACGO_TTY_PASSTHROUGH=1           Pass TTY device directly to child (experimental)
+	// - Default: TTY passthrough when running interactively, FIFO when piped
+	// - MACGO_TTY_PASSTHROUGH=0           Force FIFO-based I/O (disable TTY passthrough)
+	// - MACGO_TTY_PASSTHROUGH=1           Force TTY passthrough even when piped
 	// - MACGO_DISABLE_IO_FORWARDING=1     Disable all I/O forwarding
 	// - MACGO_IO_LOG_DIR=<path>           Directory to write I/O debug logs
-	useTTYPassthrough := os.Getenv("MACGO_TTY_PASSTHROUGH") == "1" && getTTYPath() != ""
-	if useTTYPassthrough && (isPipeOutput() || isPipeStderr()) {
-		// stdout or stderr is a pipe (e.g. "go run app 2>&1 | pp"), so passing
-		// the TTY device to the child would bypass the pipe. Fall back to
-		// FIFO-based forwarding so output flows through the parent.
-		s.logger.Debug("TTY passthrough disabled: output is piped, falling back to FIFO forwarding")
+	var useTTYPassthrough bool
+	switch os.Getenv("MACGO_TTY_PASSTHROUGH") {
+	case "0":
 		useTTYPassthrough = false
-	}
-	if useTTYPassthrough {
-		s.logger.Debug("TTY passthrough enabled via MACGO_TTY_PASSTHROUGH=1", "tty", getTTYPath())
+		s.logger.Debug("TTY passthrough explicitly disabled")
+	case "1":
+		if isPipeOutput() {
+			s.logger.Debug("TTY passthrough requested but stdout is piped, using FIFO forwarding")
+		} else {
+			useTTYPassthrough = getTTYPath() != ""
+			if useTTYPassthrough {
+				s.logger.Debug("TTY passthrough explicitly enabled", "tty", getTTYPath())
+			}
+		}
+	default:
+		// Auto-detect: use TTY passthrough when stdout is a terminal,
+		// fall back to FIFO when stdout is piped (so pipe redirection works).
+		if isPipeOutput() {
+			s.logger.Debug("TTY passthrough auto-disabled: stdout is piped, using FIFO forwarding")
+		} else if tty := getTTYPath(); tty != "" {
+			useTTYPassthrough = true
+			s.logger.Debug("TTY passthrough auto-enabled: running interactively", "tty", tty)
+		}
 	}
 
 	disableIO := os.Getenv("MACGO_DISABLE_IO_FORWARDING") == "1" || useTTYPassthrough
@@ -317,7 +331,7 @@ func (s *ServicesLauncher) Launch(ctx context.Context, bundlePath, execPath stri
 	}
 
 	// Build the launch command
-	cmd, err := s.buildOpenCommand(sigCtx, bundlePath, pipes, noWait, cfg)
+	cmd, err := s.buildOpenCommand(sigCtx, bundlePath, pipes, noWait, useTTYPassthrough, cfg)
 	if err != nil {
 		return fmt.Errorf("build open command: %w", err)
 	}
@@ -794,7 +808,7 @@ func (s *ServicesLauncher) createNamedPipes(pipeDir string, enableStdin, enableS
 }
 
 // buildOpenCommand constructs the open command with appropriate arguments.
-func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath string, pipes *pipeSet, noWait bool, cfg *Config) (*exec.Cmd, error) {
+func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath string, pipes *pipeSet, noWait, useTTYPassthrough bool, cfg *Config) (*exec.Cmd, error) {
 	args := []string{}
 
 	// Add -g flag to not bring app to foreground (for background/CLI apps)
@@ -813,10 +827,9 @@ func (s *ServicesLauncher) buildOpenCommand(ctx context.Context, bundlePath stri
 		args = append(args, "-n")
 	}
 
-	// TTY passthrough (experimental): pass the parent's terminal device directly to the child
-	// This preserves isatty()=true and full terminal capabilities
-	// Opt-in via MACGO_TTY_PASSTHROUGH=1 (default is pipe-based I/O)
-	useTTYPassthrough := os.Getenv("MACGO_TTY_PASSTHROUGH") == "1" && getTTYPath() != ""
+	// TTY passthrough: pass the parent's terminal device directly to the child.
+	// This preserves isatty()=true and full terminal capabilities (TUI apps).
+	// Enabled by default when running interactively; falls back to FIFO when piped.
 	if useTTYPassthrough {
 		ttyPath := getTTYPath()
 		s.logger.Debug("TTY passthrough: passing terminal device to child", "tty", ttyPath)
@@ -1082,15 +1095,6 @@ func (s *ServicesLauncher) forwardStderr(stderrPipe string) error {
 // isPipeOutput checks if stdout is piped to another command
 func isPipeOutput() bool {
 	stat, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return (stat.Mode() & os.ModeCharDevice) == 0
-}
-
-// isPipeStderr checks if stderr is piped (not a terminal)
-func isPipeStderr() bool {
-	stat, err := os.Stderr.Stat()
 	if err != nil {
 		return false
 	}
