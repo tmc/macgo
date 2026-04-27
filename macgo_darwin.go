@@ -55,6 +55,18 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		os.Getenv("MACGO_CONTROL_PIPE") != ""
 
 	if isChild {
+		// Second-pass re-entry after DevMode exec'd from bundle into the source
+		// binary: FDs (including dup2'd stdout/stderr) and CWD survive exec, so
+		// pipe redirection has already been applied. Just register the exit
+		// handler and return — the source binary continues normally.
+		if system.IsRelaunchDisabled() {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: child re-entry after dev mode exec (PID: %d)\n", os.Getpid())
+			}
+			registerExitHandler(cfg.Debug)
+			return nil
+		}
+
 		if cfg.Debug {
 			fmt.Fprintf(os.Stderr, "macgo: detected relaunch via environment (PID: %d)\n", os.Getpid())
 		}
@@ -81,6 +93,25 @@ func startDarwin(ctx context.Context, cfg *Config) error {
 		if err := setupPipeRedirection(cfg.Debug); err != nil {
 			if cfg.Debug {
 				fmt.Fprintf(os.Stderr, "macgo: failed to setup pipe redirection: %v\n", err)
+			}
+		}
+
+		// In DevMode, exec the source binary now that pipe redirection is in
+		// place. The dup2'd stdout/stderr FDs survive exec, so the source
+		// binary's output continues to flow through the parent's FIFOs.
+		// execDevTarget sets MACGO_NO_RELAUNCH=1 before exec so the re-entered
+		// Start above takes the short-circuit path.
+		if cfg.DevMode {
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: dev mode active in child - will exec source binary\n")
+			}
+			if err := execDevTarget(cfg); err != nil {
+				if cfg.Debug {
+					fmt.Fprintf(os.Stderr, "macgo: dev mode exec failed: %v\n", err)
+				}
+				// Fall through to normal bundled execution if exec fails.
+			} else if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "macgo: dev mode - no target found, running bundled binary\n")
 			}
 		}
 
